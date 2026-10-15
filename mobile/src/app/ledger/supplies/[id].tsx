@@ -3,6 +3,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { checkDate, DateField, ErrorNote, GardenPicker, QtyField } from '../../../components/fields';
+import { FieldLines } from '../../../components/extraFields';
 import { ItemRow, SectionTitle } from '../../../components/ledger';
 import { Button, Card, styles } from '../../../components/ui';
 import { confirmAsync } from '../../../lib/confirm';
@@ -80,6 +81,7 @@ function SupplyDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapsh
         {supply.shop_name ? ` ở ${supply.shop_name}` : ''} · {formatQty(supply.quantity)} {supply.unit} × {formatVnd(supply.unit_price)} ={' '}
         <Text style={{ fontWeight: '700' }}>{formatVnd(supplyCost(supply))}</Text>
       </Text>
+      <FieldLines fields={data.custom_fields} target="supply" extra={supply.extra} />
       {debt && (
         <Pressable onPress={() => router.push({ pathname: '/ledger/debts/[id]', params: { id: debt.id } })} accessibilityRole="link" style={{ minHeight: 44, justifyContent: 'center', marginBottom: 4 }}>
           <Text style={{ color: colors.primary, fontSize: font.body, fontWeight: '600' }}>🧾 Mua thiếu: xem công nợ</Text>

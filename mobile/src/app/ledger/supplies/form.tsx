@@ -1,8 +1,9 @@
-import { formatVnd, supplyCost, today, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
+import { extraTexts, formatVnd, saveExtra, supplyCost, today, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { CategoryPicker, checkDate, CheckRow, DateField, ErrorNote, Field, MoneyField, QtyField, TextField } from '../../../components/fields';
+import { CustomFieldInputs } from '../../../components/extraFields';
 import { Button, Chip } from '../../../components/ui';
 import { useLedger } from '../../../lib/ledger';
 import { parseQty, qtyText } from '../../../lib/qty';
@@ -34,6 +35,7 @@ function SupplyForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) 
   const [useFor, setUseFor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [extra, setExtra] = useState(() => extraTexts(data.custom_fields, 'supply', supply?.extra));
 
   const quantity = parseQty(qty);
   const total = supplyCost({ quantity, unit_price: unitPrice });
@@ -49,9 +51,11 @@ function SupplyForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) 
     try {
       if (supply) {
         await ledger.updateSupply(supply.id, input);
+        await saveExtra(ledger, data.custom_fields, 'supply', supply.id, extra);
         router.back();
       } else {
         const created = await ledger.addSupply({ ...input, on_credit: onCredit, use_for: useFor });
+        await saveExtra(ledger, data.custom_fields, 'supply', created.id, extra);
         showToast({ message: `Đã ghi mua ${name.trim()}: ${formatVnd(total)}${onCredit ? ' (mua thiếu, đã ghi công nợ)' : ''}` });
         router.replace({ pathname: '/ledger/supplies/[id]', params: { id: created.id } });
       }
@@ -78,6 +82,7 @@ function SupplyForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) 
       <DateField label="Ngày mua" value={boughtOn} onChange={setBoughtOn} notFuture />
       <TextField label="Mua ở đâu" value={shop} onChange={setShop} maxLength={80} placeholder="Ví dụ: Đại lý Hai Lúa" />
       <TextField label="Ghi chú" value={note} onChange={setNote} maxLength={200} />
+      <CustomFieldInputs fields={data.custom_fields} target="supply" texts={extra} onChange={setExtra} />
 
       {!supply && (
         <>

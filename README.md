@@ -156,6 +156,13 @@ gunzip -c exports/nhanong-gia-….sql.gz | mysql --default-character-set=utf8mb4
 ```
 Chạy lại được: bài / tháng đã lấy thì bỏ qua.
 
+### Ghi nhanh, thu hoạch, nhân công, thông tin tự thêm
+- **Khoản hay dùng:** khi ghi tiền, tích "Lưu làm khoản hay dùng"; lần sau bấm 1 lần là điền sẵn. Quản lý trong Cài đặt sổ.
+- **Thông tin tự thêm:** tự tạo ô riêng (chữ / số / ngày / lựa chọn) cho vườn, khoản thu chi, vật tư. Giá trị lưu trong `extra` của từng bản ghi.
+- **Thu hoạch** (Nâng cao): ghi sản lượng theo vườn, có giá thì tự ghi tiền bán. Trang vườn hiện giá thành đ/kg (tự cộng cả số kg đã cắt bán cho lái).
+- **Nhân công** (Nâng cao): người làm + tiền công/ngày, chấm công nhiều người 1 lần. Trả công thì tự ghi khoản "Nhân công" theo từng vườn.
+- Phần lõi: `packages/shared/src/ledger.ts` (các bảng `templates`, `harvests`, `workers`, `work_logs`, `custom_fields`) và `extras.ts` (các hàm tính).
+
 ## Mobile khi dev
 
 App tự gọi backend theo IP của máy đang chạy Metro, cổng 8000. Vì vậy cần chạy Laravel cho điện thoại cùng mạng truy cập được:

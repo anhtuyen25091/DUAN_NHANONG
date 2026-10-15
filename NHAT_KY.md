@@ -30,7 +30,7 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
   - lùi về tháng 9, chọn ngày 14: lịch tự đóng, ô hiện "Thứ Hai, 14/09/2026", dòng tóm tắt đổi theo
   - nút Hôm qua / Hôm nay đổi đúng ngày
 
-### Mục 19: Khoản hay dùng, thu hoạch, nhân công, ô tự thêm (đang làm)
+### Mục 19: Khoản hay dùng, thu hoạch, nhân công, ô tự thêm ✅
 
 #### 19.1 Phần lõi dùng chung ✅
 **Đã làm** (`packages/shared`)
@@ -97,6 +97,42 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 - Nhân công: thêm Anh Ba 300.000 đ/ngày → chấm cả ngày → nợ 300.000 đ → Trả công → còn 0 đ; sổ có khoản "Nhân công · Trả công Anh Ba: 1 ngày −300.000 đ" đúng vườn.
 - Lint, typecheck sạch.
 - Lưu ý khi viết test: script bấm theo chữ có thể bấm nhầm (chữ "5" khớp với ô ngày "15/10/2026"), nên bàn phím số phải bấm đúng `.keypad button`.
+
+#### 19.3 Giao diện app (Expo) ✅
+**Đã làm**
+- Màn Ghi tiền:
+  - hàng "⭐ Khoản hay dùng" cuộn ngang
+  - ô tích "Lưu làm khoản hay dùng"
+  - ô tự thêm trong phần "Ghi chú · thông tin thêm"
+- Form vườn, form vật tư: có ô tự thêm. Trang vườn, trang vật tư, danh sách khoản: hiện giá trị các ô.
+- Trang vườn (Nâng cao): mục "🌾 Thu hoạch" có sản lượng, giá thành đ/kg, danh sách, nút "＋ Ghi thu hoạch".
+- Màn mới:
+  - `ledger/harvest-form`: ghi / sửa thu hoạch
+  - `ledger/templates`: khoản hay dùng
+  - `ledger/custom-fields`: thông tin tự thêm
+  - `ledger/workers` (danh sách + nút nổi "✅ Chấm công"), `ledger/workers/form`, `ledger/workers/[id]` (trả công; bấm ngày công đã trả để bỏ lần trả), `ledger/workers/work-day`
+- Trang chính (Nâng cao) có ô lối tắt "👷 Nhân công". Cài đặt sổ có mục "Ghi nhanh & thông tin riêng".
+- Khoản tự ghi từ thu hoạch / trả công: bấm vào thì mở lần thu hoạch / người làm; xóa thì báo rõ sẽ xóa gì.
+- Hàm `extraTexts` / `saveExtra` chuyển vào `packages/shared/src/extras.ts`, web và app dùng chung.
+- Thêm `mobile/metro.config.js` (cấu hình mặc định của Expo + đuôi `.wasm`).
+  - Trước đây build bản web của app (`expo export --platform web`) báo lỗi không nạp được `expo-sqlite/web/wa-sqlite.wasm`. Lỗi có từ trước, không do phần mới.
+
+**Kiểm tra**
+- Typecheck mobile sạch.
+- `expo export --platform android` build được bundle 3,8 MB.
+- Bấm thử trên bản web export của app, mở bằng server tĩnh trong Chrome headless:
+  - Khoản hay dùng: Thuốc 350.000 đ, tích lưu mẫu → lần sau có nút "Khoản hay dùng Thuốc, 350.000 đ" → bấm là điền sẵn.
+  - Ô tự thêm: thêm "Số gốc cây" → nhập 1200 ở form vườn → trang vườn hiện "Số gốc cây: 1.200".
+  - Thu hoạch: 1.200 kg × 45.000 đ → tiền vào 54.000.000 đ; giá thành (4.250.000 + 350.000) ÷ 1.200 = **3.833 đ/kg** (đúng).
+  - Nhân công: Anh Ba chấm cả ngày → nợ 300.000 đ → trả công → còn 0 đ; sổ có khoản "Trả công Anh Ba: 1 ngày".
+- **Chưa thử trên điện thoại thật bằng Expo Go.**
+
+**Ghi chú môi trường (máy dev Docker, Node 24.15, macOS 26.2)**
+- Metro / `expo export` bị crash ngẫu nhiên (exit 139 / 133), kể cả khi chạy với `--max-workers 1`.
+  - Chạy lại 1–2 lần thì được (lần này export Android thành công lần 1, web thành công lần 2).
+  - Khi cần thử giao diện app trên máy này, dùng `expo export --platform web` rồi mở bằng server tĩnh, thay cho dev server.
+
+**Kết quả mục 19:** xong khoản hay dùng, thu hoạch, nhân công, ô tự thêm trên cả web và app.
 
 ---
 
@@ -211,7 +247,7 @@ gunzip -c exports/nhanong-gia-….sql.gz | mysql --default-character-set=utf8mb4
 | 5. Điểm bán | Nhập điểm từ OSM/CSV, danh sách, gần tôi, gọi điện, chỉ đường, người dùng đề xuất + duyệt | ✅ Xong. Chưa có bản đồ |
 | 3. Sổ thu chi Cơ bản (lưu trên máy) | Vườn, Tiền vào/ra, tổng kết, xuất/nhập file | ✅ Xong (web + app + PWA). Chưa thử với nông dân thật |
 | 4. Đồng bộ | Lưu trên máy + server, API sync, giao diện web/app | ✅ Xong. Chưa thử trên điện thoại thật; chưa có quên mật khẩu (cần OTP SMS) |
-| 4b. Sổ thu chi Nâng cao | Mùa vụ, kho vật tư, công nợ | ✅ Xong (web + app). Chưa thử trên điện thoại thật |
+| 4b. Sổ thu chi Nâng cao | Mùa vụ, kho vật tư, công nợ, nhân công, thu hoạch (giá thành/kg), khoản hay dùng, ô tự thêm | ✅ Xong (web + app). Chưa thử trên điện thoại thật |
 | 1b. Dữ liệu giá cũ | Lấy lại giá 2021 → nay từ báo / cơ sở dữ liệu nhà nước | 🔄 Cà phê, tiêu, lúa gạo đang chạy; phân bón An Giang, sầu riêng (từ 10/2024) xong |
 | 7. Phân quyền xem giá | Khách 10 ngày, đăng ký 30 ngày, có gói xem toàn bộ; gói tháng / năm | ✅ Xong. Thanh toán trong app chưa làm (admin kích hoạt tay) |
 | 8. Đơn mua bán chung | Thương lái / chi nhánh / nông dân: mã tham gia, xác nhận 2 bên, lời cả lô, nối sổ, thông báo | ✅ Xong (web + app). Chưa có thông báo đẩy khi app đóng |
@@ -252,7 +288,7 @@ Máy khác muốn lấy tiếp: nạp file `exports/*.sql.gz` (có cả `crawl_l
 | 16 | Lọc điểm bán theo tỉnh | Nhiều điểm từ OpenStreetMap không ghi tỉnh; cần suy ra tỉnh từ tọa độ |
 | 17 | ~~Lịch chọn ngày tiếng Việt cho bản web~~ | ✅ Xong 15/10 tối |
 | 18 | Sổ thu chi: ghi chú bằng giọng nói, chụp ảnh hóa đơn | Có trong kế hoạch |
-| 19 | Bảng đã khai báo nhưng chưa có chức năng: trường tự thêm, mẫu ghi nhanh, thu hoạch, nhân công | |
+| 19 | ~~Trường tự thêm, mẫu ghi nhanh, thu hoạch, nhân công~~ | ✅ Xong 15/10 tối (web + app). Chưa thử trên điện thoại thật |
 
 ### D. Chưa kiểm tra thật
 | # | Việc |

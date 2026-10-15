@@ -1,9 +1,9 @@
 /**
  * Tính toán cho khoản hay dùng, thu hoạch, nhân công và ô tự thêm (hàm thuần, dùng cho màn hình + test).
  */
-import { cutKg, formatQtyGrouped } from './advanced';
+import { cutKg, formatQty, formatQtyGrouped } from './advanced';
 import { formatDate } from './format';
-import type { LedgerSnapshot } from './ledger';
+import type { Ledger, LedgerSnapshot } from './ledger';
 import { formatVnd } from './money';
 import type { CustomFieldDef, CustomFieldTarget, CustomFieldType, Harvest, Worker, WorkLog } from './types';
 
@@ -145,4 +145,21 @@ export function parseFieldInput(field: Pick<CustomFieldDef, 'type'>, text: strin
 /** Tiền công 1 ngày dạng "300.000 đ/ngày" */
 export function formatWage(wage: number): string {
   return `${formatVnd(wage)}/ngày`;
+}
+
+/** Giá trị đã lưu → chữ để điền sẵn vào ô nhập (số dùng formatQty "2,5", không nhóm hàng nghìn) */
+export function extraTexts(fields: CustomFieldDef[], target: CustomFieldTarget, extra: Record<string, string | number | null> | undefined): Record<string, string> {
+  const texts: Record<string, string> = {};
+  for (const f of fieldsFor(fields, target)) {
+    const v = extra?.[f.key];
+    texts[f.key] = v === null || v === undefined ? '' : typeof v === 'number' ? formatQty(v) : v;
+  }
+  return texts;
+}
+
+/** Lưu giá trị các ô tự thêm của 1 bản ghi từ chữ người dùng gõ (ô để trống thì xóa giá trị) */
+export function saveExtra(ledger: Ledger, fields: CustomFieldDef[], target: CustomFieldTarget, id: string, texts: Record<string, string>): Promise<void> {
+  const list = fieldsFor(fields, target);
+  if (list.length === 0) return Promise.resolve();
+  return ledger.setExtra(target, id, Object.fromEntries(list.map((f) => [f.key, parseFieldInput(f, texts[f.key] ?? '')])));
 }

@@ -63,6 +63,13 @@ export default function RootLayout() {
         <Stack.Screen name="ledger/contracts/form" options={{ title: 'Nhận cọc của lái' }} />
         <Stack.Screen name="ledger/contracts/[id]" options={{ title: 'Bán cho lái' }} />
         <Stack.Screen name="ledger/contracts/cut-form" options={{ title: 'Ghi đợt cắt' }} />
+        <Stack.Screen name="ledger/templates" options={{ title: '⭐ Khoản hay dùng' }} />
+        <Stack.Screen name="ledger/custom-fields" options={{ title: '🏷️ Thông tin tự thêm' }} />
+        <Stack.Screen name="ledger/harvest-form" options={{ title: '🌾 Ghi thu hoạch' }} />
+        <Stack.Screen name="ledger/workers/index" options={{ title: '👷 Nhân công' }} />
+        <Stack.Screen name="ledger/workers/form" options={{ title: 'Người làm' }} />
+        <Stack.Screen name="ledger/workers/[id]" options={{ title: 'Người làm' }} />
+        <Stack.Screen name="ledger/workers/work-day" options={{ title: '✅ Chấm công' }} />
         <Stack.Screen name="deals/new" options={{ title: 'Tạo đơn mua bán' }} />
         <Stack.Screen name="deals/join" options={{ title: '🔑 Tham gia đơn' }} />
         <Stack.Screen name="deals/[id]" options={{ title: 'Đơn mua bán' }} />

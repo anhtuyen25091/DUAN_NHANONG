@@ -1,4 +1,4 @@
-import { formatDate, formatVnd, groupByDate, SYNC_STATUS_LABELS, today, type DebtKind, type Ledger, type LedgerSnapshot, type Totals, type Transaction } from '@nhanong/shared';
+import { fieldLines, formatDate, formatVnd, groupByDate, SYNC_STATUS_LABELS, today, type DebtKind, type Ledger, type LedgerSnapshot, type Totals, type Transaction } from '@nhanong/shared';
 import { router, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -49,7 +49,7 @@ export function EntryItemRow({ item, ledger, data, showGarden }: { item: EntryIt
   const t = item.entry;
   const cat = data.categories.find((c) => c.id === t.category_id);
   const garden = showGarden ? (t.garden_id ? data.gardens.find((g) => g.id === t.garden_id)?.name : 'Chi chung') : null;
-  const sub = [garden, t.note].filter(Boolean).join(' · ');
+  const sub = [garden, t.note, ...fieldLines(data.custom_fields, 'transaction', t.extra).map((l) => `${l.label}: ${l.value}`)].filter(Boolean).join(' · ');
 
   // Khoản sinh ra khi mua vật tư / ghi nợ: mở vật tư / khoản nợ để sửa, để 2 bên không lệch nhau
   const debtId = data.debts.find((d) => d.transaction_id === t.id)?.id;
@@ -58,6 +58,9 @@ export function EntryItemRow({ item, ledger, data, showGarden }: { item: EntryIt
   // Khoản của đợt cắt / bỏ cọc / đền cọc: mở hợp đồng bán cho lái
   const cut = data.harvest_cuts.find((c) => c.transaction_id === t.id);
   const contractId = cut?.contract_id ?? data.harvest_contracts.find((c) => c.settle_transaction_id === t.id)?.id;
+  // Khoản tiền bán ghi kèm sản lượng: mở lần thu hoạch; khoản trả công: mở người làm
+  const harvestId = data.harvests.find((h) => h.transaction_id === t.id)?.id;
+  const workerId = data.work_logs.find((l) => l.transaction_id === t.id)?.worker_id;
   // Khoản tự ghi từ đơn mua bán chung: mở đơn (sửa / xóa ở đơn)
   const dealId = ledger.dealOf(t);
   const open = () => {
@@ -65,11 +68,13 @@ export function EntryItemRow({ item, ledger, data, showGarden }: { item: EntryIt
     else if (t.supply_id) router.push({ pathname: '/ledger/supplies/[id]', params: { id: t.supply_id } });
     else if (debtId ?? interestDebtId) router.push({ pathname: '/ledger/debts/[id]', params: { id: (debtId ?? interestDebtId)! } });
     else if (contractId) router.push({ pathname: '/ledger/contracts/[id]', params: { id: contractId } });
+    else if (harvestId) router.push({ pathname: '/ledger/harvest-form', params: { id: harvestId } });
+    else if (workerId) router.push({ pathname: '/ledger/workers/[id]', params: { id: workerId } });
     else router.push({ pathname: '/ledger/add', params: { sua: t.id } });
   };
 
   const remove = async () => {
-    const linked = t.supply_id ? ' (xóa cả vật tư trong kho)' : debtId ? ' (xóa cả khoản nợ)' : interestDebtId ? ' (xóa cả lần trả nợ)' : cut ? ' (xóa đợt cắt)' : contractId ? ' (mở lại hợp đồng)' : '';
+    const linked = t.supply_id ? ' (xóa cả vật tư trong kho)' : debtId ? ' (xóa cả khoản nợ)' : interestDebtId ? ' (xóa cả lần trả nợ)' : cut ? ' (xóa đợt cắt)' : contractId ? ' (mở lại hợp đồng)' : harvestId ? ' (xóa cả lần thu hoạch)' : workerId ? ' (bỏ lần trả công, công thành chưa trả)' : '';
     try {
       const undo = await ledger.removeEntry(t.id);
       showToast({ message: `Đã xóa ${formatVnd(t.amount)}${linked}`, undo });

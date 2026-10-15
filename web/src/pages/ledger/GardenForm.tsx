@@ -1,7 +1,7 @@
 import type { Ledger, LedgerSnapshot } from '@nhanong/shared'
 import { useState, type FormEvent } from 'react'
 import { go, href } from '../../hooks'
-import { extraTexts, saveExtra } from '../../ledger/extra'
+import { extraTexts, saveExtra } from '@nhanong/shared'
 import { CustomFieldInputs } from './extraFields'
 
 /** Thêm vườn mới, hoặc sửa vườn (id) */

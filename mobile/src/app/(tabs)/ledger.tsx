@@ -1,4 +1,4 @@
-import { allocatedEntries, contractSummaries, debtStatus, debtSummary, dueReminders, filterEntries, formatDate, formatVnd, interestPaid, supplyStock, today, totals, type Ledger, type LedgerSnapshot, type StorageMode } from '@nhanong/shared';
+import { allocatedEntries, contractSummaries, debtStatus, debtSummary, dueReminders, filterEntries, formatDate, formatVnd, interestPaid, supplyStock, today, totals, type Ledger, type LedgerSnapshot, type StorageMode, workerBalances } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
@@ -174,6 +174,7 @@ function AdvancedShortcuts({ data }: { data: LedgerSnapshot }) {
   const inStock = supplyStock(data).filter((s) => s.left > 1e-9);
   const debts = debtSummary(debtStatus(data, today()));
   const openContracts = contractSummaries(data).filter((c) => c.contract.status === 'open');
+  const owedWages = workerBalances(data).reduce((s, b) => s + b.owed, 0);
   return (
     <View>
       <Shortcut title="🤝 Bán cho lái" onPress={() => router.push('/ledger/contracts')}>
@@ -197,6 +198,11 @@ function AdvancedShortcuts({ data }: { data: LedgerSnapshot }) {
           )}
         </Shortcut>
       </View>
+      <Shortcut title="👷 Nhân công" onPress={() => router.push('/ledger/workers')}>
+        <Text style={[styles.muted, owedWages > 0 && { color: colors.loss }]}>
+          {owedWages ? `Chưa trả công ${formatVnd(owedWages)}` : data.workers.length ? `${data.workers.length} người · đã trả đủ` : 'Chấm công, trả công theo vườn'}
+        </Text>
+      </Shortcut>
     </View>
   );
 }

@@ -1,10 +1,11 @@
-import { allocatedEntries, CONTRACT_STATUS_LABELS, contractSummaries, filterEntries, formatDate, formatQty, formatVnd, monthlyTotals, seasonRange, seasonsOf, supplyUsedValue, today, totals } from '@nhanong/shared';
+import { allocatedEntries, CONTRACT_STATUS_LABELS, contractSummaries, costPerUnit, filterEntries, formatDate, formatHarvest, formatQty, formatQtyGrouped, formatVnd, harvestTotals, monthlyTotals, seasonRange, seasonsOf, supplyUsedValue, today, totals, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { groupDigits } from '../../../components/fields';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { EntryItemRow, entryItems, Fab, ItemRow, MonthBars, ProfitCard, RowCard } from '../../../components/ledger';
 import { Button, Card, Chip, styles } from '../../../components/ui';
+import { FieldLines } from '../../../components/extraFields';
 import { useLedger } from '../../../lib/ledger';
 import { colors, font } from '../../../lib/theme';
 import { showToast } from '../../../lib/toast';
@@ -84,6 +85,7 @@ export default function GardenScreen() {
           {[garden.crop, garden.area_m2 ? `${groupDigits(Math.round(garden.area_m2))} m²` : null].filter(Boolean).join(' · ')}
         </Text>
       ) : null}
+      {garden && <FieldLines fields={data.custom_fields} target="garden" extra={garden.extra} />}
 
       {advanced && garden ? (
         <>
@@ -133,6 +135,7 @@ export default function GardenScreen() {
           <View style={{ marginBottom: 12 }}>
             <Button label="＋ Nhận cọc của lái" variant="outline" onPress={() => router.push({ pathname: '/ledger/contracts/form', params: { gardenId: garden.id } })} />
           </View>
+          <HarvestSection data={data} gardenId={garden.id} range={range} label={label} expense={totals(filterEntries(allocated, range)).expense} />
         </>
       )}
 
@@ -185,5 +188,46 @@ export default function GardenScreen() {
       />
       <Fab label="＋ Ghi tiền" href={{ pathname: '/ledger/add', params: gardenId ? { vuon: gardenId } : {} }} />
     </View>
+  );
+}
+
+/** Sản lượng thu hoạch trong vụ / năm đang xem, kèm giá thành mỗi kg */
+function HarvestSection({ data, gardenId, range, label, expense }: { data: LedgerSnapshot; gardenId: string; range: { from?: string; to?: string }; label: string; expense: number }) {
+  const sum = harvestTotals(data, gardenId, range);
+  const perKg = costPerUnit(expense, sum.kg);
+  const list = data.harvests.filter((h) => h.garden_id === gardenId && (!range.from || h.date >= range.from) && (!range.to || h.date <= range.to));
+  return (
+    <>
+      <Text style={{ fontSize: font.title - 2, fontWeight: '700', color: colors.text, marginTop: 8, marginBottom: 6 }}>🌾 Thu hoạch</Text>
+      {sum.byUnit.length > 0 ? (
+        <Card>
+          <Text style={styles.muted}>Sản lượng · {label}</Text>
+          <Text style={{ fontSize: 26, fontWeight: '800', color: colors.text, marginVertical: 2 }}>{sum.byUnit.map((u) => `${formatQtyGrouped(u.quantity)} ${u.unit}`).join(' · ')}</Text>
+          {sum.cutKg > 0 && <Text style={styles.muted}>Gồm {formatQtyGrouped(sum.cutKg)} kg đã cắt bán cho lái (tự cộng, không cần ghi lại).</Text>}
+          {perKg !== null && (
+            <Text style={[styles.body, { marginTop: 4 }]}>
+              Giá thành: <Text style={{ fontWeight: '800' }}>{formatVnd(perKg)}/kg</Text>
+              <Text style={styles.muted}> (tiền chi {formatVnd(expense)} ÷ {formatQtyGrouped(sum.kg)} kg)</Text>
+            </Text>
+          )}
+        </Card>
+      ) : (
+        <Text style={[styles.muted, { marginBottom: 8 }]}>Ghi sản lượng mỗi lần hái / cắt để biết mỗi kg tốn bao nhiêu tiền (giá thành), so với giá bán.</Text>
+      )}
+      {list.map((h) => (
+        <ItemRow
+          key={h.id}
+          icon="🌾"
+          title={formatHarvest(h)}
+          sub={`${formatDate(h.date)}${h.note ? ` · ${h.note}` : ''}`}
+          amount={h.price ? `+${formatVnd(Math.round(h.quantity * h.price))}` : 'chưa bán'}
+          amountColor={h.price ? colors.gain : colors.muted}
+          onPress={() => router.push({ pathname: '/ledger/harvest-form', params: { id: h.id } })}
+        />
+      ))}
+      <View style={{ marginBottom: 12 }}>
+        <Button label="＋ Ghi thu hoạch" variant="outline" onPress={() => router.push({ pathname: '/ledger/harvest-form', params: { gardenId } })} />
+      </View>
+    </>
   );
 }

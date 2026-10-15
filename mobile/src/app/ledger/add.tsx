@@ -1,8 +1,10 @@
-import { formatVnd, pressAmountKey, readVnd, today, type AmountKey, type EntryType } from '@nhanong/shared';
+import { extraTexts, fieldsFor, formatVnd, pressAmountKey, readVnd, saveExtra, today, type AmountKey, type EntryType, type QuickTemplate } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { DatePicker } from '../../components/DatePicker';
+import { CustomFieldInputs } from '../../components/extraFields';
+import { CheckRow } from '../../components/fields';
 import { Button, Chip, styles } from '../../components/ui';
 import { useLedger } from '../../lib/ledger';
 import { colors, font } from '../../lib/theme';
@@ -31,6 +33,19 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
   const [note, setNote] = useState(editing?.note ?? '');
   const [more, setMore] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [extra, setExtra] = useState(() => extraTexts(data.custom_fields, 'transaction', editing?.extra));
+  const [keepAsTemplate, setKeepAsTemplate] = useState(false);
+  const hasFields = fieldsFor(data.custom_fields, 'transaction').length > 0;
+
+  /** Bấm 1 khoản hay dùng: điền sẵn mọi thứ, nhảy sang bước số tiền (vẫn sửa được trước khi Lưu) */
+  const applyTemplate = (t: QuickTemplate) => {
+    setType(t.type);
+    setCategoryId(data.categories.some((c) => c.id === t.category_id) ? t.category_id : null);
+    setAmount(t.amount);
+    setFresh(true);
+    if (t.garden_id === null || data.gardens.some((g) => g.id === t.garden_id)) setGardenId(t.garden_id);
+    setNote(t.note ?? '');
+  };
 
   const category = data.categories.find((c) => c.id === categoryId);
 
@@ -46,9 +61,12 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
     setSaving(true);
     const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today() ? date : today();
     const entry = { type, amount, category_id: category.id, garden_id: gardenId, date: validDate, note };
+    let id = editing?.id;
     if (editing) await ledger.updateEntry(editing.id, entry);
-    else await ledger.addEntry(entry);
-    showToast({ message: `Đã lưu ${type === 'income' ? 'tiền vào' : 'tiền ra'} ${formatVnd(amount)}` });
+    else id = (await ledger.addEntry(entry)).id;
+    await saveExtra(ledger, data.custom_fields, 'transaction', id!, extra);
+    if (keepAsTemplate && !editing) await ledger.templateFromEntry(id!);
+    showToast({ message: `Đã lưu ${type === 'income' ? 'tiền vào' : 'tiền ra'} ${formatVnd(amount)}${keepAsTemplate && !editing ? ' · đã thêm vào khoản hay dùng' : ''}` });
     router.back();
   };
 
@@ -75,6 +93,27 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
             );
           })}
         </View>
+        {!editing && data.templates.length > 0 && (
+          <View style={{ marginBottom: 14 }}>
+            <Text style={[styles.muted, { marginBottom: 6 }]}>⭐ Khoản hay dùng</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {data.templates.map((t) => (
+                <Pressable
+                  key={t.id}
+                  onPress={() => applyTemplate(t)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Khoản hay dùng ${t.label}, ${formatVnd(t.amount)}`}
+                  style={({ pressed }) => ({ minHeight: 64, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.primarySoft : colors.surface, justifyContent: 'center' })}
+                >
+                  <Text style={styles.body}>
+                    {data.categories.find((c) => c.id === t.category_id)?.icon ?? '📦'} {t.label}
+                  </Text>
+                  <Text style={{ fontSize: font.body, fontWeight: '700', color: t.type === 'income' ? colors.gain : colors.loss }}>{formatVnd(t.amount)}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
         <Text style={{ fontSize: font.title, fontWeight: '700', color: colors.text, marginBottom: 12 }}>{type === 'expense' ? 'Chi cho việc gì?' : 'Tiền vào từ đâu?'}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           {data.categories
@@ -154,14 +193,17 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
 
       <Pressable onPress={() => setMore(!more)} style={{ minHeight: 44, justifyContent: 'center' }}>
         <Text style={{ color: colors.primary, fontSize: font.body }}>
-          {more ? '▾' : '▸'} Ghi chú{note.trim() ? `: ${note.trim()}` : ''}
+          {more ? '▾' : '▸'} Ghi chú{hasFields ? ' · thông tin thêm' : ''}{note.trim() ? `: ${note.trim()}` : ''}
         </Text>
       </Pressable>
       {more && (
         <View style={{ gap: 10, marginBottom: 12 }}>
           <TextInput value={note} onChangeText={setNote} placeholder="Ví dụ: 4 bao NPK" maxLength={200} style={inputStyle} />
+          <CustomFieldInputs fields={data.custom_fields} target="transaction" texts={extra} onChange={setExtra} />
         </View>
       )}
+
+      {!editing && <CheckRow label="⭐ Lưu làm khoản hay dùng (lần sau bấm 1 lần là ghi)" checked={keepAsTemplate} onChange={setKeepAsTemplate} />}
 
       <Button label={saving ? 'Đang lưu…' : 'Lưu'} onPress={save} disabled={amount <= 0 || saving} />
     </ScrollView>

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { go, href } from '../../hooks'
 import { showToast } from '../../ledger/toast'
 import { DateField } from '../../components/DateField'
-import { extraTexts, saveExtra } from '../../ledger/extra'
+import { extraTexts, saveExtra } from '@nhanong/shared'
 import { CustomFieldInputs } from './extraFields'
 
 const KEYS: AmountKey[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0', 'xóa']

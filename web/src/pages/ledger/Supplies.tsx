@@ -5,7 +5,7 @@ import { showToast } from '../../ledger/toast'
 import { parseQty, qtyText } from '../../ledger/qty'
 import { CategoryPicker, GardenPicker, MoneyField, QtyField } from './fields'
 import { DateField } from '../../components/DateField'
-import { extraTexts, saveExtra } from '../../ledger/extra'
+import { extraTexts, saveExtra } from '@nhanong/shared'
 import { CustomFieldInputs, FieldLines } from './extraFields'
 
 const UNITS = ['bao', 'chai', 'gói', 'kg', 'lít', 'cây', 'thùng']

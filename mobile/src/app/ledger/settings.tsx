@@ -82,11 +82,19 @@ export default function LedgerSettingsScreen() {
       <Stack.Screen options={{ title: 'Cài đặt sổ' }} />
       <StoragePlace data={data} />
       <Card>
+        <Text style={heading}>Ghi nhanh & thông tin riêng</Text>
+        <View style={{ gap: 8 }}>
+          <Button label={`⭐ Khoản hay dùng (${data.templates.length})`} variant="outline" onPress={() => router.push('/ledger/templates')} />
+          <Button label={`🏷️ Thông tin tự thêm (${data.custom_fields.length} ô)`} variant="outline" onPress={() => router.push('/ledger/custom-fields')} />
+        </View>
+      </Card>
+
+      <Card>
         <Text style={heading}>Chế độ Nâng cao</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.body, { fontWeight: '700' }]}>Bật mùa vụ, kho vật tư, công nợ</Text>
-            <Text style={[styles.muted, { marginTop: 2 }]}>Chia lời/lỗ theo vụ; mua phân thuốc về kho rồi ghi dùng cho vườn nào; ghi mua thiếu, bán chịu. Tắt đi thì dữ liệu vẫn giữ.</Text>
+            <Text style={[styles.body, { fontWeight: '700' }]}>Bật mùa vụ, kho vật tư, công nợ, nhân công, thu hoạch</Text>
+            <Text style={[styles.muted, { marginTop: 2 }]}>Chia lời/lỗ theo vụ; mua phân thuốc về kho rồi ghi dùng cho vườn nào; ghi mua thiếu, bán chịu; chấm công, trả công; ghi sản lượng để biết giá thành mỗi kg. Tắt đi thì dữ liệu vẫn giữ.</Text>
           </View>
           <Switch
             value={!!data.meta.advanced}
