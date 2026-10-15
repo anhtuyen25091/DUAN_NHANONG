@@ -1,6 +1,7 @@
 import {
   CATEGORY_TYPE_LABELS,
   compareToReference,
+  formatPercent,
   formatDate,
   formatDistance,
   formatVnd,
@@ -124,7 +125,7 @@ function LocalPriceCard({ item }: { item: LocalPriceProduct }) {
             <p>{formatVnd(item.reference.price)}</p>
             {compare && compare.diff !== 0 && (
               <p className={`small ${compare.good ? 'in' : 'out'}`}>
-                Quanh đây {compare.diff > 0 ? 'cao' : 'thấp'} hơn {Math.abs(compare.percent)}% ({compare.diff > 0 ? '+' : '-'}
+                Quanh đây {compare.diff > 0 ? 'cao' : 'thấp'} hơn {formatPercent(compare.percent)}% ({compare.diff > 0 ? '+' : '-'}
                 {formatVnd(Math.abs(compare.diff))})
               </p>
             )}

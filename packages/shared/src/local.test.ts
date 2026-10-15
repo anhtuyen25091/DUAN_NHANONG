@@ -17,7 +17,8 @@ describe('khu vực của tôi', () => {
 
 describe('so với giá chung', () => {
   it('nông sản: cao hơn là tốt cho người bán; phân thuốc: thấp hơn là tốt cho người mua', () => {
-    expect(compareToReference(95000, 93000, 'nong_san')).toEqual({ diff: 2000, percent: 2, good: true });
+    expect(compareToReference(95000, 93000, 'nong_san')).toEqual({ diff: 2000, percent: 2.2, good: true });
+    expect(compareToReference(93300, 93000, 'nong_san')?.percent).toBe(0.3);
     expect(compareToReference(500000, 520000, 'phan_bon')).toMatchObject({ diff: -20000, good: true });
     expect(compareToReference(540000, 520000, 'phan_bon')).toMatchObject({ good: false });
     expect(compareToReference(1, null, 'nong_san')).toBeNull();

@@ -3,6 +3,9 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { PriceChart } from '../../components/PriceChart';
+import { LocationBar } from '../../components/LocationPicker';
+import { LocalPriceList } from '../../components/localPrices';
+import { useMyLocation } from '../../lib/myLocation';
 import { Button, Card, Change, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { setAuth, updateAuthUser, useAuth } from '../../lib/auth';
@@ -151,6 +154,7 @@ export default function ProductScreen() {
           ))}
         </Card>
       )}
+      <LocalForProduct code={code} />
     </ScrollView>
   );
 }
@@ -237,6 +241,17 @@ function AlertForm({ productCode, unit, region, regionName, onDone }: { productC
         </View>
         <Button label="Hủy" variant="outline" onPress={onDone} />
       </View>
+    </View>
+  );
+}
+
+/** Giá các điểm mua quanh khu vực của tôi cho mặt hàng này */
+function LocalForProduct({ code }: { code: string }) {
+  const location = useMyLocation();
+  return (
+    <View style={{ marginTop: 8 }}>
+      <Text style={{ fontSize: font.title - 2, fontWeight: '700', color: colors.text, marginBottom: 6 }}>📍 Giá các điểm mua quanh bạn</Text>
+      {location ? <LocalPriceList product={code} /> : <LocationBar />}
     </View>
   );
 }

@@ -156,6 +156,11 @@ export function describeLocation(location: MyLocation): string {
   return `${place} · ${location.radius} km`;
 }
 
+/** 0.3 -> "0,3"; 2 -> "2" */
+export function formatPercent(percent: number): string {
+  return String(Math.abs(percent)).replace('.', ',');
+}
+
 /**
  * So giá điểm mua với giá chung: nông sản cao hơn giá chung là có lợi cho người bán (xanh),
  * phân / thuốc thấp hơn giá chung là có lợi cho người mua (xanh).
@@ -163,5 +168,6 @@ export function describeLocation(location: MyLocation): string {
 export function compareToReference(price: number, reference: number | null | undefined, type: CategoryType): { diff: number; percent: number; good: boolean } | null {
   if (!reference) return null;
   const diff = price - reference;
-  return { diff, percent: Math.round((diff / reference) * 100), good: type === 'nong_san' ? diff >= 0 : diff <= 0 };
+  // 1 chữ số lẻ: chênh 300 đ trên 93.000 đ là 0,3%, không làm tròn thành 0%
+  return { diff, percent: Math.round((diff / reference) * 1000) / 10, good: type === 'nong_san' ? diff >= 0 : diff <= 0 };
 }

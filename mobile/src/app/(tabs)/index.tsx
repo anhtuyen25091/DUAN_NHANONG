@@ -1,10 +1,11 @@
-import { CATEGORY_TYPE_LABELS, formatDate, formatPriceRange, groupByProduct, matchesSearch, type CategoryType } from '@nhanong/shared';
+import { CATEGORY_TYPE_LABELS, describeLocation, formatDate, formatPriceRange, groupByProduct, matchesSearch, type CategoryType } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { Card, Change, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { colors, font } from '../../lib/theme';
+import { useMyLocation } from '../../lib/myLocation';
 import { useAsync } from '../../lib/useAsync';
 
 const TYPES = Object.keys(CATEGORY_TYPE_LABELS) as CategoryType[];
@@ -24,6 +25,7 @@ export default function PriceBoardScreen() {
 
   const header = (
     <View style={{ gap: 10, marginBottom: 12 }}>
+      <LocalBanner />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {TYPES.map((t) => (
           <Chip key={t} label={CATEGORY_TYPE_LABELS[t]} active={t === type} onPress={() => setType(t)} />
@@ -95,5 +97,21 @@ export default function PriceBoardScreen() {
         </Card>
       )}
     />
+  );
+}
+
+/** Lối vào "Giá quanh tôi": giá các điểm mua quanh khu vực của tôi */
+function LocalBanner() {
+  const location = useMyLocation();
+  return (
+    <Pressable onPress={() => router.push('/local-prices')} accessibilityRole="button">
+      <Card style={{ marginBottom: 0, borderLeftWidth: 6, borderLeftColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text }}>📍 Giá quanh tôi</Text>
+          <Text style={styles.muted}>{location ? describeLocation(location) : 'Chọn khu vực để xem giá các điểm mua gần bạn'}</Text>
+        </View>
+        <Text style={{ fontSize: 22, color: colors.primary }}>›</Text>
+      </Card>
+    </Pressable>
   );
 }

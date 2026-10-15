@@ -5,6 +5,7 @@ import { Pressable, RefreshControl, ScrollView, Text, TextInput, View, type Text
 import { Button, Card, Chip, Status, styles } from '../components/ui';
 import { api } from '../lib/api';
 import { setAuth, updateAuthUser, useAuth } from '../lib/auth';
+import { adoptAccountLocation } from '../lib/myLocation';
 import { deviceName } from '../lib/sync';
 import { colors, font } from '../lib/theme';
 import { useAsync } from '../lib/useAsync';
@@ -21,7 +22,10 @@ export default function AccountScreen() {
   // Cập nhật mức xem / hạn gói mới nhất (admin vừa kích hoạt gói…)
   useEffect(() => {
     if (!auth) return;
-    api.me(auth.token).then(updateAuthUser, (error) => {
+    api.me(auth.token).then((user) => {
+      updateAuthUser(user);
+      adoptAccountLocation(user.location);
+    }, (error) => {
       if (error instanceof ApiError && error.status === 401) setAuth(null);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,6 +101,12 @@ function SignedIn() {
       <Text style={[styles.body, premium && { color: colors.primary, fontWeight: '700' }]}>
         {premium ? `⭐ Có gói xem giá${user.premium_until ? ` đến ${formatDate(user.premium_until)}` : ''}` : 'Tài khoản thường (chưa có gói)'}
       </Text>
+      <Button
+        label={`🏪 ${user.buyer_status === 'approved' ? 'Đăng giá của điểm mua' : user.buyer_status ? 'Hồ sơ điểm mua' : 'Tôi là đại lý / thương lái: đăng giá'}`}
+        variant="outline"
+        onPress={() => router.push('/buyer')}
+      />
+      <Button label="📍 Khu vực của tôi & giá quanh tôi" variant="outline" onPress={() => router.push('/local-prices')} />
       <Button label="Đăng xuất" variant="outline" onPress={logout} disabled={busy} />
     </Card>
   );

@@ -11,7 +11,7 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
-## 15/10/2026 (tối): Giá theo khu vực do điểm mua đóng góp + "Khu vực của tôi" (đang làm)
+## 15/10/2026 (tối): Giá theo khu vực do điểm mua đóng góp + "Khu vực của tôi" ✅
 
 **Yêu cầu:** giá crawl là giá chung, nhưng thực tế mỗi khu vực mua bán một giá khác. Cần:
 - cho điểm mua (doanh nghiệp, đại lý, thương lái, điểm bán lẻ) đăng giá từng mặt hàng theo khu vực và ngày
@@ -115,6 +115,40 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 - Typecheck, lint sạch. Backend 125 test vẫn qua.
 
 **Lỗi tìm thấy khi bấm thử, đã sửa:** "Đăng lại cho hôm nay" hiện cả mặt hàng đã đăng hôm nay và kèm **giá cũ nhất**. Nguyên nhân: `new Map(...)` giữ bản cuối, mà danh sách xếp mới nhất trước. Đã sửa thành giữ bản mới nhất, rồi bỏ mặt hàng đã đăng hôm nay.
+
+### Bước D: Giao diện app (Expo) ✅
+**Đã làm**
+- `lib/myLocation.ts`: giống web (lưu trên máy bằng kv-store; đăng nhập thì lưu cả lên tài khoản; máy mới tự lấy khu vực đã lưu).
+- `components/LocationPicker.tsx`:
+  - "📍 Dùng vị trí của tôi" bằng `expo-location`, tự đoán tỉnh
+  - chọn tỉnh bằng ô gõ để tìm + nút bấm
+  - tên chỗ ở, bán kính
+- Màn mới `local-prices` (Giá quanh tôi) và `buyer` (Điểm mua đăng giá), cùng các chức năng như web.
+  - Màn Điểm mua có nút "📍 Dùng vị trí hiện tại" để đứng tại điểm mua lấy tọa độ chính xác.
+- Tab Bảng giá có thẻ "📍 Giá quanh tôi" trên cùng. Trang mặt hàng có mục "Giá các điểm mua quanh bạn". Tài khoản có nút sang Điểm mua và Khu vực của tôi.
+- Cả web và app: chênh lệch so với giá chung hiện 1 chữ số lẻ. Trước đây chênh 300 đ trên 93.000 đ bị làm tròn thành "cao hơn 0%"; giờ hiện "0,3% (+300 đ)".
+
+**Kiểm tra**
+- Typecheck mobile sạch. Metro build bundle Android đủ 1723 module.
+- Bấm thử trên bản web export của app:
+  - chưa chọn khu vực thì thẻ mời chọn → chọn Đắk Lắk, 20 km → hiện cà phê (3 điểm, giá giữa 93.300 đ) và dịch vụ quanh đây
+  - đăng nhập Hai Lúa → "✅ Đã duyệt" → đăng tiêu 141.500 đ → "Đã đăng giá"
+- `expo export --platform web` crash 4 lần (139 / 138), lần thứ 5 mới qua.
+- **Chưa thử GPS trên điện thoại thật.**
+
+### Kết quả
+Xong chức năng giá theo khu vực trên backend, web và app.
+
+**Cách thử**
+1. Web http://192.168.1.10:5173 → Bảng giá → "📍 Giá quanh tôi" → chọn Đắk Lắk (hoặc Cần Thơ).
+2. Điểm mua demo: đăng nhập `0900000102` / `nhanong-demo` (Đại lý Hai Lúa) → Tài khoản → "🏪 Đăng giá của điểm mua".
+3. Admin `/admin` → nhóm "Giá theo khu vực": duyệt "Đại lý Năm Tèo"; xem giá tiêu 210.000 đ đang chờ duyệt.
+
+**Còn tồn / làm sau**
+- Bản đồ các điểm mua (hiện chỉ có danh sách và khoảng cách).
+- Thông báo cho điểm mua khi hồ sơ được duyệt, hoặc giá bị đưa về chờ duyệt.
+- Nhắc điểm mua đăng giá hằng ngày (thông báo đẩy, cần development build).
+- Khu vực theo xã / phường: bạn đã chọn tỉnh + vị trí; nếu sau cần thì nạp danh sách xã.
 
 ---
 

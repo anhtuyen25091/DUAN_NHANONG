@@ -163,6 +163,23 @@ Chạy lại được: bài / tháng đã lấy thì bỏ qua.
 - **Nhân công** (Nâng cao): người làm + tiền công/ngày, chấm công nhiều người 1 lần. Trả công thì tự ghi khoản "Nhân công" theo từng vườn.
 - Phần lõi: `packages/shared/src/ledger.ts` (các bảng `templates`, `harvests`, `workers`, `work_logs`, `custom_fields`) và `extras.ts` (các hàm tính).
 
+## Giá theo khu vực (điểm mua đóng góp)
+
+- Doanh nghiệp, đại lý, thương lái, điểm bán lẻ đăng ký **hồ sơ điểm mua**: web `#/diem-mua`, app vào từ Tài khoản.
+  - Admin duyệt trong `/admin` → "Giá theo khu vực" → "Điểm mua đăng giá".
+  - Duyệt xong mới đăng giá được, và điểm mua tự xuất hiện trong danh sách Điểm bán.
+- Giá đăng lên hiện ngay.
+  - Lệch hơn 30% so với giá tham chiếu thì **chờ duyệt**. Giá tham chiếu là giá giữa của các điểm mua khác trong 50 km / 14 ngày; không đủ thì lấy giá chung của tỉnh.
+  - 3 máy báo "giá sai" thì cũng chờ duyệt.
+- Người dùng chọn **Khu vực của tôi** (tỉnh + GPS hoặc trung tâm tỉnh, bán kính 10–50 km).
+  - **Giá quanh tôi** (web `#/gia-quanh-toi`, app thẻ trên tab Bảng giá): gom theo mặt hàng, so với giá chung, kèm dịch vụ quanh đây.
+- API:
+  - `GET /api/v1/local-prices?lat&lng&radius&type&product`
+  - `PUT /me/location`
+  - `GET/PUT /me/buyer`, `GET/POST/DELETE /me/buyer/prices`
+  - `POST /local-prices/{id}/flag`
+- Dữ liệu demo (chỉ máy dev): `php artisan db:seed --class=LocalPriceDemoSeeder`. Có điểm mua quanh Buôn Ma Thuột và Cần Thơ; tài khoản 09000001xx / `nhanong-demo`.
+
 ## Mobile khi dev
 
 App tự gọi backend theo IP của máy đang chạy Metro, cổng 8000. Vì vậy cần chạy Laravel cho điện thoại cùng mạng truy cập được:
