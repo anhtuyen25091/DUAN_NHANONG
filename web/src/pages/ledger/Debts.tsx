@@ -6,6 +6,8 @@ import {
   formatDate,
   formatVnd,
   interestPaid,
+  LENDER_TYPE_LABELS,
+  loanSchedule,
   monthlyInterest,
   telHref,
   today,
@@ -17,6 +19,8 @@ import { useState, type FormEvent } from 'react'
 import { go, href } from '../../hooks'
 import { showToast } from '../../ledger/toast'
 import { CategoryPicker, GardenPicker, MoneyField } from './fields'
+import { loanDraft, loanTermsOf } from '../../ledger/loanDraft'
+import { LenderFields, LoanFields, LoanScheduleCard } from './Loan'
 
 const KIND_ICON: Record<DebtKind, string> = { loan: '🏦', payable: '🔴', receivable: '🟢' }
 const partyHref = (kind: DebtKind, party: string) => href(`so/no/nguoi/${kind}/${encodeURIComponent(party)}`)
@@ -195,7 +199,7 @@ export function DebtForm({ ledger, data, id }: { ledger: Ledger; data: LedgerSna
   const [gardenId, setGardenId] = useState<string | null>(debt ? debt.garden_id : null)
   const [note, setNote] = useState(debt?.note ?? '')
   const [recordEntry, setRecordEntry] = useState(true)
-  const [rate, setRate] = useState(debt?.interest_rate ? String(debt.interest_rate).replace('.', ',') : '')
+  const [terms, setTerms] = useState(() => loanDraft(debt))
   const loan = kind === 'loan'
   const type = kind === 'receivable' ? 'income' : 'expense'
   const [categoryId, setCategoryId] = useState('')
@@ -205,8 +209,7 @@ export function DebtForm({ ledger, data, id }: { ledger: Ledger; data: LedgerSna
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
-    const interestRate = Number(rate.replace(',', '.')) || null
-    const input = { party, phone, amount, date, due_on: dueOn || null, garden_id: gardenId, note, ...(loan ? { interest_rate: interestRate } : {}) }
+    const input = { party, phone, amount, date, due_on: dueOn || null, garden_id: gardenId, note, ...(loan ? loanTermsOf(terms) : {}) }
     try {
       if (debt) {
         await ledger.updateDebt(debt.id, input)
@@ -241,9 +244,10 @@ export function DebtForm({ ledger, data, id }: { ledger: Ledger; data: LedgerSna
         </div>
       )}
       {loan && <p className="small muted">Tiền vay là tiền mượn nên không tính vào lời/lỗ. Mỗi lần trả, tiền lãi sẽ ghi thành tiền ra (hạng mục 🏦 Lãi vay).</p>}
+      {loan && <LenderFields draft={terms} onChange={setTerms} party={party} onParty={setParty} />}
       {kind === 'payable' && !debt && <p className="small muted">Mua phân, thuốc thiếu: nên ghi ở Kho vật tư → Mua vật tư → “Mua thiếu” để biết cả số bao.</p>}
       <label>
-        {loan ? 'Vay của ai (ngân hàng, người quen) *' : kind === 'payable' ? 'Nợ ai (đại lý, cửa hàng) *' : 'Ai nợ (thương lái, người mua) *'}
+        {loan ? (terms.lenderType === 'bank' ? 'Tên ngân hàng * (chọn ở trên hoặc gõ tên)' : 'Tên bên cho vay *') : kind === 'payable' ? 'Nợ ai (đại lý, cửa hàng) *' : 'Ai nợ (thương lái, người mua) *'}
         <input
           value={party}
           onChange={(e) => setParty(e.target.value)}
@@ -263,22 +267,20 @@ export function DebtForm({ ledger, data, id }: { ledger: Ledger; data: LedgerSna
         <input type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} />
       </label>
       <MoneyField label={loan ? 'Số tiền vay *' : 'Số tiền *'} value={amount} onChange={setAmount} required />
-      {loan && (
-        <label>
-          Lãi suất (%/năm)
-          <input inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value.replace(/[^\d.,]/g, ''))} placeholder="Ví dụ: 9" />
-          {Number(rate.replace(',', '.')) > 0 && amount > 0 && <span className="small muted">Lãi ước tính mỗi tháng: {formatVnd(monthlyInterest(amount, Number(rate.replace(',', '.'))))}</span>}
-        </label>
-      )}
+      {loan && <LoanFields draft={terms} onChange={setTerms} party={party} amount={amount} date={date} />}
       <div className="row-2">
         <label>
           Ngày
           <input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value || today())} />
         </label>
-        <label>
-          Hẹn trả ngày
-          <input type="date" value={dueOn} onChange={(e) => setDueOn(e.target.value)} />
-        </label>
+        {loan && loanTermsOf(terms).loan_plan ? (
+          <p className="small muted">Hạn trả: tự tính theo kỳ hạn vay.</p>
+        ) : (
+          <label>
+            {loan ? 'Hạn trả hết nợ' : 'Hẹn trả ngày'}
+            <input type="date" value={dueOn} min={date} onChange={(e) => setDueOn(e.target.value)} />
+          </label>
+        )}
       </div>
       {data.gardens.length > 0 && <GardenPicker data={data} value={gardenId} onChange={setGardenId} allowShared legend={loan ? 'Tiền lãi tính cho vườn nào (vay chung cho các vườn: chọn Chi chung)' : 'Vườn'} />}
       {!debt && !loan && (
@@ -307,9 +309,11 @@ export function DebtForm({ ledger, data, id }: { ledger: Ledger; data: LedgerSna
 export function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot; id: string }) {
   const status = debtStatus(data, today()).find((s) => s.debt.id === id)
   const isLoan = status?.debt.kind === 'loan'
-  // Khoản vay: mặc định trả lãi 1 tháng, gốc để trống; nợ thường: trả hết
-  const [amount, setAmount] = useState(isLoan ? 0 : (status?.left ?? 0))
-  const [interest, setInterest] = useState(isLoan ? monthlyInterest(status!.left, status!.debt.interest_rate) : 0)
+  // Khoản vay có lịch: mặc định trả kỳ tới; vay không lịch: trả lãi 1 tháng; nợ thường: trả hết
+  const next = status && isLoan ? loanSchedule(status.debt, data.debt_payments, today())?.next : null
+  const [installment, setInstallment] = useState<number | null>(next?.no ?? null)
+  const [amount, setAmount] = useState(next ? next.principal : isLoan ? 0 : (status?.left ?? 0))
+  const [interest, setInterest] = useState(next ? next.interest : isLoan ? monthlyInterest(status!.left, status!.debt) : 0)
   const [date, setDate] = useState(today())
   const [error, setError] = useState<string | null>(null)
 
@@ -330,9 +334,13 @@ export function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerS
     e.preventDefault()
     setError(null)
     try {
-      await ledger.payDebt({ debt_id: id, amount, interest, date })
+      await ledger.payDebt({ debt_id: id, amount, interest, date, installment })
       showToast({ message: `Đã ghi ${payable ? 'trả' : 'thu'} ${formatVnd(amount)}${interest > 0 ? ` + lãi ${formatVnd(interest)}` : ''}${amount === left ? '. Đã hết nợ 🎉' : ''}` })
-      setAmount(isLoan ? 0 : left - amount)
+      // Chuyển sang kỳ kế tiếp
+      const after = isLoan ? loanSchedule(debt, ledger.getSnapshot().debt_payments, today())?.next : null
+      setInstallment(after?.no ?? null)
+      setAmount(after ? after.principal : isLoan ? 0 : left - amount)
+      setInterest(after ? after.interest : interest)
     } catch (err) {
       setError((err as Error).message)
     }
@@ -390,15 +398,38 @@ export function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerS
         {debt.due_on && <p className={`small ${overdue ? 'out' : 'muted'}`}>Hẹn trả: {formatDate(debt.due_on)}{overdue ? ' (quá hạn)' : ''}</p>}
         {isLoan && (
           <p className="small muted">
-            {debt.interest_rate ? `Lãi suất ${String(debt.interest_rate).replace('.', ',')}%/năm · ước tính ${formatVnd(monthlyInterest(left, debt.interest_rate))}/tháng · ` : ''}
+            {debt.lender_type ? `${LENDER_TYPE_LABELS[debt.lender_type]} · ` : ''}
+            {debt.interest_rate ? `Lãi suất ${String(debt.interest_rate).replace('.', ',')}%/${debt.rate_unit === 'month' ? 'tháng' : 'năm'} · ước tính ${formatVnd(monthlyInterest(left, debt))}/tháng · ` : ''}
             Lãi đã trả {formatVnd(loanInterest)}
           </p>
         )}
       </section>
 
+      {isLoan && (
+        <LoanScheduleCard
+          debt={debt}
+          payments={data.debt_payments}
+          onPick={(it) => {
+            setInstallment(it.no)
+            setAmount(it.principal)
+            setInterest(it.interest)
+            document.getElementById('pay-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
+        />
+      )}
+
       {left > 0 && (
-        <form className="form card" onSubmit={pay}>
+        <form className="form card" id="pay-form" onSubmit={pay}>
           <h2>{payable ? 'Ghi lần trả nợ' : 'Ghi lần thu nợ'}</h2>
+          {isLoan && debt.loan_plan && (
+            <p className="small">
+              {installment ? <b>Trả kỳ {installment}</b> : <b>Trả thêm ngoài lịch (trả bớt gốc sớm)</b>}
+              {' · '}
+              <button type="button" className="linklike" onClick={() => setInstallment(installment ? null : (next?.no ?? null))}>
+                {installment ? 'Trả thêm ngoài lịch' : 'Trả theo kỳ'}
+              </button>
+            </p>
+          )}
           <MoneyField label={isLoan ? 'Tiền gốc trả (để 0 nếu chỉ trả lãi)' : 'Số tiền'} value={amount} onChange={setAmount} />
           {isLoan && <MoneyField label="Tiền lãi trả (tính vào tiền ra)" value={interest} onChange={setInterest} />}
           <div className="actions">
@@ -430,7 +461,10 @@ export function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerS
                 💵
               </span>
               <span className="entry-text">
-                <span>{formatDate(p.date)}</span>
+                <span>
+                  {formatDate(p.date)}
+                  {p.installment ? ` · kỳ ${p.installment}` : ''}
+                </span>
                 {p.note && <span className="small muted">{p.note}</span>}
               </span>
               <span className="amount">

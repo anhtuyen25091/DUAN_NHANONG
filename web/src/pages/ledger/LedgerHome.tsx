@@ -1,4 +1,4 @@
-import { allocatedEntries, contractSummaries, debtStatus, interestPaid, debtSummary, filterEntries, formatVnd, supplyStock, today, totals, type Ledger, type LedgerSnapshot } from '@nhanong/shared'
+import { allocatedEntries, contractSummaries, debtStatus, dueReminders, formatDate, interestPaid, debtSummary, filterEntries, formatVnd, supplyStock, today, totals, type Ledger, type LedgerSnapshot } from '@nhanong/shared'
 import { useState } from 'react'
 import { href } from '../../hooks'
 import { PERIOD_LABELS, periodRange, type Period } from '../../ledger/period'
@@ -24,6 +24,7 @@ export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnaps
         </a>
       </div>
       <SyncBadge />
+      <DueReminders data={data} />
 
       <nav className="segmented" aria-label="Thời gian">
         {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
@@ -93,6 +94,28 @@ export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnaps
   )
 }
 
+/** Kỳ trả nợ vay / hạn trả nợ trong 7 ngày tới hoặc đã quá hạn */
+function DueReminders({ data }: { data: LedgerSnapshot }) {
+  const now = today()
+  const list = dueReminders(data, now, 7)
+  if (list.length === 0) return null
+  return (
+    <section className="card reminders" role="status">
+      <h2>🔔 Sắp đến hạn</h2>
+      <ul>
+        {list.map((r) => (
+          <li key={r.key}>
+            <a href={href(`so/no/${r.debt.id}`)}>{r.title}</a>
+            <span className={r.overdue ? 'out' : 'muted'}>
+              {r.overdue ? `Quá hạn ${formatDate(r.due)}` : r.due === now ? 'Hôm nay' : formatDate(r.due)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 /**
  * Tình hình tài chính: lời/lỗ đã gồm phân thuốc mua thiếu và lãi vay;
  * kèm các khoản còn nợ / được nợ để biết sau khi thanh toán hết thì còn bao nhiêu.
@@ -154,12 +177,18 @@ function AdvancedShortcuts({ data }: { data: LedgerSnapshot }) {
         <b>🧾 Công nợ</b>
         <span className="small muted">
           {debts.payable || debts.receivable || debts.loan ? (
-            <>
-              {debts.loan > 0 && <span className="out">Vay {formatVnd(debts.loan)} · </span>}
-              {debts.payable > 0 && <span className="out">Nợ {formatVnd(debts.payable)}</span>}
-              {debts.payable > 0 && debts.receivable > 0 && ' · '}
-              {debts.receivable > 0 && <span className="in">Được nợ {formatVnd(debts.receivable)}</span>}
-            </>
+            ([
+              [debts.loan, 'Vay', 'out'],
+              [debts.payable, 'Nợ', 'out'],
+              [debts.receivable, 'Được nợ', 'in'],
+            ] as const)
+              .filter(([v]) => v > 0)
+              .map(([v, label, cls], i) => (
+                <span key={label} className={cls}>
+                  {i > 0 && ' · '}
+                  {label} {formatVnd(v)}
+                </span>
+              ))
           ) : (
             'Không còn nợ'
           )}

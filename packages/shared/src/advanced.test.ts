@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allocatedEntries, contractSummaries, debtsByParty, debtStatus, interestPaid, monthlyInterest, debtSummary, seasonRange, seasonsOf, suggestSeasonName, supplyStock, supplyUsedValue } from './advanced';
+import { addMonths, allocatedEntries, contractSummaries, debtsByParty, debtStatus, dueReminders, interestPaid, loanSchedule, monthlyInterest, debtSummary, seasonRange, seasonsOf, suggestSeasonName, supplyStock, supplyUsedValue } from './advanced';
 import { filterEntries, Ledger, totals, type LedgerMeta, type LedgerStorage } from './ledger';
 import type { SyncRecord } from './types';
 
@@ -317,5 +317,65 @@ describe('Khoản vay + nợ cửa hàng nhiều lần', () => {
     await store2.saveMeta(meta);
     const reopened = await Ledger.open(store2, now);
     expect(reopened.getSnapshot().categories.filter((c) => c.name === 'Lãi vay')).toHaveLength(1);
+  });
+});
+
+describe('Lịch trả nợ vay + nhắc hạn', () => {
+  it('addMonths: ngày cuối tháng không bị tràn sang tháng sau', () => {
+    expect(addMonths('2026-01-31', 1)).toBe('2026-02-28');
+    expect(addMonths('2026-11-15', 3)).toBe('2027-02-15');
+    expect(addMonths('2026-01-10', 1, 5)).toBe('2026-02-05');
+  });
+
+  it('trả lãi hằng tháng, gốc cuối kỳ: 100tr, 9%/năm, 11 tháng → tổng lãi 8.250.000 đ', async () => {
+    const { ledger } = await setup();
+    const loan = await ledger.addDebt({ kind: 'loan', lender_type: 'bank', party: 'Agribank', amount: 100_000_000, date: '2026-01-05', interest_rate: 9, loan_plan: 'monthly_interest', term_months: 11 });
+    expect(loan.due_on).toBe('2026-12-05');
+    expect(loan.pay_day).toBe(5);
+    let s = loanSchedule(loan, [], '2026-01-05')!;
+    expect(s.items).toHaveLength(11);
+    expect(s.items[0]).toMatchObject({ no: 1, due: '2026-02-05', principal: 0, interest: 750_000 });
+    expect(s.items[10]).toMatchObject({ no: 11, due: '2026-12-05', principal: 100_000_000, interest: 750_000 });
+    expect(s.interestTotal).toBe(8_250_000);
+
+    // Trả kỳ 1, 2 đúng hạn; tới 15/04 thì kỳ 3 (05/04) quá hạn
+    await ledger.payDebt({ debt_id: loan.id, amount: 0, interest: 750_000, installment: 1, date: '2026-02-05' });
+    await ledger.payDebt({ debt_id: loan.id, amount: 0, interest: 750_000, installment: 2, date: '2026-03-05' });
+    s = loanSchedule(loan, ledger.getSnapshot().debt_payments, '2026-04-15')!;
+    expect(s).toMatchObject({ interestPaid: 1_500_000, interestLeft: 6_750_000, interestTotal: 8_250_000, next: { no: 3, overdue: true } });
+
+    // Trả bớt 40tr gốc ở kỳ 3 → lãi các kỳ sau tính trên 60tr
+    await ledger.payDebt({ debt_id: loan.id, amount: 40_000_000, interest: 750_000, installment: 3, date: '2026-04-15' });
+    s = loanSchedule(loan, ledger.getSnapshot().debt_payments, '2026-04-15')!;
+    expect(s.items[3].interest).toBe(450_000);
+    expect(s.interestTotal).toBe(2_250_000 + 8 * 450_000);
+    expect(s.principalLeft).toBe(60_000_000);
+  });
+
+  it('trả góp gốc đều + lãi dư nợ giảm dần; trả 1 lần cuối kỳ; lãi theo tháng (vay cá nhân)', async () => {
+    const { ledger } = await setup();
+    const gop = await ledger.addDebt({ kind: 'loan', party: 'BIDV', amount: 12_000_000, date: '2026-01-10', interest_rate: 12, loan_plan: 'equal_principal', term_months: 12, pay_day: 15 });
+    const s1 = loanSchedule(gop, [], '2026-01-10')!;
+    expect(s1.items.map((i) => i.principal)).toEqual(Array(12).fill(1_000_000));
+    expect(s1.items.map((i) => i.interest).slice(0, 3)).toEqual([120_000, 110_000, 100_000]);
+    expect(s1.items[0].due).toBe('2026-02-15');
+    expect(s1.interestTotal).toBe(780_000); // 120k + 110k + … + 10k
+
+    const motLan = await ledger.addDebt({ kind: 'loan', lender_type: 'person', party: 'Chú Sáu', amount: 50_000_000, date: '2026-03-01', interest_rate: 1.5, rate_unit: 'month', loan_plan: 'lump_sum', term_months: 6 });
+    const s2 = loanSchedule(motLan, [], '2026-03-01')!;
+    expect(s2.items).toEqual([expect.objectContaining({ no: 1, due: '2026-09-01', principal: 50_000_000, interest: 4_500_000 })]);
+    expect(monthlyInterest(50_000_000, motLan)).toBe(750_000);
+  });
+
+  it('nhắc hạn: kỳ vay sắp tới / quá hạn và nợ có hẹn ngày trả', async () => {
+    const { ledger } = await setup();
+    await ledger.addDebt({ kind: 'loan', party: 'Agribank', amount: 100_000_000, date: '2026-09-20', interest_rate: 9, loan_plan: 'monthly_interest', term_months: 6 });
+    await ledger.addDebt({ kind: 'payable', party: 'Cửa hàng A', amount: 5_000_000, date: '2026-09-01', due_on: '2026-10-10', record_entry: false });
+    await ledger.addDebt({ kind: 'payable', party: 'Cửa hàng B', amount: 5_000_000, date: '2026-09-01', due_on: '2026-12-10', record_entry: false });
+    const list = dueReminders(ledger.getSnapshot(), '2026-10-15', 7);
+    expect(list.map((r) => [r.title, r.due, r.overdue])).toEqual([
+      ['Cửa hàng A: hạn trả nợ 5.000.000 đ', '2026-10-10', true],
+      ['Agribank: kỳ 1, lãi 750.000 đ', '2026-10-20', false],
+    ]);
   });
 });

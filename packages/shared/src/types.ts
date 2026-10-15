@@ -80,6 +80,17 @@ export interface SupplyUsage extends SyncRecord {
 /** loan: mình đi vay tiền (ngân hàng, người quen): tiền gốc không tính lời/lỗ, tiền lãi là tiền ra */
 export type DebtKind = 'payable' | 'receivable' | 'loan';
 
+/** Bên cho vay */
+export type LenderType = 'bank' | 'credit_fund' | 'person' | 'company';
+
+/**
+ * Cách trả khoản vay:
+ * - monthly_interest: trả lãi hằng tháng, gốc trả 1 lần cuối kỳ
+ * - equal_principal: trả góp gốc chia đều hằng tháng + lãi tính trên dư nợ còn lại
+ * - lump_sum: trả 1 lần cuối kỳ cả gốc lẫn lãi
+ */
+export type LoanPlan = 'monthly_interest' | 'equal_principal' | 'lump_sum';
+
 /**
  * Khoản nợ. Tiền đã tính vào lời/lỗ lúc mua/bán (khoản thu chi transaction_id, nếu có);
  * trả nợ chỉ làm giảm số còn nợ, không tính lại vào lời/lỗ.
@@ -95,8 +106,16 @@ export interface Debt extends SyncRecord {
   garden_id: string | null;
   transaction_id: string | null;
   supply_id: string | null; // nợ sinh ra khi mua vật tư thiếu
-  /** Khoản vay: lãi suất %/năm (để ước tính lãi), có thể trống */
+  /** Khoản vay: lãi suất (theo rate_unit), có thể trống */
   interest_rate?: number | null;
+  /** Lãi suất tính theo năm (ngân hàng) hay theo tháng (vay cá nhân hay dùng); mặc định năm */
+  rate_unit?: 'year' | 'month' | null;
+  lender_type?: LenderType | null;
+  loan_plan?: LoanPlan | null;
+  /** Kỳ hạn vay (tháng); có kỳ hạn + cách trả thì app lập lịch trả nợ */
+  term_months?: number | null;
+  /** Ngày trả hằng tháng (1–31); mặc định theo ngày vay */
+  pay_day?: number | null;
   note: string | null;
 }
 
@@ -106,6 +125,8 @@ export interface DebtPayment extends SyncRecord {
   /** Tiền lãi trả kèm (khoản vay); ghi thành tiền ra hạng mục "Lãi vay" */
   interest?: number;
   interest_transaction_id?: string | null;
+  /** Trả cho kỳ số mấy trong lịch trả nợ (khoản vay); trống = trả thêm ngoài lịch */
+  installment?: number | null;
   date: string;
   note: string | null;
 }

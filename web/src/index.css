@@ -1103,3 +1103,104 @@ a.entry.entry-main {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* ---- Khoản vay: chọn ngân hàng, cách trả, lịch trả nợ ---- */
+.bank-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.bank-grid button {
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.bank-grid button.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.form label.radio-card {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 0 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.form label.radio-card input {
+  min-height: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  flex: none;
+}
+
+.form label.radio-card > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.loan-preview p {
+  margin: 4px 0;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table.schedule {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+table.schedule th,
+table.schedule td {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+table.schedule .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+table.schedule tr.paid {
+  color: var(--muted);
+}
+
+table.schedule tr.overdue td {
+  color: var(--loss);
+  font-weight: 600;
+}
+
+table.schedule tr.next {
+  background: var(--primary-soft);
+}
+
+.reminders li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.reminders ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}

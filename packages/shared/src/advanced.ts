@@ -3,7 +3,8 @@
  * Dùng chung cho web, mobile và test.
  */
 import type { LedgerSnapshot } from './ledger';
-import type { CutLine, Debt, DebtKind, HarvestContract, HarvestCut, Season, Supply, Transaction } from './types';
+import { formatVnd } from './money';
+import type { CutLine, Debt, DebtKind, DebtPayment, HarvestContract, HarvestCut, LenderType, LoanPlan, Season, Supply, Transaction } from './types';
 
 // ---- Kho vật tư ----
 
@@ -230,7 +231,186 @@ export function interestPaid(data: Pick<LedgerSnapshot, 'debt_payments'>, range:
     .reduce((sum, p) => sum + (p.interest ?? 0), 0);
 }
 
-/** Lãi ước tính 1 tháng của khoản vay còn lại (lãi suất %/năm, tính đơn giản theo dư nợ) */
-export function monthlyInterest(left: number, ratePerYear: number | null | undefined): number {
-  return ratePerYear ? Math.round((left * ratePerYear) / 100 / 12) : 0;
+/** Lãi suất 1 tháng (số thập phân) của khoản vay: 9%/năm -> 0,0075; 1,5%/tháng -> 0,015 */
+export function monthlyRate(debt: Pick<Debt, 'interest_rate' | 'rate_unit'>): number {
+  if (!debt.interest_rate) return 0;
+  return debt.rate_unit === 'month' ? debt.interest_rate / 100 : debt.interest_rate / 100 / 12;
+}
+
+/** Lãi ước tính 1 tháng trên dư nợ (ratePerYear: %/năm; hoặc truyền khoản vay để tính theo đơn vị của nó) */
+export function monthlyInterest(left: number, rate: number | null | undefined | Pick<Debt, 'interest_rate' | 'rate_unit'>): number {
+  const r = typeof rate === 'object' && rate !== null ? monthlyRate(rate) : rate ? rate / 100 / 12 : 0;
+  return Math.round(left * r);
+}
+
+// ---- Khoản vay: bên cho vay, cách trả, lịch trả nợ, nhắc hạn ----
+
+export const LENDER_TYPE_LABELS: Record<LenderType, string> = {
+  bank: '🏦 Ngân hàng',
+  credit_fund: '🏛️ Quỹ tín dụng',
+  person: '👤 Cá nhân',
+  company: '🏪 Doanh nghiệp / cửa hàng',
+};
+
+export const LOAN_PLAN_LABELS: Record<LoanPlan, { title: string; hint: string }> = {
+  monthly_interest: { title: 'Trả lãi hằng tháng, gốc cuối kỳ', hint: 'Mỗi tháng trả lãi; hết hạn trả hết tiền gốc.' },
+  equal_principal: { title: 'Trả góp hằng tháng (gốc + lãi)', hint: 'Mỗi tháng trả 1 phần gốc bằng nhau + lãi trên số còn nợ; lãi giảm dần.' },
+  lump_sum: { title: 'Trả 1 lần cuối kỳ', hint: 'Hết hạn trả 1 lần cả gốc lẫn lãi.' },
+};
+
+/** Ngân hàng hay cho nông dân vay (tên thường gọi); người dùng vẫn gõ được tên khác */
+export const VN_BANKS = [
+  'Agribank',
+  'Ngân hàng Chính sách xã hội',
+  'Vietcombank',
+  'BIDV',
+  'VietinBank',
+  'LPBank (Bưu điện Liên Việt)',
+  'Sacombank',
+  'Techcombank',
+  'MB Bank',
+  'ACB',
+  'VPBank',
+  'HDBank',
+  'SHB',
+  'VIB',
+  'TPBank',
+  'OCB',
+  'SeABank',
+  'Eximbank',
+  'MSB',
+  'Nam A Bank',
+  'Bac A Bank',
+  'Kienlongbank',
+  'ABBANK',
+  'PVcomBank',
+  'Saigonbank',
+  'Co-opBank (Ngân hàng Hợp tác xã)',
+];
+
+/** "2026-01-31" + 1 tháng = "2026-02-28" (ngày vượt cuối tháng thì lấy ngày cuối tháng); day: ép ngày trong tháng */
+export function addMonths(date: string, months: number, day?: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const total = y * 12 + (m - 1) + months;
+  const ny = Math.floor(total / 12);
+  const nm = (total % 12) + 1;
+  const last = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
+  return `${ny}-${String(nm).padStart(2, '0')}-${String(Math.min(day ?? d, last)).padStart(2, '0')}`;
+}
+
+export interface Installment {
+  no: number;
+  due: string;
+  /** Kỳ đã trả: số thật đã trả; chưa trả: số dự kiến */
+  principal: number;
+  interest: number;
+  paid: boolean;
+  overdue: boolean;
+  payments: DebtPayment[];
+}
+
+export interface LoanSchedule {
+  items: Installment[];
+  /** Tổng lãi đến khi tất toán = lãi đã trả + lãi dự kiến các kỳ chưa trả */
+  interestTotal: number;
+  interestPaid: number;
+  interestLeft: number;
+  principalLeft: number;
+  /** Kỳ chưa trả gần nhất */
+  next: Installment | null;
+}
+
+/**
+ * Lịch trả nợ của khoản vay có kỳ hạn + cách trả.
+ * Kỳ đã trả dùng số thật; kỳ chưa trả tính lại theo dư nợ hiện tại (trả bớt gốc sớm thì lãi dự kiến giảm theo).
+ * Lãi 1 kỳ = dư nợ × lãi suất tháng; trả 1 lần cuối kỳ: lãi = gốc × lãi suất tháng × số tháng.
+ */
+export function loanSchedule(debt: Debt, allPayments: DebtPayment[], today: string): LoanSchedule | null {
+  if (debt.kind !== 'loan' || !debt.loan_plan || !debt.term_months) return null;
+  const payments = allPayments.filter((p) => p.debt_id === debt.id);
+  const r = monthlyRate(debt);
+  const n = debt.term_months;
+  const plan = debt.loan_plan;
+  const principalPaid = payments.reduce((s, p) => s + p.amount, 0);
+  const interestPaid = payments.reduce((s, p) => s + (p.interest ?? 0), 0);
+  let left = Math.max(0, debt.amount - principalPaid);
+  const count = plan === 'lump_sum' ? 1 : n;
+  const share = Math.round(debt.amount / n);
+  const items: Installment[] = [];
+  let unpaidLeft = count;
+  for (let no = 1; no <= count; no++) {
+    const due = plan === 'lump_sum' ? addMonths(debt.date, n) : addMonths(debt.date, no, debt.pay_day ?? undefined);
+    const own = payments.filter((p) => p.installment === no);
+    if (own.length) {
+      items.push({ no, due, principal: own.reduce((s, p) => s + p.amount, 0), interest: own.reduce((s, p) => s + (p.interest ?? 0), 0), paid: true, overdue: false, payments: own });
+      unpaidLeft--;
+      continue;
+    }
+    let principal = 0;
+    let interest = 0;
+    if (plan === 'lump_sum') {
+      principal = left;
+      interest = Math.round(left * r * n);
+    } else {
+      interest = Math.round(left * r);
+      const last = unpaidLeft === 1 || no === count;
+      principal = plan === 'equal_principal' ? (last ? left : Math.min(share, left)) : last ? left : 0;
+    }
+    left -= principal;
+    unpaidLeft--;
+    items.push({ no, due, principal, interest, paid: false, overdue: due < today && principal + interest > 0, payments: [] });
+  }
+  // Hết nợ gốc thì các kỳ còn lại không phải trả gì
+  const pending = items.filter((i) => !i.paid && i.principal + i.interest > 0);
+  const interestLeft = pending.reduce((s, i) => s + i.interest, 0);
+  return {
+    items,
+    interestTotal: interestPaid + interestLeft,
+    interestPaid,
+    interestLeft,
+    principalLeft: Math.max(0, debt.amount - principalPaid),
+    next: pending[0] ?? null,
+  };
+}
+
+export interface DueReminder {
+  key: string;
+  debt: Debt;
+  due: string;
+  /** Số tiền phải trả / phải thu */
+  amount: number;
+  /** Khoản vay: kỳ số mấy, gốc + lãi của kỳ */
+  installment: Installment | null;
+  overdue: boolean;
+  title: string;
+}
+
+/**
+ * Các khoản sắp đến hạn (trong `days` ngày tới) hoặc đã quá hạn: kỳ trả nợ vay, nợ có hẹn ngày trả.
+ * Dùng cho thẻ "Sắp đến hạn" và thông báo nhắc trên điện thoại.
+ */
+export function dueReminders(data: Pick<LedgerSnapshot, 'debts' | 'debt_payments'>, today: string, days = 7): DueReminder[] {
+  const until = addDays(today, days);
+  const result: DueReminder[] = [];
+  for (const status of debtStatus(data, today)) {
+    const { debt, left } = status;
+    const schedule = loanSchedule(debt, data.debt_payments, today);
+    if (schedule) {
+      for (const it of schedule.items) {
+        if (it.paid || it.principal + it.interest <= 0 || it.due > until) continue;
+        const parts = [it.principal > 0 ? `gốc ${formatVnd(it.principal)}` : '', it.interest > 0 ? `lãi ${formatVnd(it.interest)}` : ''].filter(Boolean).join(' + ');
+        result.push({ key: `${debt.id}:${it.no}`, debt, due: it.due, amount: it.principal + it.interest, installment: it, overdue: it.due < today, title: `${debt.party}: kỳ ${it.no}, ${parts}` });
+      }
+    } else if (left > 0 && debt.due_on && debt.due_on <= until) {
+      const verb = debt.kind === 'receivable' ? 'thu nợ' : 'trả nợ';
+      result.push({ key: debt.id, debt, due: debt.due_on, amount: left, installment: null, overdue: debt.due_on < today, title: `${debt.party}: hạn ${verb} ${formatVnd(left)}` });
+    }
+  }
+  return result.sort((a, b) => a.due.localeCompare(b.due));
+}
+
+function addDays(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + days));
+  return t.toISOString().slice(0, 10);
 }

@@ -2,7 +2,7 @@
  * Sổ thu chi: dữ liệu nằm trong bộ nhớ, ghi xuống máy (IndexedDB trên web, SQLite trên mobile)
  * qua LedgerStorage. Web và mobile dùng chung class này; mỗi nơi chỉ viết phần lưu trữ.
  */
-import { cutKg, cutValue, formatQty, supplyCost, supplyEntryNote } from './advanced';
+import { addMonths, cutKg, cutValue, formatQty, supplyCost, supplyEntryNote } from './advanced';
 import { randomUuid } from './api';
 import { formatVnd } from './money';
 import {
@@ -16,6 +16,8 @@ import {
   type HarvestContract,
   type HarvestCut,
   type LedgerCategory,
+  type LenderType,
+  type LoanPlan,
   type Season,
   type StorageMode,
   type Supply,
@@ -122,6 +124,11 @@ export interface NewUsage {
 export interface NewDebt {
   kind: DebtKind;
   interest_rate?: number | null;
+  rate_unit?: 'year' | 'month' | null;
+  lender_type?: LenderType | null;
+  loan_plan?: LoanPlan | null;
+  term_months?: number | null;
+  pay_day?: number | null;
   party: string;
   phone?: string | null;
   amount: number;
@@ -154,6 +161,7 @@ export interface NewPayment {
   debt_id: string;
   amount: number;
   interest?: number;
+  installment?: number | null;
   date?: string;
   note?: string | null;
 }
@@ -630,7 +638,7 @@ export class Ledger {
       garden_id: input.garden_id ?? null,
       transaction_id: entry?.id ?? null,
       supply_id: null,
-      interest_rate: input.kind === 'loan' && input.interest_rate ? input.interest_rate : null,
+      ...(input.kind === 'loan' ? loanTerms(input, date) : { interest_rate: null }),
       note: input.note?.trim() || null,
       updated_at: at,
       deleted_at: null,
@@ -657,6 +665,7 @@ export class Ledger {
       due_on: patch.due_on === undefined ? debt.due_on : patch.due_on || null,
       garden_id: patch.garden_id === undefined ? debt.garden_id : patch.garden_id,
       note: patch.note === undefined ? debt.note : patch.note?.trim() || null,
+      ...(debt.kind === 'loan' ? loanTerms({ ...debt, ...patch }, patch.date ?? debt.date) : {}),
       updated_at: at,
     };
     await this.write('debts', [next]);
@@ -722,6 +731,7 @@ export class Ledger {
       amount,
       interest,
       interest_transaction_id: interestEntry?.id ?? null,
+      installment: debt.kind === 'loan' ? (input.installment ?? null) : null,
       date,
       note: input.note?.trim() || null,
       updated_at: at,
@@ -1230,4 +1240,19 @@ export function pressAmountKey(amount: number, key: AmountKey): number {
       next = amount * 10 + Number(key);
   }
   return next > MAX_AMOUNT ? amount : next;
+}
+
+/** Điều khoản khoản vay đã chuẩn hóa; hạn trả (due_on) = ngày vay + kỳ hạn */
+function loanTerms(input: Partial<NewDebt>, date: string): Pick<Debt, 'interest_rate' | 'rate_unit' | 'lender_type' | 'loan_plan' | 'term_months' | 'pay_day'> & { due_on?: string | null } {
+  const term = input.term_months && input.term_months > 0 ? Math.round(input.term_months) : null;
+  const plan = term ? (input.loan_plan ?? 'monthly_interest') : null;
+  return {
+    interest_rate: input.interest_rate || null,
+    rate_unit: input.rate_unit ?? 'year',
+    lender_type: input.lender_type ?? null,
+    loan_plan: plan,
+    term_months: term,
+    pay_day: plan && plan !== 'lump_sum' ? Math.min(31, Math.max(1, Math.round(input.pay_day ?? Number(date.slice(8, 10))))) : null,
+    ...(term ? { due_on: addMonths(date, term) } : {}),
+  };
 }
