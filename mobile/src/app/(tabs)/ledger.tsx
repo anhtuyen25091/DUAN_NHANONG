@@ -1,4 +1,4 @@
-import { filterEntries, formatVnd, totals, type Ledger, type StorageMode } from '@nhanong/shared';
+import { allocatedEntries, debtStatus, debtSummary, filterEntries, formatVnd, supplyStock, today, totals, type Ledger, type LedgerSnapshot, type StorageMode } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
@@ -36,8 +36,10 @@ export default function LedgerScreen() {
   const { ledger, data } = state;
   if (!data.meta.storage_mode) return <ChooseMode ledger={ledger} />;
 
-  const inPeriod = filterEntries(data.transactions, rangeOf(period));
-  const hasShared = inPeriod.some((t) => t.garden_id === null);
+  const range = rangeOf(period);
+  // Vật tư lấy từ kho tính vào vườn đã dùng (tổng cả sổ không đổi)
+  const inPeriod = filterEntries(allocatedEntries(data), range);
+  const hasShared = filterEntries(data.transactions, range).some((t) => t.garden_id === null);
 
   const header = (
     <View>
@@ -48,6 +50,7 @@ export default function LedgerScreen() {
         ))}
       </View>
       <ProfitCard label={`Tất cả các vườn · ${PERIODS[period].toLowerCase()}`} {...totals(inPeriod)} />
+      {data.meta.advanced && <AdvancedShortcuts data={data} />}
 
       <Text style={{ fontSize: font.title - 2, fontWeight: '700', color: colors.text, marginVertical: 8 }}>Vườn của tôi</Text>
       {data.gardens.length === 0 && (
@@ -87,6 +90,35 @@ export default function LedgerScreen() {
         renderItem={({ item }) => <EntryItemRow item={item} ledger={ledger} data={data} showGarden />}
       />
       <Fab label="＋ Ghi tiền" href="/ledger/add" />
+    </View>
+  );
+}
+
+/** Chế độ Nâng cao: lối tắt vào Kho vật tư và Công nợ, kèm con số chính */
+function AdvancedShortcuts({ data }: { data: LedgerSnapshot }) {
+  const inStock = supplyStock(data).filter((s) => s.left > 1e-9);
+  const debts = debtSummary(debtStatus(data, today()));
+  return (
+    <View style={{ flexDirection: 'row', gap: 10 }}>
+      <Pressable onPress={() => router.push('/ledger/supplies')} accessibilityRole="button" style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.8 : 1 })}>
+        <Card style={{ minHeight: 88 }}>
+          <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text, marginBottom: 4 }}>📦 Kho vật tư</Text>
+          <Text style={styles.muted}>{inStock.length ? `${inStock.length} loại · còn ${formatVnd(inStock.reduce((s, x) => s + x.leftValue, 0))}` : 'Chưa có gì trong kho'}</Text>
+        </Card>
+      </Pressable>
+      <Pressable onPress={() => router.push('/ledger/debts')} accessibilityRole="button" style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.8 : 1 })}>
+        <Card style={{ minHeight: 88 }}>
+          <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text, marginBottom: 4 }}>🧾 Công nợ</Text>
+          {debts.payable || debts.receivable ? (
+            <>
+              {debts.payable > 0 && <Text style={[styles.muted, { color: colors.loss }]}>Nợ {formatVnd(debts.payable)}</Text>}
+              {debts.receivable > 0 && <Text style={[styles.muted, { color: colors.gain }]}>Được nợ {formatVnd(debts.receivable)}</Text>}
+            </>
+          ) : (
+            <Text style={styles.muted}>Không còn nợ</Text>
+          )}
+        </Card>
+      </Pressable>
     </View>
   );
 }

@@ -1,5 +1,6 @@
 import { formatDate, formatVnd, groupByDate, SYNC_STATUS_LABELS, today, type Ledger, type LedgerSnapshot, type Totals, type Transaction } from '@nhanong/shared';
 import { router, type Href } from 'expo-router';
+import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { getSync, useSyncStatus } from '../lib/sync';
@@ -47,15 +48,24 @@ export function EntryItemRow({ item, ledger, data, showGarden }: { item: EntryIt
   const garden = showGarden ? (t.garden_id ? data.gardens.find((g) => g.id === t.garden_id)?.name : 'Chi chung') : null;
   const sub = [garden, t.note].filter(Boolean).join(' · ');
 
+  // Khoản sinh ra khi mua vật tư / ghi nợ: mở vật tư / khoản nợ để sửa, để 2 bên không lệch nhau
+  const debtId = data.debts.find((d) => d.transaction_id === t.id)?.id;
+  const open = () => {
+    if (t.supply_id) router.push({ pathname: '/ledger/supplies/[id]', params: { id: t.supply_id } });
+    else if (debtId) router.push({ pathname: '/ledger/debts/[id]', params: { id: debtId } });
+    else router.push({ pathname: '/ledger/add', params: { sua: t.id } });
+  };
+
   const remove = async () => {
+    const linked = t.supply_id ? ' (xóa cả vật tư trong kho)' : debtId ? ' (xóa cả khoản nợ)' : '';
     const undo = await ledger.removeEntry(t.id);
-    showToast({ message: `Đã xóa ${formatVnd(t.amount)}`, undo });
+    showToast({ message: `Đã xóa ${formatVnd(t.amount)}${linked}`, undo });
   };
 
   return (
     <View style={{ flexDirection: 'row', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, marginBottom: 6 }}>
       <Pressable
-        onPress={() => router.push({ pathname: '/ledger/add', params: { sua: t.id } })}
+        onPress={open}
         style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, minHeight: 60 }}
         accessibilityRole="button"
       >
@@ -81,6 +91,59 @@ export function EntryItemRow({ item, ledger, data, showGarden }: { item: EntryIt
       >
         <Text style={{ fontSize: 20 }}>🗑</Text>
       </Pressable>
+    </View>
+  );
+}
+
+/** Tiêu đề mục lớn trong trang sổ */
+export function SectionTitle({ children }: { children: ReactNode }) {
+  return <Text style={{ fontSize: font.title - 2, fontWeight: '700', color: colors.text, marginTop: 12, marginBottom: 6 }}>{children}</Text>;
+}
+
+/** Thẻ 1 dòng bấm được: tên + dòng phụ bên trái, con số bên phải (vật tư, khoản nợ…) */
+export function RowCard({ title, sub, right, rightColor, tag, faded, onPress }: { title: string; sub?: string | null; right: string; rightColor?: string; tag?: string | null; faded?: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => ({ opacity: faded ? 0.6 : pressed ? 0.8 : 1 })}>
+      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text }}>{title}</Text>
+          {sub ? <Text style={styles.muted}>{sub}</Text> : null}
+          {tag ? (
+            <Text style={{ alignSelf: 'flex-start', marginTop: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.lossSoft, color: colors.loss, fontSize: font.small, fontWeight: '700' }}>{tag}</Text>
+          ) : null}
+        </View>
+        <Text style={{ fontSize: font.body, fontWeight: '700', color: rightColor ?? colors.text }}>{right}</Text>
+      </Card>
+    </Pressable>
+  );
+}
+
+/** Dòng trong danh sách (lần dùng vật tư, lần trả nợ…) có nút 🗑 bên phải */
+export function ItemRow({ icon, title, sub, amount, amountColor, onPress, onDelete, deleteLabel }: { icon: string; title: string; sub?: string | null; amount: string; amountColor?: string; onPress?: () => void; onDelete?: () => void; deleteLabel?: string }) {
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, marginBottom: 6 }}>
+      <Pressable onPress={onPress} disabled={!onPress} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, minHeight: 60 }} accessibilityRole={onPress ? 'button' : undefined}>
+        <Text style={{ fontSize: 26 }}>{icon}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.body}>{title}</Text>
+          {sub ? (
+            <Text style={styles.muted} numberOfLines={2}>
+              {sub}
+            </Text>
+          ) : null}
+        </View>
+        <Text style={{ fontSize: font.body, fontWeight: '700', color: amountColor ?? colors.text }}>{amount}</Text>
+      </Pressable>
+      {onDelete && (
+        <Pressable
+          onPress={onDelete}
+          accessibilityRole="button"
+          accessibilityLabel={deleteLabel ?? 'Xóa'}
+          style={{ width: 52, alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: colors.border }}
+        >
+          <Text style={{ fontSize: 20 }}>🗑</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

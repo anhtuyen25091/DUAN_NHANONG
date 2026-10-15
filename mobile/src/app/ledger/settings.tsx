@@ -3,7 +3,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Platform, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, ScrollView, Switch, Text, View } from 'react-native';
 import { Button, Card, styles } from '../../components/ui';
 import { useLedger } from '../../lib/ledger';
 import { getSync, useSyncStatus } from '../../lib/sync';
@@ -79,6 +79,22 @@ export default function LedgerSettingsScreen() {
     <ScrollView contentContainerStyle={{ padding: 16 }}>
       <Stack.Screen options={{ title: 'Cài đặt sổ' }} />
       <StoragePlace data={data} />
+      <Card>
+        <Text style={heading}>Chế độ Nâng cao</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.body, { fontWeight: '700' }]}>Bật mùa vụ, kho vật tư, công nợ</Text>
+            <Text style={[styles.muted, { marginTop: 2 }]}>Chia lời/lỗ theo vụ; mua phân thuốc về kho rồi ghi dùng cho vườn nào; ghi mua thiếu, bán chịu. Tắt đi thì dữ liệu vẫn giữ.</Text>
+          </View>
+          <Switch
+            value={!!data.meta.advanced}
+            onValueChange={(advanced) => ledger.setMeta({ advanced })}
+            trackColor={{ true: colors.primary, false: colors.border }}
+            thumbColor="#fff"
+            accessibilityLabel="Bật chế độ Nâng cao"
+          />
+        </View>
+      </Card>
       <Card>
         <Text style={heading}>Sao lưu</Text>
         <Text style={[styles.muted, { marginBottom: 10 }]}>Lưu sổ ra 1 file (gửi qua Zalo, lưu Google Drive…). Đổi máy thì nhập lại file này.</Text>

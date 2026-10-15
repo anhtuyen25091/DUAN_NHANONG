@@ -96,6 +96,11 @@ php artisan shops:import-csv ds-dai-ly.csv --source="Sở NN&MT Đắk Lắk" --
   - Phần lưu trữ của từng nơi: `web/src/ledger/storage.ts` và `mobile/src/lib/ledger.ts`.
 - Web: `#/so`. App: tab "📒 Sổ thu chi".
 - Sao lưu ra file JSON và nhập lại trong mục Cài đặt sổ.
+- **Chế độ Nâng cao** (bật trong Cài đặt sổ; tắt đi thì dữ liệu vẫn giữ):
+  - **Mùa vụ:** mỗi vườn có các vụ (từ ngày → đến ngày, không được trùng nhau). Khoản thu chi tự thuộc vụ theo ngày + vườn. Trang vườn xem lời/lỗ theo vụ.
+  - **Kho vật tư** (web `#/so/kho`, app `ledger/supplies`): mua vật tư ghi 1 khoản tiền ra "chi chung"; "Dùng cho vườn" chuyển phần tiền tương ứng sang vườn đó (`allocatedEntries`), tổng cả sổ không đổi. Có thể mua thiếu (tự ghi công nợ) hoặc dùng hết ngay cho 1 vườn.
+  - **Công nợ** (web `#/so/no`, app `ledger/debts`): mua thiếu / bán chịu ghi vào lời/lỗ lúc phát sinh; mỗi lần trả/thu chỉ làm giảm số còn nợ. Có hẹn ngày trả, báo quá hạn.
+  - Phần lõi: `packages/shared/src/ledger.ts` (thao tác) và `packages/shared/src/advanced.ts` (tính toán).
 - **Lưu cả trên mạng** (người dùng tự chọn): đăng nhập bằng số điện thoại + mật khẩu (web `#/so/dang-nhap`, app `ledger/sign-in`).
   - Sổ vẫn nằm trên máy; mỗi lần ghi sẽ tự gửi lên sau 1,5 giây, rồi nhận phần mới từ máy khác (bản sửa mới hơn thắng).
   - Tự đồng bộ lại khi: mở sổ, có mạng lại (web), quay lại tab/app, hoặc kéo xuống trên app.

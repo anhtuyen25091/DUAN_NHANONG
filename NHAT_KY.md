@@ -24,6 +24,8 @@ Các link chỉ mở được khi các server đang chạy. Cách bật server: 
 | Danh sách điểm bán / thu mua | http://localhost:5173/#/diem-ban |
 | Form thêm điểm bán mới | http://localhost:5173/#/diem-ban/de-xuat |
 | Sổ thu chi (web) | http://localhost:5173/#/so |
+| Kho vật tư / Công nợ (web, cần bật Chế độ Nâng cao) | http://localhost:5173/#/so/kho · http://localhost:5173/#/so/no |
+| Kho vật tư / Công nợ (app) | http://localhost:8081/ledger/supplies · http://localhost:8081/ledger/debts |
 | Đăng nhập để lưu cả trên mạng (web) | http://localhost:5173/#/so/dang-nhap |
 | Đăng nhập để lưu cả trên mạng (app) | http://localhost:8081/ledger/sign-in |
 | Sổ thu chi (app, tab 📒) | http://localhost:8081/ledger |
@@ -88,8 +90,64 @@ cd backend && php artisan crawl:run && php artisan shops:import-osm
 | 5. Điểm bán | Nhập điểm từ OSM/CSV, danh sách, gần tôi, gọi điện, chỉ đường, người dùng đề xuất + duyệt | ✅ Xong. Chưa có bản đồ |
 | 3. Sổ thu chi Cơ bản (lưu trên máy) | Vườn, Tiền vào/ra, tổng kết, xuất/nhập file | ✅ Xong (web + app + PWA). Chưa thử với nông dân thật |
 | 4. Đồng bộ | Lưu trên máy + server, API sync, giao diện web/app | ✅ Xong. Chưa thử trên điện thoại thật; chưa có quên mật khẩu (cần OTP SMS) |
-| 4b. Sổ thu chi Nâng cao | Mùa vụ, kho vật tư, công nợ… | ⏳ Chưa làm |
+| 4b. Sổ thu chi Nâng cao | Mùa vụ, kho vật tư, công nợ | ✅ Xong (web + app). Chưa thử trên điện thoại thật |
 | 6. Phát hành | EAS build, CH Play / App Store, VPS | ⏳ Chưa làm |
+
+---
+
+## 15/10/2026: Giai đoạn 4b, Sổ thu chi Nâng cao: mùa vụ, kho vật tư, công nợ ✅
+
+**Cách tính (quyết định thiết kế)**
+- Tất cả nằm sau công tắc **"Chế độ Nâng cao"** trong Cài đặt sổ (`meta.advanced`), để bản Cơ bản vẫn gọn cho người lớn tuổi. Tắt đi thì dữ liệu vẫn giữ, số liệu vẫn tính đúng.
+- **Mùa vụ** tính theo ngày + vườn, không lưu `season_id` vào từng khoản. Sửa ngày vụ thì số liệu tự tính lại, và không phải đồng bộ hàng loạt bản ghi. Hai vụ của cùng một vườn không được trùng ngày.
+- **Kho vật tư:** lúc mua ghi 1 khoản tiền ra "chi chung" (`transactions.supply_id`). Mỗi lần "dùng cho vườn A" sinh 2 khoản ảo khi tính (`allocatedEntries`): +tiền ở vườn A, −tiền ở chi chung. Nhờ vậy tổng cả sổ không đổi, mỗi vườn biết đã tốn bao nhiêu vật tư, và phần chưa dùng nằm ở chi chung ("gồm X đ vật tư còn trong kho").
+- **Công nợ:** mua thiếu / bán chịu tính vào lời/lỗ ngay lúc phát sinh (tùy chọn "Ghi luôn vào sổ thu chi", mặc định bật). Trả nợ chỉ giảm số còn nợ, không tính lại vào lời/lỗ.
+- Khoản sinh ra từ vật tư / nợ: bấm vào thì mở vật tư / khoản nợ để sửa. Xóa khoản đó thì xóa luôn vật tư / khoản nợ, có Hoàn tác, để hai bên không lệch nhau.
+
+**Đã làm**
+- `packages/shared`:
+  - thêm 5 bảng `seasons`, `supplies`, `supply_usages`, `debts`, `debt_payments`
+  - thao tác thêm/sửa/xóa có hoàn tác (`removeRecords`)
+  - hàm tính trong `advanced.ts`
+  - không dùng `toLocaleString('vi-VN')`, vì Hermes trên Android có thể không có dữ liệu locale
+- Backend: cho phép đồng bộ bảng `debt_payments` (các bảng kia đã khai báo sẵn từ trước).
+- Web:
+  - `#/so/kho`, `#/so/kho/mua`, `#/so/kho/:id`, `#/so/no`, `#/so/no/moi`, `#/so/no/:id`, `#/so/vuon/:id/vu-moi`
+  - trang vườn có chọn vụ (`?vu=`), "Kết thúc vụ hôm nay", "Vật tư đã dùng"
+  - lối tắt Kho / Công nợ trên trang sổ
+  - ô nhập tiền tự thêm dấu chấm và đọc thành chữ
+  - ô "Thành tiền" tự tính ngược ra giá 1 đơn vị (giá lẻ được giữ nguyên, ví dụ 1 triệu / 3 chai)
+  - IndexedDB lên version 2 để tạo bảng mới
+- App (Claude giao cho một agent làm theo bản web, rồi tự kiểm lại):
+  - các màn hình `ledger/supplies`, `ledger/debts`, `ledger/season-form`
+  - trang vườn và tab Sổ thu chi giống web
+  - nhập ngày bằng chữ `năm-tháng-ngày` như màn hình Ghi tiền, vì chưa có thư viện chọn ngày
+  - `confirmAsync`: dùng `Alert` trên máy thật, `window.confirm` trên bản web (`Alert.alert` của RN-web không làm gì)
+
+**Lỗi tìm thấy và đã sửa**
+- Vite dev server không nhận thay đổi file (trả bản cũ của `LedgerSettings.tsx`), khởi động lại thì được. Nếu sửa code mà web không đổi thì khởi động lại Vite.
+- Agent làm app phát hiện 2 lỗi ở phần lõi, đã sửa và thêm test:
+  - Sửa giá vật tư mua thiếu xuống thấp hơn số đã trả nợ → giờ báo lỗi.
+  - Sửa số tiền của khoản nợ đi theo vật tư làm lệch với thành tiền vật tư → giờ báo "Hãy sửa số lượng / giá ở vật tư".
+
+**Kiểm tra**
+- 46 test shared (thêm 8 test Nâng cao), 81 test backend (thêm test đồng bộ 5 bảng mới), build + lint web, typecheck mobile: đều qua.
+- Web, bấm tự động (18/18 bước qua):
+  - mua thiếu 10 bao NPK × 600.000 đ → dùng 6 bao cho vườn A, "2,5" bao cho vườn B → còn 1,5 bao; dùng quá thì báo lỗi
+  - trang sổ: A lỗ 3.600.000 đ, B lỗ 1.500.000 đ, chi chung −900.000 đ, tổng vẫn 6.000.000 đ
+  - trả 2 triệu → còn nợ 4 triệu; bán chịu 20 triệu hẹn 01/10 → "Quá hạn"
+  - vụ 2026 của vườn A: Lời 16.400.000 đ; thêm vụ trùng ngày → báo lỗi
+  - xóa khoản mua NPK → kho trống, nợ mất; Hoàn tác → quay lại đủ; tải lại trang → dữ liệu còn
+- Đồng bộ 2 trình duyệt cùng tài khoản: vật tư, lần dùng và khoản nợ đều sang máy kia, lời/lỗ của vườn khớp. Bài thử đồng bộ cũ (web ↔ web 10/10, app ↔ web 7/7) vẫn qua.
+- App (Expo web), agent bấm thử toàn bộ luồng: mua (chỉ nhập thành tiền), dùng, trả hết nợ, bán chịu, thêm vụ, xóa + hoàn tác; không có lỗi trang.
+
+**Còn tồn**
+- Chưa thử trên điện thoại thật; chưa thử với nông dân thật xem có dễ hiểu không (nhất là cách tính "chi chung" khi có kho).
+- `npx expo export --platform web` lỗi vì Metro không đọc được file `.wasm` của `expo-sqlite` (đã có từ trước, không do phần này). Cần thêm `metro.config.js` khi muốn xuất bản web của app.
+- Chưa làm: trường tự thêm (`custom_fields`), mẫu ghi nhanh (`templates`), thu hoạch, nhân công (các bảng đã khai báo trên backend).
+
+### ⏭️ Việc làm tiếp
+- **Giai đoạn 6, Phát hành:** EAS build (development build để thử thông báo đẩy, SQLite, vị trí trên máy thật), CH Play / App Store, VPS cho backend.
 
 ---
 
@@ -152,8 +210,7 @@ Script tự bấm bằng Chrome headless (Chrome DevTools Protocol, mỗi "máy"
 - Đăng nhập tài khoản khác trên máy đang có sổ thì sổ trên máy được gộp vào tài khoản mới. Đúng như thiết kế "không mất bên nào", nhưng cần cân nhắc hỏi lại người dùng khi đổi tài khoản.
 
 ### ⏭️ Việc làm tiếp
-- **Giai đoạn 4b, Sổ thu chi Nâng cao:** mùa vụ, kho vật tư (vật tư đã mua và đã dùng cho vườn nào: yêu cầu gốc trong `text.html`), công nợ.
-- Sau đó **giai đoạn 6, Phát hành:** EAS build, CH Play / App Store, VPS.
+- Giai đoạn 4b (đã làm, xem mục phía trên).
 
 ---
 

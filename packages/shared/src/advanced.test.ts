@@ -95,11 +95,17 @@ describe('Kho vật tư', () => {
     expect(snap().debts[0].amount).toBe(700_000);
     expect(totals(filterEntries(allocatedEntries(snap()), { gardenId: a.id })).expense).toBe(700_000);
 
+    // Đã trả 500k: không cho sửa thành tiền xuống dưới; không sửa số nợ trực tiếp
+    await ledger.payDebt({ debt_id: snap().debts[0].id, amount: 500_000 });
+    await expect(ledger.updateSupply(thuoc.id, { unit_price: 100_000 })).rejects.toThrow('Đã trả 500.000 đ');
+    await expect(ledger.updateDebt(snap().debts[0].id, { amount: 650_000 })).rejects.toThrow('đi theo vật tư');
+    await ledger.updateDebt(snap().debts[0].id, { phone: '0912345678' });
+
     // Xóa khoản tiền ra trong danh sách = xóa cả vật tư
     const undo = await ledger.removeEntry(snap().transactions[0].id);
-    expect([snap().supplies, snap().transactions, snap().supply_usages, snap().debts].map((t) => t.length)).toEqual([0, 0, 0, 0]);
+    expect([snap().supplies, snap().transactions, snap().supply_usages, snap().debts, snap().debt_payments].map((t) => t.length)).toEqual([0, 0, 0, 0, 0]);
     await undo();
-    expect([snap().supplies, snap().transactions, snap().supply_usages, snap().debts].map((t) => t.length)).toEqual([1, 1, 1, 1]);
+    expect([snap().supplies, snap().transactions, snap().supply_usages, snap().debts, snap().debt_payments].map((t) => t.length)).toEqual([1, 1, 1, 1, 1]);
   });
 
   it('xóa vườn: vật tư đã dùng trả về kho, vụ của vườn bị xóa; hoàn tác thì lấy lại', async () => {

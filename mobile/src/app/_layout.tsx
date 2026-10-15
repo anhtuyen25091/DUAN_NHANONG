@@ -47,6 +47,13 @@ export default function RootLayout() {
         <Stack.Screen name="ledger/garden-form" options={{ title: 'Thêm vườn' }} />
         <Stack.Screen name="ledger/settings" options={{ title: 'Cài đặt sổ' }} />
         <Stack.Screen name="ledger/sign-in" options={{ title: 'Lưu cả trên mạng' }} />
+        <Stack.Screen name="ledger/season-form" options={{ title: 'Vụ' }} />
+        <Stack.Screen name="ledger/supplies/index" options={{ title: '📦 Kho vật tư' }} />
+        <Stack.Screen name="ledger/supplies/form" options={{ title: 'Mua vật tư' }} />
+        <Stack.Screen name="ledger/supplies/[id]" options={{ title: 'Vật tư' }} />
+        <Stack.Screen name="ledger/debts/index" options={{ title: '🧾 Công nợ' }} />
+        <Stack.Screen name="ledger/debts/form" options={{ title: 'Ghi nợ' }} />
+        <Stack.Screen name="ledger/debts/[id]" options={{ title: 'Công nợ' }} />
       </Stack>
       <ToastHost />
       <StatusBar style="dark" />

@@ -465,6 +465,10 @@ export class Ledger {
     if (!supply) return;
     const used = this.usedQuantity(id);
     if (patch.quantity !== undefined && patch.quantity < used) throw new Error(`Đã dùng ${formatQty(used)} ${supply.unit}, số lượng không thể ít hơn.`);
+    const debt = this.live('debts').find((d) => d.supply_id === id);
+    const newCost = supplyCost({ quantity: patch.quantity ?? supply.quantity, unit_price: patch.unit_price ?? supply.unit_price });
+    const paid = debt ? this.paidAmount(debt.id) : 0;
+    if (debt && newCost < paid) throw new Error(`Đã trả ${formatVnd(paid)} cho khoản mua thiếu này, thành tiền không thể ít hơn.`);
     const at = this.stamp();
     const next: Supply = {
       ...supply,
@@ -480,7 +484,6 @@ export class Ledger {
     if (entry) {
       await this.write('transactions', [{ ...entry, amount: supplyCost(next), date: next.bought_on, category_id: next.category_id, note: supplyEntryNote(next), updated_at: at }]);
     }
-    const debt = this.live('debts').find((d) => d.supply_id === id);
     if (debt) await this.write('debts', [{ ...debt, amount: supplyCost(next), date: next.bought_on, party: next.shop_name ?? debt.party, updated_at: at }]);
   }
 
@@ -586,6 +589,8 @@ export class Ledger {
     const debt = this.alive('debts', id);
     if (!debt) return;
     const paid = this.paidAmount(id);
+    // Nợ mua thiếu vật tư: số tiền đi theo thành tiền vật tư, sửa ở vật tư để 2 bên không lệch
+    if (debt.supply_id && patch.amount !== undefined && Math.round(patch.amount) !== debt.amount) throw new Error('Khoản nợ này đi theo vật tư mua thiếu. Hãy sửa số lượng / giá ở vật tư.');
     if (patch.amount !== undefined && patch.amount < paid) throw new Error(`Đã trả ${formatVnd(paid)}, số nợ không thể ít hơn.`);
     const at = this.stamp();
     const next: Debt = {
