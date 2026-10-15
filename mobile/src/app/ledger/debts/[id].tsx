@@ -1,9 +1,9 @@
-import { DEBT_KIND_LABELS, debtStatus, formatDate, formatVnd, telHref, today, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
+import { DEBT_KIND_LABELS, debtStatus, formatDate, formatVnd, interestPaid, monthlyInterest, telHref, today, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { checkDate, DateField, ErrorNote, MoneyField } from '../../../components/fields';
-import { ItemRow, SectionTitle } from '../../../components/ledger';
+import { ItemRow, KIND_ICON, SectionTitle } from '../../../components/ledger';
 import { Button, Card, styles } from '../../../components/ui';
 import { confirmAsync } from '../../../lib/confirm';
 import { useLedger } from '../../../lib/ledger';
@@ -20,7 +20,10 @@ export default function DebtDetailScreen() {
 
 function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot; id: string }) {
   const status = debtStatus(data, today()).find((s) => s.debt.id === id);
-  const [amount, setAmount] = useState(status?.left ?? 0);
+  const isLoan = status?.debt.kind === 'loan';
+  // Khoản vay: mặc định trả lãi 1 tháng, gốc để trống; nợ thường: trả hết
+  const [amount, setAmount] = useState(isLoan ? 0 : (status?.left ?? 0));
+  const [interest, setInterest] = useState(isLoan && status ? monthlyInterest(status.left, status.debt.interest_rate) : 0);
   const [date, setDate] = useState(today());
   const [error, setError] = useState<string | null>(null);
 
@@ -33,8 +36,9 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
     );
   }
   const { debt, paid, left, overdue } = status;
-  const payable = debt.kind === 'payable';
+  const payable = debt.kind !== 'receivable';
   const payments = data.debt_payments.filter((p) => p.debt_id === id);
+  const loanInterest = interestPaid({ debt_payments: payments });
   const garden = data.gardens.find((g) => g.id === debt.garden_id);
   const supply = data.supplies.find((s) => s.id === debt.supply_id);
   const color = payable ? colors.loss : colors.gain;
@@ -44,9 +48,9 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
     if (dateError) return setError(dateError);
     setError(null);
     try {
-      await ledger.payDebt({ debt_id: id, amount, date });
-      showToast({ message: `Đã ghi ${payable ? 'trả' : 'thu'} ${formatVnd(amount)}${amount === left ? '. Đã hết nợ 🎉' : ''}` });
-      setAmount(left - amount);
+      await ledger.payDebt({ debt_id: id, amount, interest, date });
+      showToast({ message: `Đã ghi ${payable ? 'trả' : 'thu'} ${formatVnd(amount)}${interest > 0 ? ` + lãi ${formatVnd(interest)}` : ''}${amount === left ? '. Đã hết nợ 🎉' : ''}` });
+      setAmount(isLoan ? 0 : left - amount);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -64,7 +68,7 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen
         options={{
-          title: `${payable ? '🔴' : '🟢'} ${debt.party}`,
+          title: `${KIND_ICON[debt.kind]} ${debt.party}`,
           headerRight: () => (
             <Text accessibilityRole="button" onPress={() => router.push({ pathname: '/ledger/debts/form', params: { id } })} style={{ color: colors.primary, fontSize: font.body, padding: 8 }}>
               Sửa
@@ -105,19 +109,28 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
             {overdue ? ' (quá hạn)' : ''}
           </Text>
         )}
+        {isLoan && (
+          <Text style={[styles.muted, { marginTop: 4 }]}>
+            {debt.interest_rate ? `Lãi suất ${String(debt.interest_rate).replace('.', ',')}%/năm · ước tính ${formatVnd(monthlyInterest(left, debt.interest_rate))}/tháng · ` : ''}
+            Lãi đã trả {formatVnd(loanInterest)}
+          </Text>
+        )}
       </Card>
 
       {left > 0 && (
         <Card>
           <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text, marginBottom: 8 }}>{payable ? 'Ghi lần trả nợ' : 'Ghi lần thu nợ'}</Text>
-          <MoneyField label="Số tiền" value={amount} onChange={setAmount} />
+          <MoneyField label={isLoan ? 'Tiền gốc trả (để 0 nếu chỉ trả lãi)' : 'Số tiền'} value={amount} onChange={setAmount} />
+          {isLoan && <MoneyField label="Tiền lãi trả (tính vào tiền ra)" value={interest} onChange={setInterest} />}
           <View style={{ marginTop: -4, marginBottom: 12 }}>
             <Button label={`${payable ? 'Trả hết' : 'Thu hết'} ${formatVnd(left)}`} variant="outline" onPress={() => setAmount(left)} />
           </View>
           <DateField label="Ngày" value={date} onChange={setDate} notFuture />
           <ErrorNote message={error} />
-          <Button label="Lưu" onPress={pay} disabled={amount <= 0} />
-          <Text style={[styles.muted, { marginTop: 8 }]}>Trả/thu nợ không tính lại vào lời/lỗ: tiền đã tính lúc {payable ? 'mua' : 'bán'}.</Text>
+          <Button label="Lưu" onPress={pay} disabled={amount + interest <= 0} />
+          <Text style={[styles.muted, { marginTop: 8 }]}>
+            {isLoan ? 'Tiền gốc không tính vào lời/lỗ; tiền lãi ghi thành tiền ra.' : `Trả/thu nợ không tính lại vào lời/lỗ: tiền đã tính lúc ${payable ? 'mua' : 'bán'}.`}
+          </Text>
         </Card>
       )}
 
@@ -129,7 +142,7 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
           icon="💵"
           title={formatDate(p.date)}
           sub={p.note}
-          amount={formatVnd(p.amount)}
+          amount={`${formatVnd(p.amount)}${p.interest ? ` + lãi ${formatVnd(p.interest)}` : ''}`}
           deleteLabel="Xóa lần trả này"
           onDelete={async () => {
             const undo = await ledger.removePayment(p.id);

@@ -100,6 +100,16 @@ php artisan shops:import-csv ds-dai-ly.csv --source="Sở NN&MT Đắk Lắk" --
   - **Mùa vụ:** mỗi vườn có các vụ (từ ngày → đến ngày, không được trùng nhau). Khoản thu chi tự thuộc vụ theo ngày + vườn. Trang vườn xem lời/lỗ theo vụ.
   - **Kho vật tư** (web `#/so/kho`, app `ledger/supplies`): mua vật tư ghi 1 khoản tiền ra "chi chung"; "Dùng cho vườn" chuyển phần tiền tương ứng sang vườn đó (`allocatedEntries`), tổng cả sổ không đổi. Có thể mua thiếu (tự ghi công nợ) hoặc dùng hết ngay cho 1 vườn.
   - **Công nợ** (web `#/so/no`, app `ledger/debts`): mua thiếu / bán chịu ghi vào lời/lỗ lúc phát sinh; mỗi lần trả/thu chỉ làm giảm số còn nợ. Có hẹn ngày trả, báo quá hạn.
+  - **Bán cho lái** (web `#/so/ban`, app `ledger/contracts`; dùng cho sầu riêng…):
+    - lái đặt cọc trước, sau đó cắt nhiều đợt; mỗi đợt ghi nhiều loại hàng (kg × giá)
+    - cọc không tính vào lời/lỗ; tiền vào = giá trị hàng của từng đợt; mỗi đợt tự nhập số trừ cọc
+    - kết thúc bằng: đóng hợp đồng (cọc trừ hết), lái bỏ cọc (phần còn lại thành tiền vào), hoặc trả lại cọc (phần đền thêm là tiền ra)
+  - **Tiền vay** (loại nợ "Mình đi vay"):
+    - tiền gốc không tính vào lời/lỗ
+    - mỗi lần trả ghi gốc + lãi; tiền lãi là tiền ra, hạng mục "🏦 Lãi vay"
+    - có lãi suất %/năm để ước tính lãi mỗi tháng
+  - **Nợ gom theo người:** cửa hàng mua thiếu nhiều lần hiện 1 dòng; "Trả gộp" trừ vào lần nợ cũ nhất trước.
+  - **Thẻ "Tình hình tài chính"** trên trang sổ: tiền vay còn phải trả, nợ cửa hàng, người ta còn nợ mình, cọc lái chưa trừ.
   - Phần lõi: `packages/shared/src/ledger.ts` (thao tác) và `packages/shared/src/advanced.ts` (tính toán).
 - **Lưu cả trên mạng** (người dùng tự chọn): đăng nhập bằng số điện thoại + mật khẩu (web `#/so/dang-nhap`, app `ledger/sign-in`).
   - Sổ vẫn nằm trên máy; mỗi lần ghi sẽ tự gửi lên sau 1,5 giây, rồi nhận phần mới từ máy khác (bản sửa mới hơn thắng).

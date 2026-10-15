@@ -1,13 +1,13 @@
-import { debtStatus, debtSummary, formatDate, formatVnd, today, type LedgerSnapshot } from '@nhanong/shared';
+import { debtsByParty, debtStatus, debtSummary, formatDate, formatVnd, today, type LedgerSnapshot } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
-import { Fab, RowCard } from '../../../components/ledger';
+import { Fab, KIND_ICON, RowCard } from '../../../components/ledger';
 import { Card, Chip, styles } from '../../../components/ui';
 import { useLedger } from '../../../lib/ledger';
 import { colors } from '../../../lib/theme';
 
-/** Công nợ: ai nợ ai, còn bao nhiêu */
+/** Công nợ & tiền vay: ai nợ ai, còn bao nhiêu (gom theo người: cửa hàng mua thiếu nhiều lần hiện 1 dòng) */
 export default function DebtListScreen() {
   const state = useLedger();
   if (!state.ledger) return <ActivityIndicator style={{ margin: 32 }} color={colors.primary} />;
@@ -18,20 +18,23 @@ function DebtList({ data }: { data: LedgerSnapshot }) {
   const [showPaid, setShowPaid] = useState(false);
   const statuses = debtStatus(data, today());
   const sum = debtSummary(statuses);
-  const shown = statuses.filter((s) => (showPaid ? s.left <= 0 : s.left > 0));
+  const groups = debtsByParty(statuses).filter((g) => (showPaid ? g.left <= 0 : g.left > 0));
+  const totals: Array<[string, number, string]> = [
+    ['🏦 Tiền vay còn nợ', sum.loan, colors.loss],
+    ['🔴 Còn nợ cửa hàng', sum.payable, colors.loss],
+    ['🟢 Người ta còn nợ mình', sum.receivable, colors.gain],
+  ];
 
   return (
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-        <Card style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-          <View style={{ flex: 1, minWidth: 140 }}>
-            <Text style={styles.muted}>Mình còn nợ người ta</Text>
-            <Text style={{ fontSize: 24, fontWeight: '800', color: colors.loss }}>{formatVnd(sum.payable)}</Text>
-          </View>
-          <View style={{ flex: 1, minWidth: 140 }}>
-            <Text style={styles.muted}>Người ta còn nợ mình</Text>
-            <Text style={{ fontSize: 24, fontWeight: '800', color: colors.gain }}>{formatVnd(sum.receivable)}</Text>
-          </View>
+        <Card style={{ gap: 8 }}>
+          {totals.map(([label, value, color]) => (
+            <View key={label} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <Text style={styles.body}>{label}</Text>
+              <Text style={{ fontSize: 22, fontWeight: '800', color }}>{formatVnd(value)}</Text>
+            </View>
+          ))}
         </Card>
 
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
@@ -39,22 +42,26 @@ function DebtList({ data }: { data: LedgerSnapshot }) {
           <Chip label="Đã trả xong" active={showPaid} onPress={() => setShowPaid(true)} />
         </View>
 
-        {shown.length === 0 && (
-          <Text style={styles.muted}>{showPaid ? 'Chưa có khoản nào trả xong.' : 'Không còn khoản nợ nào. Bấm “＋ Ghi nợ” khi mua thiếu hoặc bán chịu.'}</Text>
+        {groups.length === 0 && (
+          <Text style={styles.muted}>{showPaid ? 'Chưa có khoản nào trả xong.' : 'Không còn khoản nợ nào. Bấm “＋ Ghi nợ / vay” khi vay tiền, mua thiếu hoặc bán chịu.'}</Text>
         )}
-        {shown.map(({ debt, left, overdue }) => (
+        {groups.map((g) => (
           <RowCard
-            key={debt.id}
-            title={`${debt.kind === 'payable' ? '🔴' : '🟢'} ${debt.party}`}
-            sub={`${debt.kind === 'payable' ? 'mình nợ' : 'nợ mình'} · ${formatDate(debt.date)}`}
-            tag={overdue && debt.due_on ? `Quá hạn ${formatDate(debt.due_on)}` : null}
-            right={formatVnd(showPaid ? debt.amount : left)}
-            rightColor={debt.kind === 'payable' ? colors.loss : colors.gain}
-            onPress={() => router.push({ pathname: '/ledger/debts/[id]', params: { id: debt.id } })}
+            key={`${g.kind}|${g.party}`}
+            title={`${KIND_ICON[g.kind]} ${g.party}`}
+            sub={`${g.kind === 'loan' ? 'mình vay' : g.kind === 'payable' ? 'mình nợ' : 'nợ mình'}${g.count > 1 ? ` · ${g.count} lần` : ` · ${formatDate(g.statuses[0].debt.date)}`}`}
+            tag={g.overdue ? 'Quá hạn' : null}
+            right={formatVnd(showPaid ? g.amount : g.left)}
+            rightColor={g.kind === 'receivable' ? colors.gain : colors.loss}
+            onPress={() =>
+              g.count === 1
+                ? router.push({ pathname: '/ledger/debts/[id]', params: { id: g.statuses[0].debt.id } })
+                : router.push({ pathname: '/ledger/debts/party', params: { kind: g.kind, party: g.party } })
+            }
           />
         ))}
       </ScrollView>
-      <Fab label="＋ Ghi nợ" href="/ledger/debts/form" />
+      <Fab label="＋ Ghi nợ / vay" href="/ledger/debts/form" />
     </View>
   );
 }

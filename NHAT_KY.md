@@ -24,7 +24,7 @@ Các link chỉ mở được khi các server đang chạy. Cách bật server: 
 | Danh sách điểm bán / thu mua | http://localhost:5173/#/diem-ban |
 | Form thêm điểm bán mới | http://localhost:5173/#/diem-ban/de-xuat |
 | Sổ thu chi (web) | http://localhost:5173/#/so |
-| Kho vật tư / Công nợ (web, cần bật Chế độ Nâng cao) | http://localhost:5173/#/so/kho · http://localhost:5173/#/so/no |
+| Kho vật tư / Công nợ / Bán cho lái (web, cần bật Chế độ Nâng cao) | http://localhost:5173/#/so/kho · http://localhost:5173/#/so/no · http://localhost:5173/#/so/ban |
 | Kho vật tư / Công nợ (app) | http://localhost:8081/ledger/supplies · http://localhost:8081/ledger/debts |
 | Đăng nhập để lưu cả trên mạng (web) | http://localhost:5173/#/so/dang-nhap |
 | Đăng nhập để lưu cả trên mạng (app) | http://localhost:8081/ledger/sign-in |
@@ -92,6 +92,62 @@ cd backend && php artisan crawl:run && php artisan shops:import-osm
 | 4. Đồng bộ | Lưu trên máy + server, API sync, giao diện web/app | ✅ Xong. Chưa thử trên điện thoại thật; chưa có quên mật khẩu (cần OTP SMS) |
 | 4b. Sổ thu chi Nâng cao | Mùa vụ, kho vật tư, công nợ | ✅ Xong (web + app). Chưa thử trên điện thoại thật |
 | 6. Phát hành | EAS build, CH Play / App Store, VPS | ⏳ Chưa làm |
+
+---
+
+## 15/10/2026: Bán cho lái (cọc + cắt nhiều đợt), tiền vay, ngày chọn bằng lịch ✅
+
+**Yêu cầu** (anh Tuyên)
+- **Sầu riêng:** lái kiểm tra vườn và đặt cọc trước (ví dụ 100 triệu). Mùa thu hoạch tháng 8–10 cắt nhiều đợt, mỗi đợt tính tiền rồi trừ cọc. Cà phê, hồ tiêu không có trường hợp này.
+- **Tiền vay:** ví dụ vay ngân hàng 100 triệu cho tất cả các vườn, và mua thiếu phân của cửa hàng A 5 lần (khoảng 100 triệu). Trang tổng phải cho biết đúng lời/lỗ.
+
+**Quy tắc tính** (anh chọn khi được hỏi)
+- **Trừ cọc:** mỗi đợt tự nhập số tiền trừ cọc, không theo tỷ lệ cố định.
+- **Mỗi đợt ghi nhiều loại hàng:** Loại A/B/C, hàng dạt, hàng kem; mỗi loại có kg × giá.
+- **Lời/lỗ tính theo giá trị hàng giao:**
+  - cọc chưa tính vào lời/lỗ;
+  - mỗi đợt, tiền vào = giá trị hàng;
+  - "lái trả thêm" = giá trị hàng − số trừ cọc.
+- **Có nút kết thúc hợp đồng:**
+  - lái bỏ cọc: phần cọc chưa trừ thành tiền vào (hạng mục Thu khác);
+  - trả lại cọc: không đổi lời/lỗ; nếu phải đền thêm thì phần đền là tiền ra;
+  - cọc đã trừ hết thì đóng hợp đồng; mở lại được.
+- **Tiền vay:**
+  - tiền gốc không tính vào lời/lỗ, vì là tiền mượn và tiền đã chi cho vườn đã nằm trong các khoản tiền ra;
+  - lãi trả kèm từng lần là tiền ra, hạng mục mới **"🏦 Lãi vay"**. Sổ cũ tự được thêm hạng mục này khi mở.
+- **Nợ cửa hàng nhiều lần:** dùng "Mua vật tư → Mua thiếu" như cũ. Trang công nợ gom theo người ("Cửa hàng A · 5 lần"); "Trả gộp" trừ vào lần nợ cũ nhất trước.
+
+**Đã làm**
+- Phần dùng chung:
+  - 2 bảng mới `harvest_contracts`, `harvest_cuts`
+  - các hàm `addContract`, `addCut`, `forfeitDeposit`, `refundDeposit`, `closeContract`, `reopenContract`
+  - `DebtKind` thêm `loan`; `payDebt` nhận thêm tiền lãi; thêm `payParty`
+  - hàm tính `contractSummaries`, `debtsByParty`, `interestPaid`, `monthlyInterest`
+  - không cho xóa vườn khi còn hợp đồng bán
+- Backend: đồng bộ thêm 2 bảng mới. IndexedDB của web lên version 3.
+- Web: `#/so/ban` (danh sách, nhận cọc, chi tiết, ghi/sửa đợt cắt); trang công nợ gom theo người; `#/so/no/nguoi/:loai/:ten` (trả gộp); form "Mình đi vay"; trả gốc + lãi; thẻ **Tình hình tài chính** trên trang sổ.
+- App: các màn hình tương ứng (`ledger/contracts/*`, `ledger/debts/party`). Agent làm theo bản web, Claude kiểm lại.
+- App: **chọn ngày bằng lịch tiếng Việt** (`DatePicker`):
+  - hiện "Thứ Năm, 15/10/2026", tuần bắt đầu từ Thứ 2, nút Hôm nay / Hôm qua
+  - khóa ngày tương lai, hoặc ngày trước ngày bắt đầu
+  - ô ngày ở Ghi tiền giờ hiện sẵn
+
+**Kiểm tra**
+- 53 test shared (thêm 6), 81 test backend, build + lint web, typecheck mobile: đều qua.
+- Web, bấm tự động (14/14 bước qua):
+  - cọc 100 triệu → trang sổ vẫn "Lời 0 đ"
+  - đợt 1: 1200 kg × 85k + 300 kg × 60k = 120 triệu, trừ cọc 30 triệu → lái trả thêm 90 triệu
+  - đợt 2: tự điền loại hàng + giá đợt trước, trừ nốt 70 triệu → đóng hợp đồng
+  - vay Agribank 100 triệu, 9%/năm → ước tính lãi 750 nghìn/tháng; trả lãi 750 nghìn
+  - mua thiếu Cửa hàng A 2 lần → hiện 1 dòng "2 lần"; trả gộp 30 triệu → còn nợ 20 triệu
+  - trang sổ: Lời = 205 triệu − 50 triệu phân − 750 nghìn lãi = 154.250.000 đ; thẻ tài chính hiện vay 100 triệu, nợ cửa hàng 20 triệu
+- App (Expo web), agent bấm thử 29 bước qua; Claude xem lại ảnh chụp.
+- Lịch chọn ngày trên app: 6/6 bước qua.
+
+**Còn tồn**
+- Chưa thử trên điện thoại thật; chưa hỏi nông dân xem cách tính cọc / lãi vay có đúng thói quen không.
+- Đợt cắt chưa có "lái còn nợ" (giả định lái trả tiền ngay mỗi đợt). Nếu lái trả chậm thì tạm ghi thêm ở Công nợ → "Mình bán chịu", bỏ chọn "Ghi luôn vào sổ".
+- Bản web vẫn dùng ô chọn ngày của trình duyệt (dạng ngày theo ngôn ngữ của máy).
 
 ---
 

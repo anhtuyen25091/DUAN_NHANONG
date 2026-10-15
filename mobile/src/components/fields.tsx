@@ -37,7 +37,7 @@ export function TextField({ label, value, onChange, ...props }: { label: string;
 }
 
 /** "1500000" -> "1.500.000" để dễ đếm số 0 khi gõ */
-function groupDigits(n: number): string {
+export function groupDigits(n: number): string {
   return n ? String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
 }
 

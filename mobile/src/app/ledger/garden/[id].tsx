@@ -1,8 +1,9 @@
-import { allocatedEntries, filterEntries, formatDate, formatQty, formatVnd, monthlyTotals, seasonRange, seasonsOf, supplyUsedValue, today, totals } from '@nhanong/shared';
+import { allocatedEntries, CONTRACT_STATUS_LABELS, contractSummaries, filterEntries, formatDate, formatQty, formatVnd, monthlyTotals, seasonRange, seasonsOf, supplyUsedValue, today, totals } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { groupDigits } from '../../../components/fields';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
-import { EntryItemRow, entryItems, Fab, ItemRow, MonthBars, ProfitCard } from '../../../components/ledger';
+import { EntryItemRow, entryItems, Fab, ItemRow, MonthBars, ProfitCard, RowCard } from '../../../components/ledger';
 import { Button, Card, Chip, styles } from '../../../components/ui';
 import { useLedger } from '../../../lib/ledger';
 import { colors, font } from '../../../lib/theme';
@@ -55,10 +56,16 @@ export default function GardenScreen() {
 
   const remove = async () => {
     if (!garden) return;
-    const undo = await ledger.removeGarden(garden.id);
-    showToast({ message: `Đã xóa ${garden.name}. Các khoản chuyển sang chi chung.`, undo });
-    router.back();
+    try {
+      const undo = await ledger.removeGarden(garden.id);
+      showToast({ message: `Đã xóa ${garden.name}. Các khoản chuyển sang chi chung.`, undo });
+      router.back();
+    } catch (err) {
+      // Vườn còn hợp đồng bán cho lái: báo để xóa hợp đồng trước
+      showToast({ message: (err as Error).message });
+    }
   };
+  const contracts = gardenId ? contractSummaries(data).filter((c) => c.contract.garden_id === gardenId) : [];
 
   const endSeason = async () => {
     if (!season) return;
@@ -74,7 +81,7 @@ export default function GardenScreen() {
     <View>
       {garden && (garden.crop || garden.area_m2) ? (
         <Text style={[styles.muted, { marginBottom: 8 }]}>
-          {[garden.crop, garden.area_m2 ? `${garden.area_m2.toLocaleString('vi-VN')} m²` : null].filter(Boolean).join(' · ')}
+          {[garden.crop, garden.area_m2 ? `${groupDigits(Math.round(garden.area_m2))} m²` : null].filter(Boolean).join(' · ')}
         </Text>
       ) : null}
 
@@ -109,6 +116,25 @@ export default function GardenScreen() {
         <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text, marginBottom: 6 }}>6 tháng gần đây</Text>
         <MonthBars months={monthlyTotals(allocated, 6, today())} />
       </Card>
+
+      {advanced && garden && (
+        <>
+          <Text style={{ fontSize: font.title - 2, fontWeight: '700', color: colors.text, marginTop: 8, marginBottom: 6 }}>🤝 Bán cho lái</Text>
+          {contracts.map(({ contract, cuts, delivered, depositLeft }) => (
+            <RowCard
+              key={contract.id}
+              title={contract.buyer}
+              sub={`${cuts.length} đợt · ${CONTRACT_STATUS_LABELS[contract.status]}${contract.status === 'open' && depositLeft > 0 ? ` · cọc còn ${formatVnd(depositLeft)}` : ''}`}
+              right={formatVnd(delivered)}
+              rightColor={colors.gain}
+              onPress={() => router.push({ pathname: '/ledger/contracts/[id]', params: { id: contract.id } })}
+            />
+          ))}
+          <View style={{ marginBottom: 12 }}>
+            <Button label="＋ Nhận cọc của lái" variant="outline" onPress={() => router.push({ pathname: '/ledger/contracts/form', params: { gardenId: garden.id } })} />
+          </View>
+        </>
+      )}
 
       {usages.length > 0 && (
         <>

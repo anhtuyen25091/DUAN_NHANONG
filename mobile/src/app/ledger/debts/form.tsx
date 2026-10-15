@@ -1,12 +1,14 @@
-import { formatVnd, today, type DebtKind, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
+import { formatVnd, monthlyInterest, today, type DebtKind, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { CategoryPicker, checkDate, CheckRow, DateField, ErrorNote, GardenPicker, MoneyField, TextField } from '../../../components/fields';
-import { Button, styles } from '../../../components/ui';
+import { Button, Chip, styles } from '../../../components/ui';
 import { useLedger } from '../../../lib/ledger';
 import { colors, font } from '../../../lib/theme';
 import { showToast } from '../../../lib/toast';
+
+const KIND_TABS: Record<DebtKind, string> = { payable: 'Mình mua thiếu', receivable: 'Mình bán chịu', loan: 'Mình đi vay' };
 
 /** Ghi nợ mới, hoặc sửa khoản nợ (param id) */
 export default function DebtFormScreen() {
@@ -27,18 +29,26 @@ function DebtForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
   const [gardenId, setGardenId] = useState<string | null>(debt ? debt.garden_id : null);
   const [note, setNote] = useState(debt?.note ?? '');
   const [recordEntry, setRecordEntry] = useState(true);
-  const type = kind === 'payable' ? 'expense' : 'income';
+  const [rate, setRate] = useState(debt?.interest_rate ? String(debt.interest_rate).replace('.', ',') : '');
+  const loan = kind === 'loan';
+  const rateValue = Number(rate.replace(',', '.')) || 0;
+  const type = kind === 'receivable' ? 'income' : 'expense';
   const [categoryId, setCategoryId] = useState('');
   const category = data.categories.find((c) => c.id === categoryId && c.type === type) ?? data.categories.find((c) => c.type === type);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Gợi ý tên đã ghi trước (cùng loại nợ) để trả gộp được theo người
+  const typed = party.trim().toLowerCase();
+  const suggestions = [...new Set(data.debts.filter((d) => d.kind === kind).map((d) => d.party))]
+    .filter((p) => p !== party.trim() && (!typed || p.toLowerCase().includes(typed)))
+    .slice(0, 6);
 
   const save = async () => {
     const dateError = checkDate(date, 'Ngày', { notFuture: true }) ?? checkDate(dueOn, 'Hẹn trả ngày', { optional: true });
     if (dateError) return setError(dateError);
     setError(null);
     setSaving(true);
-    const input = { party, phone, amount, date, due_on: dueOn || null, garden_id: gardenId, note };
+    const input = { party, phone, amount, date, due_on: dueOn || null, garden_id: gardenId, note, ...(loan ? { interest_rate: rateValue || null } : {}) };
     try {
       if (debt) {
         await ledger.updateDebt(debt.id, input);
@@ -59,36 +69,53 @@ function DebtForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
       <Stack.Screen options={{ title: debt ? 'Sửa khoản nợ' : 'Ghi nợ' }} />
       {!debt && (
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-          {(['payable', 'receivable'] as const).map((k) => {
+          {(['payable', 'receivable', 'loan'] as const).map((k) => {
             const active = k === kind;
-            const color = k === 'payable' ? colors.loss : colors.gain;
+            const color = k === 'receivable' ? colors.gain : colors.loss;
             return (
               <Pressable
                 key={k}
                 onPress={() => setKind(k)}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
-                style={{ flex: 1, minHeight: 52, borderRadius: 12, borderWidth: 1, borderColor: active ? color : colors.border, backgroundColor: active ? color : colors.surface, alignItems: 'center', justifyContent: 'center' }}
+                style={{ flex: 1, minHeight: 56, paddingHorizontal: 4, borderRadius: 12, borderWidth: 1, borderColor: active ? color : colors.border, backgroundColor: active ? color : colors.surface, alignItems: 'center', justifyContent: 'center' }}
               >
-                <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: active ? '#fff' : colors.text }}>{k === 'payable' ? 'Mình mua thiếu' : 'Mình bán chịu'}</Text>
+                <Text style={{ fontSize: font.body, fontWeight: '700', textAlign: 'center', color: active ? '#fff' : colors.text }}>{KIND_TABS[k]}</Text>
               </Pressable>
             );
           })}
         </View>
       )}
+      {loan && <Text style={[styles.muted, { marginBottom: 12 }]}>Tiền vay là tiền mượn nên không tính vào lời/lỗ. Mỗi lần trả, tiền lãi sẽ ghi thành tiền ra (hạng mục 🏦 Lãi vay).</Text>}
+      {kind === 'payable' && !debt && <Text style={[styles.muted, { marginBottom: 12 }]}>Mua phân, thuốc thiếu: nên ghi ở Kho vật tư → Mua vật tư → “Mua thiếu” để biết cả số bao.</Text>}
       <TextField
-        label={kind === 'payable' ? 'Nợ ai (đại lý, cửa hàng) *' : 'Ai nợ (thương lái, người mua) *'}
+        label={loan ? 'Vay của ai (ngân hàng, người quen) *' : kind === 'payable' ? 'Nợ ai (đại lý, cửa hàng) *' : 'Ai nợ (thương lái, người mua) *'}
         value={party}
         onChange={setParty}
         maxLength={80}
-        placeholder={kind === 'payable' ? 'Ví dụ: Đại lý Hai Lúa' : 'Ví dụ: Thương lái Tư'}
+        placeholder={loan ? 'Ví dụ: Agribank, Quỹ tín dụng' : kind === 'payable' ? 'Ví dụ: Đại lý Hai Lúa' : 'Ví dụ: Thương lái Tư'}
       />
+      {suggestions.length > 0 && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: -4, marginBottom: 12 }}>
+          {suggestions.map((p) => (
+            <Chip key={p} label={p} active={false} onPress={() => setParty(p)} />
+          ))}
+        </View>
+      )}
       <TextField label="Số điện thoại" value={phone} onChange={setPhone} maxLength={20} keyboardType="phone-pad" />
-      <MoneyField label="Số tiền *" value={amount} onChange={setAmount} />
+      <MoneyField label={loan ? 'Số tiền vay *' : 'Số tiền *'} value={amount} onChange={setAmount} />
+      {loan && (
+        <>
+          <TextField label="Lãi suất (%/năm)" value={rate} onChange={(t) => setRate(t.replace(/[^\d.,]/g, ''))} keyboardType="decimal-pad" maxLength={6} placeholder="Ví dụ: 9" />
+          {rateValue > 0 && amount > 0 && <Text style={[styles.muted, { marginTop: -6, marginBottom: 12 }]}>Lãi ước tính mỗi tháng: {formatVnd(monthlyInterest(amount, rateValue))}</Text>}
+        </>
+      )}
       <DateField label="Ngày" value={date} onChange={setDate} notFuture />
       <DateField label="Hẹn trả ngày" value={dueOn} onChange={setDueOn} optional min={date} />
-      {data.gardens.length > 0 && <GardenPicker data={data} value={gardenId} onChange={setGardenId} allowShared />}
-      {!debt && (
+      {data.gardens.length > 0 && (
+        <GardenPicker data={data} value={gardenId} onChange={setGardenId} allowShared label={loan ? 'Tiền lãi tính cho vườn nào (vay chung cho các vườn: chọn Chi chung)' : 'Vườn'} />
+      )}
+      {!debt && !loan && (
         <>
           <CheckRow label={`Ghi luôn vào sổ thu chi (${kind === 'payable' ? 'tiền ra' : 'tiền vào'}, tính vào lời/lỗ)`} checked={recordEntry} onChange={setRecordEntry} />
           {!recordEntry && <Text style={[styles.muted, { marginBottom: 12 }]}>Bỏ chọn khi khoản này đã ghi trong sổ rồi, để không bị tính 2 lần.</Text>}

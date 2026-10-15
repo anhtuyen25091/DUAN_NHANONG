@@ -44,9 +44,14 @@ export default function RootLayout() {
         <Stack.Screen name="ledger/supplies/index" options={{ title: '📦 Kho vật tư' }} />
         <Stack.Screen name="ledger/supplies/form" options={{ title: 'Mua vật tư' }} />
         <Stack.Screen name="ledger/supplies/[id]" options={{ title: 'Vật tư' }} />
-        <Stack.Screen name="ledger/debts/index" options={{ title: '🧾 Công nợ' }} />
+        <Stack.Screen name="ledger/debts/index" options={{ title: '🧾 Công nợ & tiền vay' }} />
         <Stack.Screen name="ledger/debts/form" options={{ title: 'Ghi nợ' }} />
         <Stack.Screen name="ledger/debts/[id]" options={{ title: 'Công nợ' }} />
+        <Stack.Screen name="ledger/debts/party" options={{ title: 'Công nợ' }} />
+        <Stack.Screen name="ledger/contracts/index" options={{ title: '🤝 Bán cho lái' }} />
+        <Stack.Screen name="ledger/contracts/form" options={{ title: 'Nhận cọc của lái' }} />
+        <Stack.Screen name="ledger/contracts/[id]" options={{ title: 'Bán cho lái' }} />
+        <Stack.Screen name="ledger/contracts/cut-form" options={{ title: 'Ghi đợt cắt' }} />
       </Stack>
       <ToastHost />
       <StatusBar style="dark" />

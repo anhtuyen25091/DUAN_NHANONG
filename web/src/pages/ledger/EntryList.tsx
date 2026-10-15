@@ -16,13 +16,14 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
   const contractOf = new Map<string, string>()
   for (const c of data.harvest_cuts) if (c.transaction_id) contractOf.set(c.transaction_id, c.contract_id)
   for (const c of data.harvest_contracts) if (c.settle_transaction_id) contractOf.set(c.settle_transaction_id, c.id)
-  // Khoản lãi vay: mở khoản vay
-  for (const p of data.debt_payments) if (p.interest_transaction_id) debtOf.set(p.interest_transaction_id, p.debt_id)
+  // Khoản lãi vay: mở khoản vay; xóa thì chỉ xóa lần trả đó
+  const interestOf = new Map<string, string>()
+  for (const p of data.debt_payments) if (p.interest_transaction_id) interestOf.set(p.interest_transaction_id, p.debt_id)
   const entryHref = (t: Transaction) =>
     t.supply_id
       ? href(`so/kho/${t.supply_id}`)
-      : debtOf.has(t.id)
-        ? href(`so/no/${debtOf.get(t.id)}`)
+      : debtOf.has(t.id) || interestOf.has(t.id)
+        ? href(`so/no/${debtOf.get(t.id) ?? interestOf.get(t.id)}`)
         : contractOf.has(t.id)
           ? href(`so/ban/${contractOf.get(t.id)}`)
           : href('so/ghi', { sua: t.id })
@@ -32,6 +33,8 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
       ? ' (xóa cả vật tư trong kho)'
       : debtOf.has(entry.id)
         ? ' (xóa cả khoản nợ)'
+        : interestOf.has(entry.id)
+          ? ' (xóa cả lần trả nợ)'
         : data.harvest_cuts.some((c) => c.transaction_id === entry.id)
           ? ' (xóa đợt cắt)'
           : contractOf.has(entry.id)

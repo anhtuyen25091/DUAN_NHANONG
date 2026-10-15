@@ -1,4 +1,4 @@
-import { formatDate, formatVnd, groupByDate, SYNC_STATUS_LABELS, today, type Ledger, type LedgerSnapshot, type Totals, type Transaction } from '@nhanong/shared';
+import { formatDate, formatVnd, groupByDate, SYNC_STATUS_LABELS, today, type DebtKind, type Ledger, type LedgerSnapshot, type Totals, type Transaction } from '@nhanong/shared';
 import { router, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -7,6 +7,9 @@ import { getSync, useSyncStatus } from '../lib/sync';
 import { colors, font } from '../lib/theme';
 import { hideToast, showToast, useToast } from '../lib/toast';
 import { Card, styles } from './ui';
+
+/** Biểu tượng loại nợ: vay ngân hàng / mình nợ / nợ mình */
+export const KIND_ICON: Record<DebtKind, string> = { loan: '🏦', payable: '🔴', receivable: '🟢' };
 
 export function ProfitCard({ label, income, expense, profit }: Totals & { label: string }) {
   const color = profit >= 0 ? colors.gain : colors.loss;
@@ -50,14 +53,20 @@ export function EntryItemRow({ item, ledger, data, showGarden }: { item: EntryIt
 
   // Khoản sinh ra khi mua vật tư / ghi nợ: mở vật tư / khoản nợ để sửa, để 2 bên không lệch nhau
   const debtId = data.debts.find((d) => d.transaction_id === t.id)?.id;
+  // Khoản lãi vay: mở khoản vay
+  const interestDebtId = data.debt_payments.find((p) => p.interest_transaction_id === t.id)?.debt_id;
+  // Khoản của đợt cắt / bỏ cọc / đền cọc: mở hợp đồng bán cho lái
+  const cut = data.harvest_cuts.find((c) => c.transaction_id === t.id);
+  const contractId = cut?.contract_id ?? data.harvest_contracts.find((c) => c.settle_transaction_id === t.id)?.id;
   const open = () => {
     if (t.supply_id) router.push({ pathname: '/ledger/supplies/[id]', params: { id: t.supply_id } });
-    else if (debtId) router.push({ pathname: '/ledger/debts/[id]', params: { id: debtId } });
+    else if (debtId ?? interestDebtId) router.push({ pathname: '/ledger/debts/[id]', params: { id: (debtId ?? interestDebtId)! } });
+    else if (contractId) router.push({ pathname: '/ledger/contracts/[id]', params: { id: contractId } });
     else router.push({ pathname: '/ledger/add', params: { sua: t.id } });
   };
 
   const remove = async () => {
-    const linked = t.supply_id ? ' (xóa cả vật tư trong kho)' : debtId ? ' (xóa cả khoản nợ)' : '';
+    const linked = t.supply_id ? ' (xóa cả vật tư trong kho)' : debtId ? ' (xóa cả khoản nợ)' : interestDebtId ? ' (xóa cả lần trả nợ)' : cut ? ' (xóa đợt cắt)' : contractId ? ' (mở lại hợp đồng)' : '';
     const undo = await ledger.removeEntry(t.id);
     showToast({ message: `Đã xóa ${formatVnd(t.amount)}${linked}`, undo });
   };
@@ -119,7 +128,7 @@ export function RowCard({ title, sub, right, rightColor, tag, faded, onPress }: 
 }
 
 /** Dòng trong danh sách (lần dùng vật tư, lần trả nợ…) có nút 🗑 bên phải */
-export function ItemRow({ icon, title, sub, amount, amountColor, onPress, onDelete, deleteLabel }: { icon: string; title: string; sub?: string | null; amount: string; amountColor?: string; onPress?: () => void; onDelete?: () => void; deleteLabel?: string }) {
+export function ItemRow({ icon, title, sub, subLines = 2, amount, amountColor, onPress, onDelete, deleteLabel }: { icon: string; title: string; sub?: string | null; subLines?: number; amount: string; amountColor?: string; onPress?: () => void; onDelete?: () => void; deleteLabel?: string }) {
   return (
     <View style={{ flexDirection: 'row', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, marginBottom: 6 }}>
       <Pressable onPress={onPress} disabled={!onPress} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, minHeight: 60 }} accessibilityRole={onPress ? 'button' : undefined}>
@@ -127,7 +136,7 @@ export function ItemRow({ icon, title, sub, amount, amountColor, onPress, onDele
         <View style={{ flex: 1 }}>
           <Text style={styles.body}>{title}</Text>
           {sub ? (
-            <Text style={styles.muted} numberOfLines={2}>
+            <Text style={styles.muted} numberOfLines={subLines}>
               {sub}
             </Text>
           ) : null}
