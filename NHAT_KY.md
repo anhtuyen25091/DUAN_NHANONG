@@ -11,6 +11,26 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 15/10/2026 (tối): Pull code mới + nạp backup giá trên máy dev Docker (192.168.1.10)
+- **Pull:** từ `1c8353b` lên `a1a330a` (25 commit).
+  - Lần pull đầu bị ngắt giữa chừng, để lại `.git/index.lock` và đã chép dở một phần file.
+  - Đã so từng file với `origin/main`: tất cả đều giống bản trên server, không có sửa đổi riêng nào. Đã cất vào `git stash` ("ban-chep-do-dang-cua-lan-pull-bi-ngat-15-10") rồi pull lại.
+- **Migration:** chạy 4 migration mới (gói xem giá, đơn mua bán).
+- **Nạp backup** `nhanong-gia-20261015-1618.sql.gz` qua container MySQL (`docker exec -i dnnhnng-mysql-1 mysql …`), vì máy không có lệnh `mysql`.
+  - File chỉ thay 8 bảng giá: categories, products, regions, price_sources, prices, unmatched_names, crawl_logs, plans.
+  - Kết quả: 23.072 giá (10/2021 → 15/10/2026), 41 mặt hàng, 10 nguồn, 2 gói.
+  - Bảng users, shops, sổ thu chi, đơn mua bán giữ nguyên.
+  - Đã sao lưu 8 bảng cũ trước khi nạp: `/private/tmp/claude-501/db-backup/truoc-khi-nap-20261015.sql.gz` (thư mục tạm).
+- **Đang chạy:** backend `:8000`, web `:5173` (mở từ Wi-Fi bằng http://192.168.1.10:5173).
+- **Metro (Expo Go)** bị segfault (exit 139) khi chạy trong Claude Code, 3 lần liên tiếp. Chạy trong Terminal thường:
+
+```bash
+cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.10 npx expo start --go --lan --port 8081 --clear
+```
+  - Lệnh này tự in mã QR; Expo Go mở link `exp://192.168.1.10:8081`.
+
+---
+
 ## Link xem thử khi chạy dưới máy
 
 Các link chỉ mở được khi các server đang chạy (xem "Cách chạy lại" bên dưới). Máy dev hiện tại (máy 2, từ 15/10/2026) chạy web ở cổng **5180**, vì cổng 5173 đang bị dự án khác dùng.
