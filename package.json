@@ -1,0 +1,19 @@
+{
+  "name": "nha-nong",
+  "private": true,
+  "workspaces": [
+    "web",
+    "mobile",
+    "packages/*"
+  ],
+  "scripts": {
+    "web": "npm run dev -w web",
+    "mobile": "npm run start -w mobile",
+    "test": "npm run test -w @nhanong/shared",
+    "typecheck": "npm run typecheck -w @nhanong/shared && npm run build -w web && npm run typecheck -w mobile"
+  },
+  "overrides": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  }
+}
