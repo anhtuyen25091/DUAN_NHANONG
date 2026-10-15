@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CatalogController;
+use App\Http\Controllers\Api\V1\DealController;
+use App\Http\Controllers\Api\V1\DealEntryController;
 use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\LedgerSyncController;
 use App\Http\Controllers\Api\V1\PlanController;
@@ -47,5 +49,19 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/sync/push', [LedgerSyncController::class, 'push'])->name('sync.push');
         Route::get('/sync/pull', [LedgerSyncController::class, 'pull'])->name('sync.pull');
         Route::delete('/ledger', [LedgerSyncController::class, 'destroy'])->name('ledger.destroy');
+
+        // Đơn mua bán chung 2 bên (thương lái / chi nhánh / nông dân)
+        Route::get('/deals', [DealController::class, 'index'])->name('deals.index');
+        Route::post('/deals', [DealController::class, 'store'])->name('deals.store');
+        Route::post('/deals/join', [DealController::class, 'join'])->middleware('throttle:20,1')->name('deals.join');
+        Route::get('/deals/{deal}', [DealController::class, 'show'])->name('deals.show');
+        Route::patch('/deals/{deal}', [DealController::class, 'update'])->name('deals.update');
+        Route::delete('/deals/{deal}', [DealController::class, 'destroy'])->name('deals.destroy');
+        Route::put('/deals/{deal}/sources', [DealController::class, 'sources'])->name('deals.sources');
+        Route::post('/deals/{deal}/entries', [DealEntryController::class, 'store'])->name('deals.entries.store');
+        Route::patch('/deal-entries/{entry}', [DealEntryController::class, 'update'])->name('deal-entries.update');
+        Route::delete('/deal-entries/{entry}', [DealEntryController::class, 'destroy'])->name('deal-entries.destroy');
+        Route::post('/deal-entries/{entry}/confirm', [DealEntryController::class, 'confirm'])->name('deal-entries.confirm');
+        Route::post('/deal-entries/{entry}/dispute', [DealEntryController::class, 'dispute'])->name('deal-entries.dispute');
     });
 });
