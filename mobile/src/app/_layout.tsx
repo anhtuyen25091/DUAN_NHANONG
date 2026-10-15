@@ -46,6 +46,7 @@ export default function RootLayout() {
         <Stack.Screen name="ledger/garden/[id]" options={{ title: '' }} />
         <Stack.Screen name="ledger/garden-form" options={{ title: 'Thêm vườn' }} />
         <Stack.Screen name="ledger/settings" options={{ title: 'Cài đặt sổ' }} />
+        <Stack.Screen name="ledger/sign-in" options={{ title: 'Lưu cả trên mạng' }} />
       </Stack>
       <ToastHost />
       <StatusBar style="dark" />

@@ -1,7 +1,8 @@
-import { formatDate, formatVnd, groupByDate, today, type Ledger, type LedgerSnapshot, type Totals, type Transaction } from '@nhanong/shared';
+import { formatDate, formatVnd, groupByDate, SYNC_STATUS_LABELS, today, type Ledger, type LedgerSnapshot, type Totals, type Transaction } from '@nhanong/shared';
 import { router, type Href } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
+import { getSync, useSyncStatus } from '../lib/sync';
 import { colors, font } from '../lib/theme';
 import { hideToast, showToast, useToast } from '../lib/toast';
 import { Card, styles } from './ui';
@@ -165,6 +166,31 @@ export function ToastHost() {
           </Pressable>
         )}
       </View>
+    </View>
+  );
+}
+
+/** Dòng trạng thái ✅ / 🔄 / ⚠️ trên trang sổ; ẩn khi chỉ lưu trên máy */
+export function SyncBadge() {
+  const status = useSyncStatus();
+  if (status === 'off') return null;
+  const warn = status === 'offline' || status === 'expired';
+  return (
+    <View
+      accessibilityRole="summary"
+      style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 12, rowGap: 4, padding: 10, borderRadius: 10, marginBottom: 12, backgroundColor: warn ? colors.lossSoft : colors.gainSoft }}
+    >
+      <Text style={[styles.body, { flexShrink: 1 }]}>{SYNC_STATUS_LABELS[status]}</Text>
+      {status === 'offline' && (
+        <Pressable onPress={() => void getSync().syncNow()} accessibilityRole="button" hitSlop={8}>
+          <Text style={{ fontSize: font.body, fontWeight: '700', color: colors.primary }}>Thử lại</Text>
+        </Pressable>
+      )}
+      {status === 'expired' && (
+        <Pressable onPress={() => router.push('/ledger/sign-in')} accessibilityRole="button" hitSlop={8}>
+          <Text style={{ fontSize: font.body, fontWeight: '700', color: colors.primary }}>Đăng nhập</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

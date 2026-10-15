@@ -1,10 +1,11 @@
 import { filterEntries, formatVnd, totals, type Ledger, type StorageMode } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
-import { EntryItemRow, entryItems, Fab, ProfitCard } from '../../components/ledger';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { EntryItemRow, entryItems, Fab, ProfitCard, SyncBadge } from '../../components/ledger';
 import { Button, Card, Chip, styles } from '../../components/ui';
 import { useLedger } from '../../lib/ledger';
+import { getSync, useSyncStatus } from '../../lib/sync';
 import { colors, font } from '../../lib/theme';
 
 type Period = 'month' | 'year' | 'all';
@@ -20,6 +21,7 @@ function rangeOf(period: Period) {
 export default function LedgerScreen() {
   const state = useLedger();
   const [period, setPeriod] = useState<Period>('year');
+  const syncStatus = useSyncStatus();
 
   if (!state.ledger) {
     return state.error ? (
@@ -39,6 +41,7 @@ export default function LedgerScreen() {
 
   const header = (
     <View>
+      <SyncBadge />
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
         {(Object.keys(PERIODS) as Period[]).map((p) => (
           <Chip key={p} label={PERIODS[p]} active={p === period} onPress={() => setPeriod(p)} />
@@ -76,6 +79,11 @@ export default function LedgerScreen() {
         keyExtractor={(item) => (item.kind === 'day' ? `d${item.date}` : item.entry.id)}
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         ListHeaderComponent={header}
+        refreshControl={
+          data.meta.storage_mode === 'sync' ? (
+            <RefreshControl refreshing={syncStatus === 'syncing'} onRefresh={() => void getSync().syncNow()} colors={[colors.primary]} tintColor={colors.primary} />
+          ) : undefined
+        }
         renderItem={({ item }) => <EntryItemRow item={item} ledger={ledger} data={data} showGarden />}
       />
       <Fab label="＋ Ghi tiền" href="/ledger/add" />
@@ -108,7 +116,12 @@ function ChooseMode({ ledger }: { ledger: Ledger }) {
       <Text style={{ fontSize: font.title, fontWeight: '700', color: colors.text }}>Sổ thu chi của bạn lưu ở đâu?</Text>
       <Text style={styles.muted}>Bạn có thể đổi lại sau trong phần Cài đặt.</Text>
       <ModeCard icon="📱" title="Chỉ lưu trên điện thoại này" text="Không ai khác xem được. Nhớ sao lưu ra file thỉnh thoảng, đổi máy thì nhập lại." onPress={() => choose('local')} />
-      <ModeCard icon="☁️" title="Lưu cả trên mạng (đổi máy không mất)" text="Sắp có. Cần đăng nhập bằng số điện thoại." />
+      <ModeCard
+        icon="☁️"
+        title="Lưu cả trên mạng (đổi máy không mất)"
+        text="Đăng nhập bằng số điện thoại. Sổ vẫn dùng được khi mất mạng, có mạng lại sẽ tự gửi lên."
+        onPress={() => router.push('/ledger/sign-in')}
+      />
     </View>
   );
 }

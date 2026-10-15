@@ -14,6 +14,7 @@ export const colors = {
   gain: '#15803d',
   loss: '#c2410c',
   gainSoft: '#dcfce7',
+  lossSoft: '#ffedd5',
 };
 
 /** Chữ to cho người lớn tuổi dễ đọc */

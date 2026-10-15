@@ -34,15 +34,15 @@ export function Chip({ label, active, onPress }: { label: string; active: boolea
   );
 }
 
-export function Button({ label, onPress, disabled, variant = 'primary' }: { label: string; onPress: () => void; disabled?: boolean; variant?: 'primary' | 'outline' }) {
+export function Button({ label, onPress, disabled, variant = 'primary' }: { label: string; onPress: () => void; disabled?: boolean; variant?: 'primary' | 'outline' | 'danger' }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      style={({ pressed }) => [styles.button, variant === 'outline' && styles.buttonOutline, (pressed || disabled) && { opacity: 0.6 }]}
+      style={({ pressed }) => [styles.button, variant !== 'primary' && styles.buttonOutline, variant === 'danger' && { borderColor: colors.error }, (pressed || disabled) && { opacity: 0.6 }]}
     >
-      <Text style={[styles.buttonText, variant === 'outline' && { color: colors.primary }]}>{label}</Text>
+      <Text style={[styles.buttonText, variant === 'outline' && { color: colors.primary }, variant === 'danger' && { color: colors.error }]}>{label}</Text>
     </Pressable>
   );
 }

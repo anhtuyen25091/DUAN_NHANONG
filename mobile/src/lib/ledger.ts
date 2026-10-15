@@ -2,6 +2,7 @@ import { LEDGER_TABLES, Ledger, type LedgerMeta, type LedgerRecords, type Ledger
 import { openDatabaseAsync } from 'expo-sqlite';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
+import { startSync } from './sync';
 
 /**
  * Sổ thu chi lưu trong SQLite trên máy: 1 bảng `records` (tbl, id, data JSON) + 1 bảng `meta`.
@@ -71,7 +72,13 @@ function browserStorage(): LedgerStorage {
 let opening: Promise<Ledger> | null = null;
 
 export function openLedger(): Promise<Ledger> {
-  opening ??= (Platform.OS === 'web' ? Promise.resolve(browserStorage()) : sqliteStorage()).then((storage) => Ledger.open(storage));
+  opening ??= (Platform.OS === 'web' ? Promise.resolve(browserStorage()) : sqliteStorage())
+    .then((storage) => Ledger.open(storage))
+    .then((ledger) => {
+      // Chỉ chạy khi người dùng bật "lưu cả trên mạng"
+      startSync(ledger);
+      return ledger;
+    });
   return opening;
 }
 
