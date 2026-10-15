@@ -104,6 +104,63 @@ gunzip -c exports/nhanong-gia-….sql.gz | mysql --default-character-set=utf8mb4
 
 ---
 
+## Việc còn lại (thống kê 15/10/2026, 16:00)
+
+### A. Đang chạy, sắp xong
+| # | Việc | Tình trạng |
+|---|---|---|
+| 1 | Lấy giá cũ cà phê, hồ tiêu (`crawl:backfill baoquocte-ca-phe baoquocte-ho-tieu --from=2021-11`) | Đang chạy, đã tới 08/2024. Log `backend/storage/logs/backfill-baoquocte.log` |
+| 2 | Lấy giá cũ lúa gạo An Giang (`crawl:backfill congthuong-lua-gao --from=2021-10`) | Đang chạy, đã tới 03/2023. Log `backend/storage/logs/backfill-congthuong.log` |
+| 3 | Sau khi 1–2 xong | Xét lại 137 giá "cần duyệt", rồi chạy lại `scripts/export-prices.sh` để xuất file dữ liệu giá đầy đủ |
+
+Máy khác muốn lấy tiếp: nạp file `exports/*.sql.gz` (có cả `crawl_logs`), rồi chạy lại 2 lệnh trên. Các bài đã lấy sẽ được bỏ qua.
+
+### B. Thiếu do nguồn dữ liệu miễn phí không có
+| # | Việc | Ghi chú |
+|---|---|---|
+| 4 | Giá thuốc BVTV | Chưa có nguồn giá hằng ngày |
+| 5 | Phân bón theo vùng / thương hiệu, Kali trước 11/2025 | Chỉ có giá bán lẻ An Giang. agro.gov.vn còn có DAP, Urê Trung Quốc, phân lân An Giang: thêm mặt hàng vào danh mục là lấy được |
+| 6 | Sầu riêng trước 10/2024 | Báo đăng bảng giá dạng ảnh |
+| 7 | Nguồn phân bón báo Hà Tĩnh | Đã dừng từ khoảng 05/2026, cần nguồn thay thế |
+
+### C. Chức năng chưa làm
+| # | Việc | Ghi chú |
+|---|---|---|
+| 8 | Thanh toán gói xem giá (nạp thẻ / chuyển khoản QR / mã kích hoạt) | Làm sau theo yêu cầu; hiện admin kích hoạt tay trong /admin |
+| 9 | Thông báo đẩy khi app đóng (đơn mua bán, cảnh báo giá trên Android) | Cần development build của app; Expo Go Android không hỗ trợ |
+| 10 | Cập nhật tức thì giữa 2 bên (WebSocket, Laravel Reverb) | Hiện hỏi server 8 giây/lần, trễ khoảng 6–8 giây |
+| 11 | Màn hình tổng hợp cho thương lái | Lời các lô theo tháng/vụ, tổng nợ nông dân, tổng chi nhánh nợ mình |
+| 12 | Phiếu cân / biên nhận gửi bên kia | Ảnh hoặc PDF |
+| 13 | Link mã đơn mở thẳng app | Hiện link mở bản web; trên app phải nhập mã tay |
+| 14 | Quên mật khẩu | Cần OTP qua SMS (dịch vụ trả phí) |
+| 15 | Bản đồ điểm bán | Hiện chỉ có danh sách + nút chỉ đường |
+| 16 | Lọc điểm bán theo tỉnh | Nhiều điểm từ OpenStreetMap không ghi tỉnh; cần suy ra tỉnh từ tọa độ |
+| 17 | Lịch chọn ngày tiếng Việt cho bản web | App đã có; web còn dùng ô chọn ngày của trình duyệt |
+| 18 | Sổ thu chi: ghi chú bằng giọng nói, chụp ảnh hóa đơn | Có trong kế hoạch |
+| 19 | Bảng đã khai báo nhưng chưa có chức năng: trường tự thêm, mẫu ghi nhanh, thu hoạch, nhân công | |
+
+### D. Chưa kiểm tra thật
+| # | Việc |
+|---|---|
+| 20 | Thử đầy đủ trên điện thoại thật: lưu SQLite, đồng bộ, nhắc hạn trả nợ, đơn mua bán giữa 2 máy, nút "Gần tôi" |
+| 21 | Thử với nông dân / thương lái thật: dễ hiểu không, thời gian ghi 1 khoản, cách tính chi chung / cọc / lãi vay có đúng thói quen |
+| 22 | Duyệt 137 giá "cần duyệt" trong /admin → Giá (giá nhảy mạnh thật, cần người xem) |
+
+### E. Giai đoạn 6: Phát hành (chưa bắt đầu)
+| # | Việc | Cần chuẩn bị |
+|---|---|---|
+| 23 | Build app bằng EAS (bản thử nội bộ, rồi bản phát hành) | Tài khoản Expo |
+| 24 | Đưa lên CH Play / App Store | Tài khoản nhà phát triển Google (25 USD) và Apple (99 USD/năm) |
+| 25 | Đưa backend lên VPS: tên miền, HTTPS, lịch lấy giá mỗi ngày (`schedule:work` / cron + `queue:work`), sao lưu DB | VPS, tên miền |
+| 26 | Bảo mật trước khi chạy thật | Đổi mật khẩu admin, xóa tài khoản thử, `APP_DEBUG=false` |
+
+**Thứ tự đề xuất:**
+1. Mục 20–21: thử trên máy thật, với người dùng thật.
+2. Mục 23 + 25: build riêng + server; xong thì làm được mục 9 (thông báo đẩy).
+3. Mục 8 (thanh toán), rồi 11–12 (cho thương lái).
+
+---
+
 ## 15/10/2026: Tổng kết cả ngày
 
 Máy dev mới (clone từ GitHub, MySQL/Redis của DBngin, web cổng 5180, app qua Expo Go cùng Wi-Fi). Mỗi phần làm xong đều có test, thử tự động trên trình duyệt (web + bản web của app), rồi commit và push.
