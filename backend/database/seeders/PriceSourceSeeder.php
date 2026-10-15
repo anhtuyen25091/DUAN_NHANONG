@@ -68,6 +68,44 @@ class PriceSourceSeeder extends Seeder
             ],
         ];
 
+        // Báo Thế giới & Việt Nam: bài giá cà phê / tiêu hằng ngày từ 2021 (từ 2025 gộp chung "Giá nông sản hôm nay").
+        // Chỉ dùng để lấy dữ liệu cũ (php artisan crawl:backfill), không chạy hằng ngày.
+        $baoquocte = [
+            'content_selector' => 'div.__MASTERCMS_CONTENT',
+            'mode' => 'by_region',
+            'same_day_only' => false,
+        ];
+        $baoquocteSitemaps = [
+            'https://baoquocte.vn/stores/lookssitemaps/site_1/sitemap-month-{Y}-{m}.xml',
+            'https://baoquocte.vn/stores/lookssitemaps/site_1/sitemap-month-{Y}-{n}.xml',
+        ];
+        $sources[] = [
+            'code' => 'baoquocte-ca-phe',
+            'name' => 'Báo Thế giới & Việt Nam - Giá cà phê (dữ liệu cũ từ 2021)',
+            'homepage_url' => 'https://baoquocte.vn',
+            'is_enabled' => false,
+            'config' => [
+                ...$baoquocte,
+                'product_code' => 'ca-phe-robusta',
+                'price_range' => [20000, 300000],
+                'section' => ['start' => '/^gia ca phe/', 'stop' => '/^gia (ho )?tieu|^thong tin/'],
+                'backfill' => ['sitemaps' => $baoquocteSitemaps, 'url_pattern' => '#baoquocte\.vn/(gia-ca-phe-hom-nay|gia-nong-san-hom-nay)-#'],
+            ],
+        ];
+        $sources[] = [
+            'code' => 'baoquocte-ho-tieu',
+            'name' => 'Báo Thế giới & Việt Nam - Giá hồ tiêu (dữ liệu cũ từ 2021)',
+            'homepage_url' => 'https://baoquocte.vn',
+            'is_enabled' => false,
+            'config' => [
+                ...$baoquocte,
+                'product_code' => 'ho-tieu',
+                'price_range' => [30000, 400000],
+                'section' => ['start' => '/^gia (ho )?tieu/', 'stop' => '/^gia ca phe|^thong tin/'],
+                'backfill' => ['sitemaps' => $baoquocteSitemaps, 'url_pattern' => '#baoquocte\.vn/(gia-tieu-hom-nay|gia-nong-san-hom-nay)-#'],
+            ],
+        ];
+
         foreach ($sources as $source) {
             PriceSource::query()->updateOrCreate(['code' => $source['code']], ['adapter' => 'sitemap_article', ...$source]);
         }

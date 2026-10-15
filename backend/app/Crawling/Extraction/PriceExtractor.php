@@ -11,6 +11,10 @@ use Dom\Element;
  * 2. Câu văn: tìm tên rồi lấy mức giá "X - Y đồng/kg" đầu tiên phía sau,
  *    bỏ qua số chỉ mức tăng/giảm ("tăng 2.000 đồng/kg").
  * Bài có bảng giá khớp được tên thì chỉ lấy từ bảng (chính xác hơn); không có mới đọc câu văn.
+ *
+ * Bài gộp nhiều mặt hàng (vd "Giá nông sản hôm nay": phần cà phê rồi phần tiêu, mỗi phần mở bằng 1 tiêu đề H2):
+ * truyền $section = ['start' => regex, 'stop' => regex] (so trên chữ đã bỏ dấu) để chỉ đọc phần của mặt hàng cần lấy.
+ * Bài không có H2 nào khớp 'start' thì đọc cả bài như bình thường.
  */
 final class PriceExtractor
 {
@@ -31,7 +35,10 @@ final class PriceExtractor
     /** Chỉ giữ phần cuối của ngữ cảnh để tìm từ khóa gần nhất */
     private const CONTEXT_LENGTH = 2000;
 
-    public function __construct(private AliasMatcher $matcher) {}
+    /**
+     * @param  array{start: string, stop: string}|null  $section
+     */
+    public function __construct(private AliasMatcher $matcher, private ?array $section = null) {}
 
     public function extract(Element $content): ExtractionResult
     {
@@ -40,7 +47,7 @@ final class PriceExtractor
         $unmatched = [];
         $context = '';
 
-        foreach ($content->querySelectorAll('p, li, h2, h3, h4, table') as $block) {
+        foreach ($this->blocks($content) as $block) {
             if ($block->tagName === 'TABLE') {
                 [$prices, $names] = $this->fromTable($block, $context);
                 $tablePrices += $prices;
@@ -66,16 +73,49 @@ final class PriceExtractor
     }
 
     /**
+     * Các khối cần đọc theo thứ tự trong bài; có $section thì chỉ lấy các khối dưới tiêu đề H2 khớp 'start'.
+     *
+     * @return list<Element>
+     */
+    private function blocks(Element $content): array
+    {
+        $blocks = iterator_to_array($content->querySelectorAll('p, li, h2, h3, h4, table'), false);
+        if ($this->section === null) {
+            return $blocks;
+        }
+
+        $isHeading = fn (Element $block, string $pattern): bool => $block->tagName === 'H2' && preg_match($pattern, Text::normalize($block->textContent ?? '')) === 1;
+        if (! array_filter($blocks, fn (Element $block): bool => $isHeading($block, $this->section['start']))) {
+            return $blocks;
+        }
+
+        $inside = false;
+        $result = [];
+        foreach ($blocks as $block) {
+            if ($block->tagName === 'H2') {
+                $inside = $isHeading($block, $this->section['start']) || ($inside && ! preg_match($this->section['stop'], Text::normalize($block->textContent ?? '')));
+            }
+            if ($inside) {
+                $result[] = $block;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * @return array{0: array<int, ExtractedPrice>, 1: list<string>}
      */
     private function fromTable(Element $table, string $context): array
     {
         $rows = [];
         foreach ($table->querySelectorAll('tr') as $tr) {
-            $rows[] = array_map(
-                fn (Element $cell): string => trim($cell->textContent ?? ''),
-                iterator_to_array($tr->querySelectorAll('th, td')),
-            );
+            // Bảng lồng trong bảng: chỉ đọc hàng/ô của chính bảng này, bảng con được đọc riêng
+            if ($tr->closest('table') !== $table) {
+                continue;
+            }
+            $cells = array_filter(iterator_to_array($tr->querySelectorAll('th, td'), false), fn (Element $cell): bool => $cell->closest('tr') === $tr);
+            $rows[] = array_values(array_map(fn (Element $cell): string => trim($cell->textContent ?? ''), $cells));
         }
 
         $header = $this->headerRow($rows);
@@ -130,52 +170,77 @@ final class PriceExtractor
     }
 
     /**
+     * Đọc giá trong câu văn. Trong 1 vế, các tên liền nhau dùng chung mức giá đứng sau:
+     * "Đắk Nông, Đắk Lắk (83.000 đ/kg); Bình Phước (84.000 đ/kg) và Bà Rịa - Vũng Tàu ... 85.000 đ/kg".
+     *
      * @param  array<int, ExtractedPrice>  $found  giá đã có từ các đoạn trước (giữ lần xuất hiện đầu)
      * @return array<int, ExtractedPrice>
      */
     private function fromSentences(string $text, string $context, array $found): array
     {
         $prices = [];
-        $pricePattern = '/('.self::NUMBER.')(?:\s*-\s*('.self::NUMBER.'))?\s*(?:dong|d)\s*\/\s*([a-z]+)/';
         $clauseContext = $context;
 
         foreach (preg_split('/;|(?<!\d)\.(?!\d)/', $text) ?: [] as $clause) {
-            $match = $this->matcher->first($clause, $clauseContext);
+            $pending = [];
+            $position = 0;
+            $assign = function (string $segment) use (&$pending, &$prices, $found): void {
+                $price = $pending === [] ? null : $this->firstPrice($segment);
+                if ($price === null) {
+                    return;
+                }
+                foreach ($pending as $id) {
+                    if (! isset($found[$id]) && ! isset($prices[$id])) {
+                        $value = ExtractedPrice::fromValues($id, $price['range'], $price['single'], $price['unit']);
+                        if ($value !== null) {
+                            $prices[$id] = $value;
+                        }
+                    }
+                }
+                $pending = [];
+            };
+
+            while (($match = $this->matcher->first(substr($clause, $position), $clauseContext.' '.substr($clause, 0, $position))) !== null) {
+                // Đoạn giữa tên trước và tên này có giá => giá đó thuộc nhóm tên trước
+                $assign(substr($clause, $position, $match['offset']));
+                $pending[] = $match['id'];
+                $position += $match['end'];
+            }
+            $assign(substr($clause, $position));
+
             $clauseContext .= ' '.$clause;
-
-            if ($match === null || isset($found[$match['id']]) || isset($prices[$match['id']])) {
-                continue;
-            }
-
-            $after = substr($clause, $match['end']);
-            if (! preg_match_all($pricePattern, $after, $priceMatches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
-                continue;
-            }
-
-            foreach ($priceMatches as $priceMatch) {
-                if (preg_match(self::DELTA_BEFORE, substr($after, 0, $priceMatch[0][1]))) {
-                    continue;
-                }
-
-                $values = [Text::toInt($priceMatch[1][0])];
-                $isRange = ($priceMatch[2][0] ?? '') !== '';
-                if ($isRange) {
-                    $values[] = Text::toInt($priceMatch[2][0]);
-                }
-
-                $unit = $this->unitFrom('dong/'.$priceMatch[3][0]);
-                $price = $isRange
-                    ? ExtractedPrice::fromValues($match['id'], $values, [], $unit)
-                    : ExtractedPrice::fromValues($match['id'], [], $values, $unit);
-                if ($price !== null) {
-                    $prices[$match['id']] = $price;
-                }
-
-                break;
-            }
         }
 
         return $prices;
+    }
+
+    /**
+     * Mức giá "X - Y đồng/kg" đầu tiên trong đoạn, bỏ qua số chỉ mức tăng/giảm.
+     *
+     * @return array{range: list<int>, single: list<int>, unit: ?string}|null
+     */
+    private function firstPrice(string $segment): ?array
+    {
+        $pricePattern = '/('.self::NUMBER.')(?:\s*-\s*('.self::NUMBER.'))?\s*(?:dong|d)\s*\/\s*([a-z]+)/';
+        if (! preg_match_all($pricePattern, $segment, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        foreach ($matches as $match) {
+            if (preg_match(self::DELTA_BEFORE, substr($segment, 0, $match[0][1]))) {
+                continue;
+            }
+
+            $first = Text::toInt($match[1][0]);
+            $isRange = ($match[2][0] ?? '') !== '';
+            $unit = $this->unitFrom('dong/'.$match[3][0]);
+
+            return $isRange
+                ? ['range' => [$first, Text::toInt($match[2][0])], 'single' => [], 'unit' => $unit]
+                : ['range' => [], 'single' => [$first], 'unit' => $unit];
+        }
+
+        return null;
     }
 
     /**

@@ -28,6 +28,9 @@ use Throwable;
  * - region_code: khu vực cố định khi mode = by_product
  * - categories: (by_product) chỉ so khớp mặt hàng thuộc các danh mục (slug) này, vd ["lua", "gao"]
  * - max_articles: số bài tối đa mỗi ngày (mặc định 1)
+ * - price_range: [min, max] giá hợp lý (đồng); bỏ số ngoài khoảng (vd giá FOB USD/tấn, mức tăng giảm lọt vào)
+ * - section: {start, stop} regex (chữ đã bỏ dấu) chọn phần bài dưới tiêu đề H2 của mặt hàng, cho bài gộp nhiều mặt hàng
+ * - backfill: cấu hình lấy dữ liệu cũ theo tháng (xem App\Crawling\BackfillRunner)
  */
 class SitemapArticleAdapter implements PriceSourceAdapter
 {
@@ -72,10 +75,14 @@ class SitemapArticleAdapter implements PriceSourceAdapter
             ],
         ])->all();
 
-        $result = (new PriceExtractor(new AliasMatcher($matcherEntities)))->extract($content);
+        $result = (new PriceExtractor(new AliasMatcher($matcherEntities), $source->configValue('section')))->extract($content);
 
         $rows = [];
+        [$minPrice, $maxPrice] = $source->configValue('price_range') ?? [0, PHP_INT_MAX];
         foreach ($result->prices as $entityId => $price) {
+            if ($price->avg < $minPrice || $price->avg > $maxPrice) {
+                continue;
+            }
             $rows[] = new PriceRow(
                 productId: $mode === 'by_region' ? $fixedId : $entityId,
                 regionId: $mode === 'by_region' ? $entityId : $fixedId,

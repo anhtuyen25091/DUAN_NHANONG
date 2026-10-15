@@ -122,6 +122,43 @@ class PriceExtractionTest extends TestCase
         $this->assertSame([['kind' => NameKind::Product, 'name' => 'Kali bột Phú Mỹ']], $page->unmatched);
     }
 
+    public function test_old_coffee_grid_skips_fob_row_and_reads_published_date(): void
+    {
+        $page = $this->parsePage('baoquocte-ca-phe', 'baoquocte-ca-phe-2021-11-15.html');
+
+        // "FOB (TP. HCM) 2.332" là giá xuất khẩu USD/tấn: nằm ngoài khoảng giá hợp lý nên bị bỏ
+        $this->assertSame([
+            'ca-phe-robusta|dak-lak' => [41300, 41300, 41300, null],
+            'ca-phe-robusta|lam-dong' => [40400, 40400, 40400, null],
+            'ca-phe-robusta|gia-lai' => [41200, 41200, 41200, null],
+            'ca-phe-robusta|dak-nong' => [41200, 41200, 41200, null],
+        ], $this->keyed($page->rows));
+        $this->assertSame('2021-11-15', $page->publishedOn?->toDateString());
+    }
+
+    public function test_several_provinces_share_the_price_that_follows_them(): void
+    {
+        // "Đắk Nông, Đắk Lắk (83.000 đ/kg); Bình Phước (84.000 đ/kg) và Bà Rịa - Vũng Tàu ... 85.000 đ/kg"
+        $prices = $this->parse('baoquocte-ho-tieu', 'baoquocte-ho-tieu-2021-11-15.html');
+
+        $this->assertSame([
+            'gia-lai' => 82500, 'dong-nai' => 83000, 'dak-nong' => 83000, 'dak-lak' => 83000, 'binh-phuoc' => 84000, 'ba-ria-vung-tau' => 85000,
+        ], collect($prices)->mapWithKeys(fn (array $p, string $key): array => [explode('|', $key)[1] => $p[2]])->all());
+    }
+
+    public function test_combined_article_reads_only_the_section_of_each_product(): void
+    {
+        // Bài "Giá nông sản hôm nay" có phần cà phê (bảng lồng trong bảng, kèm tỷ giá USD) rồi phần tiêu
+        $coffee = $this->parse('baoquocte-ca-phe', 'baoquocte-nong-san-2025-06-27.html');
+        $pepper = $this->parse('baoquocte-ho-tieu', 'baoquocte-nong-san-2025-06-27.html');
+
+        $this->assertSame(['dak-lak' => 93800, 'lam-dong' => 93500, 'gia-lai' => 93700, 'dak-nong' => 93800], collect($coffee)->mapWithKeys(fn (array $p, string $key): array => [explode('|', $key)[1] => $p[2]])->all());
+        $this->assertSame(
+            ['dak-lak' => 128000, 'dak-nong' => 128000, 'gia-lai' => 126000, 'dong-nai' => 126000, 'ba-ria-vung-tau' => 127000, 'binh-phuoc' => 127000],
+            collect($pepper)->mapWithKeys(fn (array $p, string $key): array => [explode('|', $key)[1] => $p[2]])->all(),
+        );
+    }
+
     /**
      * @return array<string, array{0: int, 1: int, 2: int, 3: string|null}>
      */
