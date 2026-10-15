@@ -71,10 +71,14 @@ class PriceImporter
         return ['imported' => $imported, 'skipped' => $skipped];
     }
 
+    /**
+     * So với giá liền trước (kể cả giá đang chờ duyệt, trừ giá admin đã loại): giá nhảy thật > 30% thì chỉ
+     * ngày đầu bị đánh dấu, các ngày sau so với chính mức mới nên không bị kẹt "cần duyệt" mãi.
+     */
     private function isAnomaly(int $productId, int $regionId, CarbonImmutable $date, int $avg): bool
     {
         $previous = Price::query()
-            ->published()
+            ->where('status', '!=', PriceStatus::Rejected)
             ->where('product_id', $productId)
             ->where('region_id', $regionId)
             ->where('date', '<', $date->toDateString())

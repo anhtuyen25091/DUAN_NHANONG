@@ -1,5 +1,6 @@
 <?php
 
+use App\Crawling\Adapters\DurianArticleAdapter;
 use App\Crawling\Adapters\PageTableAdapter;
 use App\Crawling\Adapters\SitemapArticleAdapter;
 
@@ -30,6 +31,7 @@ return [
     'adapters' => [
         'sitemap_article' => SitemapArticleAdapter::class,
         'page_table' => PageTableAdapter::class,
+        'durian_article' => DurianArticleAdapter::class,
     ],
 
 ];

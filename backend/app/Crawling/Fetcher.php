@@ -2,6 +2,7 @@
 
 namespace App\Crawling;
 
+use GuzzleHttp\Cookie\CookieJar;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -39,6 +40,42 @@ class Fetcher
             ->get($url)
             ->throw()
             ->body();
+    }
+
+    /**
+     * Tải trang dạng form (vd trang ASP.NET cần __VIEWSTATE): GET khi $form = null, ngược lại POST form.
+     * Dùng chung $cookies giữa các lần gọi để giữ phiên. Trả về nội dung thô (có thể không phải UTF-8).
+     *
+     * @param  array<string, string>|null  $form
+     * @param  bool  $retryServerErrors  false khi lỗi 5xx là kết quả bình thường (vd xuất Excel bảng rỗng)
+     *
+     * @throws CrawlBlockedException
+     * @throws RequestException
+     * @throws ConnectionException
+     */
+    public function submit(string $url, ?array $form, CookieJar $cookies, bool $retryServerErrors = true): string
+    {
+        if (! $this->robots->allows($url)) {
+            throw new CrawlBlockedException("robots.txt không cho phép tải: {$url}");
+        }
+
+        $this->waitForHost((string) parse_url($url, PHP_URL_HOST));
+
+        $request = Http::withUserAgent(config('crawler.user_agent'))
+            ->withOptions(['cookies' => $cookies])
+            ->connectTimeout(10)
+            ->timeout(max(120, (int) config('crawler.timeout')))
+            ->retry([5000, 15000], 0, fn (Throwable $e): bool => $e instanceof ConnectionException
+                || ($e instanceof RequestException && (($retryServerErrors && $e->response->serverError()) || $e->response->status() === 429)));
+
+        try {
+            $response = $form === null ? $request->get($url) : $request->asForm()->post($url, $form);
+        } finally {
+            // Trang form thường chạy truy vấn nặng: tính thời gian nghỉ từ lúc nhận xong phản hồi
+            $this->lastRequestAt[(string) parse_url($url, PHP_URL_HOST)] = microtime(true);
+        }
+
+        return $response->throw()->body();
     }
 
     private function waitForHost(string $host): void

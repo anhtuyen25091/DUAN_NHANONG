@@ -144,6 +144,14 @@ class PriceExtractionTest extends TestCase
         $this->assertSame(['dak-lak' => 42000, 'lam-dong' => 41400, 'gia-lai' => 41900, 'dak-nong' => 41900], collect($prices)->mapWithKeys(fn (array $p, string $key): array => [explode('|', $key)[1] => $p[2]])->all());
     }
 
+    public function test_coffee_table_under_market_info_heading_still_belongs_to_coffee_section(): void
+    {
+        // Bài 06/2023: H2 "Giá cà phê hôm nay" rồi H2 "Thông tin thị trường cà phê" chứa bảng giá
+        $prices = $this->parse('baoquocte-ca-phe', 'baoquocte-ca-phe-2023-06-05.html');
+
+        $this->assertSame(['dak-lak' => 61200, 'lam-dong' => 60700, 'gia-lai' => 61000, 'dak-nong' => 61300], collect($prices)->mapWithKeys(fn (array $p, string $key): array => [explode('|', $key)[1] => $p[2]])->all());
+    }
+
     public function test_several_provinces_share_the_price_that_follows_them(): void
     {
         // "Đắk Nông, Đắk Lắk (83.000 đ/kg); Bình Phước (84.000 đ/kg) và Bà Rịa - Vũng Tàu ... 85.000 đ/kg"

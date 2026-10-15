@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Crawling\Adapters\ParsedPage;
+use App\Crawling\Adapters\PriceRow;
 use App\Crawling\CrawlRunner;
+use App\Crawling\PriceImporter;
 use App\Enums\CrawlStatus;
 use App\Enums\PriceStatus;
 use App\Models\CrawlLog;
@@ -87,6 +90,21 @@ class CrawlRunnerTest extends TestCase
             ->sole();
         $this->assertSame(PriceStatus::NeedsReview, $todayGiaLai->status);
         $this->assertSame(4, Price::query()->where('date', '2026-10-14')->published()->count());
+    }
+
+    public function test_genuine_jump_flags_only_the_first_day_not_every_day_after(): void
+    {
+        $importer = app(PriceImporter::class);
+        $pepper = $this->productId('ho-tieu');
+        $giaLai = $this->regionId('gia-lai');
+        $page = fn (int $price) => new ParsedPage([new PriceRow($pepper, $giaLai, $price, $price, $price, 'kg')], [], null);
+        $status = fn (string $date) => Price::query()->where('region_id', $giaLai)->where('date', $date)->sole()->status;
+
+        $importer->import($this->pepper, CarbonImmutable::parse('2026-10-10'), 'u', $page(100000));
+        $importer->import($this->pepper, CarbonImmutable::parse('2026-10-11'), 'u', $page(140000));
+        $importer->import($this->pepper, CarbonImmutable::parse('2026-10-12'), 'u', $page(141000));
+
+        $this->assertSame([PriceStatus::Published, PriceStatus::NeedsReview, PriceStatus::Published], [$status('2026-10-10'), $status('2026-10-11'), $status('2026-10-12')]);
     }
 
     public function test_rejected_price_is_not_overwritten(): void
