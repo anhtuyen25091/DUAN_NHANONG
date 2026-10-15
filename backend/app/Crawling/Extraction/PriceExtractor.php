@@ -121,7 +121,12 @@ final class PriceExtractor
         $header = $this->headerRow($rows);
         $skipColumns = [];
         $unit = null;
-        foreach ($header ?? [] as $index => $title) {
+        // Hàng tiêu đề thiếu ô đầu (vd "Giá trung bình | Thay đổi" trên các hàng "ĐẮK LẮK | 42.000 | +100"):
+        // canh tiêu đề về bên phải để cột "Thay đổi" khớp đúng cột mức tăng giảm
+        $widest = max(array_map('count', $header === null ? $rows : array_slice($rows, 1)) ?: [0]);
+        $offset = $header === null ? 0 : max(0, $widest - count($header));
+        foreach ($header ?? [] as $position => $title) {
+            $index = $position + $offset;
             $normalized = Text::normalize($title);
             if ($index > 0 && preg_match(self::SKIP_COLUMN, $normalized)) {
                 $skipColumns[$index] = true;

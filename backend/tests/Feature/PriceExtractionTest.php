@@ -136,6 +136,14 @@ class PriceExtractionTest extends TestCase
         $this->assertSame('2021-11-15', $page->publishedOn?->toDateString());
     }
 
+    public function test_header_row_missing_first_cell_is_aligned_to_the_right(): void
+    {
+        // Tiêu đề "Giá trung bình | Thay đổi" trên các hàng "ĐẮK LẮK | 42.000 | + 100" (bài 05/2022)
+        $prices = $this->parse('baoquocte-ca-phe', 'baoquocte-ca-phe-2022-05-31.html');
+
+        $this->assertSame(['dak-lak' => 42000, 'lam-dong' => 41400, 'gia-lai' => 41900, 'dak-nong' => 41900], collect($prices)->mapWithKeys(fn (array $p, string $key): array => [explode('|', $key)[1] => $p[2]])->all());
+    }
+
     public function test_several_provinces_share_the_price_that_follows_them(): void
     {
         // "Đắk Nông, Đắk Lắk (83.000 đ/kg); Bình Phước (84.000 đ/kg) và Bà Rịa - Vũng Tàu ... 85.000 đ/kg"
