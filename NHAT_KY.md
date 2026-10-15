@@ -240,7 +240,8 @@ cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.13 npx expo start --go --l
 - **Lỗi code:** `expo-notifications` được nạp ngay khi mở app. Từ SDK 53, Expo Go trên Android báo lỗi khi nạp thư viện này, làm sập `_layout`, `alerts`, `product/[code]` ("ErrorBoundary of undefined").
   - Cách sửa: `mobile/src/lib/push.ts` chỉ nạp thư viện khi máy hỗ trợ (`require` khi cần). Trên web và Expo Go Android thì báo "Cần cài bản build riêng của app" thay vì sập.
   - Phần mở thông báo trong `_layout.tsx` chuyển sang `onNotificationOpened()`.
-- **Metro và Vite không nhận thay đổi file** trên ổ `/Volumes/MacOS` (máy chưa có watchman). Sửa code xong phải khởi động lại, Metro thì thêm `--clear`. Có thể cài watchman (`brew install watchman`) để thử khắc phục.
+- **Metro và Vite không nhận thay đổi file** trên ổ `/Volumes/MacOS` (máy chưa có watchman).
+- Đôi khi Metro khởi động mà không quét thấy file nào trong `src/app`: bundle chỉ khoảng 1.360 module (bình thường khoảng 1.700) và app mở ra màn hình trống. Cách sửa: khởi động lại Metro rồi xem dòng log "Android Bundled … (N modules)" để chắc đủ module. Sửa code xong phải khởi động lại, Metro thì thêm `--clear`. Có thể cài watchman (`brew install watchman`) để thử khắc phục.
 
 ---
 
