@@ -96,6 +96,13 @@ php artisan shops:import-csv ds-dai-ly.csv --source="Sở NN&MT Đắk Lắk" --
   - Phần lưu trữ của từng nơi: `web/src/ledger/storage.ts` và `mobile/src/lib/ledger.ts`.
 - Web: `#/so`. App: tab "📒 Sổ thu chi".
 - Sao lưu ra file JSON và nhập lại trong mục Cài đặt sổ.
+- **Lưu cả trên mạng** (người dùng tự chọn): đăng nhập bằng số điện thoại + mật khẩu (web `#/so/dang-nhap`, app `ledger/sign-in`).
+  - Sổ vẫn nằm trên máy; mỗi lần ghi sẽ tự gửi lên sau 1,5 giây, rồi nhận phần mới từ máy khác (bản sửa mới hơn thắng).
+  - Tự đồng bộ lại khi: mở sổ, có mạng lại (web), quay lại tab/app, hoặc kéo xuống trên app.
+  - Biểu tượng trên trang sổ: ✅ đã lưu, 🔄 đang gửi, ⚠️ chưa gửi được / cần đăng nhập lại.
+  - Cài đặt sổ: "Đồng bộ ngay"; "Chuyển về chỉ lưu trên máy" (chọn giữ hoặc xóa hẳn sổ trên mạng).
+  - Phần lõi: `packages/shared/src/sync.ts`; khởi động ở `web/src/ledger/sync.ts` và `mobile/src/lib/sync.ts`.
+  - API: `POST /api/v1/auth/register|login|logout`, `GET /api/v1/user`, `POST /api/v1/sync/push`, `GET /api/v1/sync/pull?since=`, `DELETE /api/v1/ledger`.
 - Bản web là PWA: cài được ra màn hình chính và dùng được khi mất mạng (`web/public/sw.js`, chỉ bật ở bản build).
   - Thử chế độ này bằng: `npm run build -w web && npx vite preview` trong `web/`.
 

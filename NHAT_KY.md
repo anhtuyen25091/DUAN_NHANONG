@@ -24,6 +24,8 @@ Các link chỉ mở được khi các server đang chạy. Cách bật server: 
 | Danh sách điểm bán / thu mua | http://localhost:5173/#/diem-ban |
 | Form thêm điểm bán mới | http://localhost:5173/#/diem-ban/de-xuat |
 | Sổ thu chi (web) | http://localhost:5173/#/so |
+| Đăng nhập để lưu cả trên mạng (web) | http://localhost:5173/#/so/dang-nhap |
+| Đăng nhập để lưu cả trên mạng (app) | http://localhost:8081/ledger/sign-in |
 | Sổ thu chi (app, tab 📒) | http://localhost:8081/ledger |
 | App điện thoại xem trên trình duyệt (tab Bảng giá, Điểm bán, Cảnh báo) | http://localhost:8081/ |
 | Trang quản trị | http://localhost:8000/admin |
@@ -85,9 +87,73 @@ cd backend && php artisan crawl:run && php artisan shops:import-osm
 | 2. Hiển thị giá | Danh sách + biểu đồ trên web/app, cảnh báo giá, thông báo đẩy | ✅ Xong. Thông báo đẩy chưa thử trên máy thật |
 | 5. Điểm bán | Nhập điểm từ OSM/CSV, danh sách, gần tôi, gọi điện, chỉ đường, người dùng đề xuất + duyệt | ✅ Xong. Chưa có bản đồ |
 | 3. Sổ thu chi Cơ bản (lưu trên máy) | Vườn, Tiền vào/ra, tổng kết, xuất/nhập file | ✅ Xong (web + app + PWA). Chưa thử với nông dân thật |
-| 4. Đồng bộ | Lưu trên máy + server, API sync | 🔄 Đang làm: xong backend + phần đồng bộ dùng chung; còn giao diện web/app |
+| 4. Đồng bộ | Lưu trên máy + server, API sync, giao diện web/app | ✅ Xong. Chưa thử trên điện thoại thật; chưa có quên mật khẩu (cần OTP SMS) |
 | 4b. Sổ thu chi Nâng cao | Mùa vụ, kho vật tư, công nợ… | ⏳ Chưa làm |
 | 6. Phát hành | EAS build, CH Play / App Store, VPS | ⏳ Chưa làm |
+
+---
+
+## 15/10/2026: Giai đoạn 4, Đồng bộ: giao diện web + app ✅
+
+### Dựng lại môi trường trên máy mới (clone từ GitHub)
+- `git clone` vào `DUAN_NHANONG/`, `composer install`, `npm install` (ở thư mục gốc), `cp .env.example .env`, `php artisan key:generate`, `php artisan migrate --seed`.
+- Máy này đã có **MySQL 8.0 và Redis của DBngin** chạy sẵn ở cổng 3306/6379, nên `docker compose up` báo trùng cổng.
+  - Cách làm: dùng luôn MySQL/Redis của DBngin; tạo database `nhanong` và user `nhanong` / `secret` (giống `.env.example`), không phải sửa `.env`.
+- Cổng 5173 đang bị một dự án khác dùng, nên chạy web ở cổng **5180**: `cd web && npx vite --host 0.0.0.0 --port 5180`. Proxy `/api` vẫn trỏ về cổng 8000.
+- Máy dùng Node 22 / npm 10 (README ghi Node 24). Chạy được, nhưng `npm install` sửa `package-lock.json` (bỏ trường `libc`); đã hoàn lại để không commit thay đổi thừa.
+- Lấy lại dữ liệu: `crawl:run` hôm nay + ngày 14/10, `shops:import-osm` (33 điểm).
+- Kiểm tra ban đầu: 80 test backend, 38 test shared, build web + typecheck mobile đều qua.
+
+### Bước 4.3: Giao diện web ✅
+**Đã làm**
+- `web/src/ledger/sync.ts`: tạo 1 `SyncEngine` khi mở sổ; đồng bộ lại khi có mạng trở lại (`online`) và khi quay lại tab (`visibilitychange`).
+- Trang mới `#/so/dang-nhap` (`SignIn.tsx`): 2 thẻ "Tạo tài khoản mới" / "Đã có tài khoản", số điện thoại, mật khẩu, ô "Hiện mật khẩu".
+  - Lỗi hiện ngay dưới ô nhập (số sai định dạng, số đã có tài khoản, sai mật khẩu); mất mạng thì báo ở cuối form.
+  - Phiên hết hạn: mở thẻ "Đã có tài khoản", điền sẵn số điện thoại.
+- Thẻ "☁️ Lưu cả trên mạng" ở màn chọn nơi lưu đã bấm được (bỏ chữ "Sắp có").
+- Trang sổ có dòng trạng thái ✅ / 🔄 / ⚠️ (`SyncBadge.tsx`), kèm nút "Thử lại" khi mất mạng và "Đăng nhập" khi hết phiên. Chỉ lưu trên máy thì không hiện.
+- Cài đặt sổ, mục "Nơi lưu":
+  - đang chỉ lưu trên máy: nút "☁️ Bật lưu cả trên mạng"
+  - đang lưu trên mạng: tên + số điện thoại, trạng thái, lần đồng bộ cuối, nút "Đồng bộ ngay", nút "Chuyển về chỉ lưu trên máy" → hỏi "Giữ lại trên mạng" / "Xóa hẳn trên mạng" / "Hủy"
+  - "Xóa hết sổ trên máy này" khi đang lưu trên mạng: đăng xuất máy này, sổ trên mạng vẫn giữ (câu hỏi xác nhận nói rõ điều này)
+
+**Lỗi tìm thấy và đã sửa**
+- Service worker (PWA) cache mọi `GET /api/...`, kể cả `/sync/pull` và `/user`. Hậu quả: dữ liệu sổ riêng tư nằm lại trong Cache Storage sau khi đăng xuất, và khi mất mạng thì trả bản cũ nên trang hiện "✅ Đã lưu" sai. Đã sửa: request có header `Authorization` không đi qua cache.
+
+### Bước 4.4: Giao diện app ✅
+**Đã làm**
+- `mobile/src/lib/sync.ts`: giống web; đồng bộ lại mỗi khi app quay lại màn hình (`AppState` = `active`).
+- Màn hình `ledger/sign-in` giống bản web; thẻ ☁️ ở màn chọn nơi lưu đã bấm được.
+- Tab Sổ thu chi: dòng trạng thái ✅ / 🔄 / ⚠️; **kéo xuống để đồng bộ** (chỉ khi đang lưu trên mạng).
+- Cài đặt sổ: mục "Nơi lưu" giống bản web. `Button` có thêm kiểu `danger` (viền đỏ) cho nút "Xóa hẳn trên mạng".
+- App chưa có thư viện theo dõi mạng (NetInfo). Có mạng lại thì app gửi bù khi: ghi khoản tiếp theo, quay lại app, kéo xuống, hoặc bấm "Thử lại".
+
+### Bước 4.5: Thử 2 máy cùng tài khoản ✅
+Script tự bấm bằng Chrome headless (Chrome DevTools Protocol, mỗi "máy" là 1 hồ sơ trình duyệt riêng).
+
+**Web ↔ web** (10/10 bước qua)
+- Máy A tạo tài khoản → dùng vườn mẫu → tự gửi lên ("✅ Đã lưu lên mạng").
+- Máy B đăng nhập bằng "+84 9xx xxx xxx" (số được chuẩn hóa), sai mật khẩu thì báo "Số điện thoại hoặc mật khẩu không đúng.", đúng thì nhận đủ 4 khoản, "Lời 4.750.000 đ", 9 hạng mục không trùng.
+- B xóa 1 khoản → A tải lại thấy ngay.
+- A mất mạng rồi xóa 1 khoản → hiện "⚠️ Chưa gửi được"; có mạng lại tự gửi bù → B nhận được.
+- A chuyển về chỉ lưu trên máy, chọn "Xóa hẳn trên mạng" → sổ trên máy A còn nguyên; trong MySQL còn 0 bản ghi của tài khoản, token của A đã bị thu hồi.
+
+**App (Expo web) ↔ web** (7/7 bước qua)
+- App tạo tài khoản + vườn mẫu → web đăng nhập nhận đủ sổ.
+- Web xóa khoản 9 triệu → app ẩn đi rồi quay lại thì tự nhận ("Lỗ 4.250.000 đ").
+- App chuyển về chỉ lưu trên máy, chọn "Giữ lại trên mạng" → web vẫn đồng bộ bình thường.
+
+**Kiểm tra:** 80 test backend, 38 test shared, build + lint web, typecheck mobile đều qua.
+
+**Còn tồn**
+- Chưa thử trên điện thoại thật (SQLite + AppState thật). Cần development build.
+- Chưa có "Quên mật khẩu": cần OTP qua SMS (nhà cung cấp trả phí). Tạm thời người dùng quên mật khẩu chỉ còn sổ trên máy.
+- App chưa tự gửi ngay khi có mạng lại (chưa có NetInfo); xem phần trên.
+- Đăng nhập tài khoản khác trên máy đang có sổ thì sổ trên máy được gộp vào tài khoản mới. Đúng như thiết kế "không mất bên nào", nhưng cần cân nhắc hỏi lại người dùng khi đổi tài khoản.
+
+### ⏭️ Việc làm tiếp
+- **Giai đoạn 4b, Sổ thu chi Nâng cao:** mùa vụ, kho vật tư (vật tư đã mua và đã dùng cho vườn nào: yêu cầu gốc trong `text.html`), công nợ.
+- Sau đó **giai đoạn 6, Phát hành:** EAS build, CH Play / App Store, VPS.
 
 ---
 
