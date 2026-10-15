@@ -33,6 +33,7 @@ function fakeServer() {
     if (!online) throw new ApiError('Không kết nối được', 0);
     if (token !== 'tok') throw new ApiError('Unauthenticated', 401);
   };
+  const loggedOut: string[] = [];
   const api = {
     async syncPush(token: string, records: SyncPushRecord[]) {
       guard(token);
@@ -58,9 +59,11 @@ function fakeServer() {
       guard(token);
       rows.clear();
     },
-    async logout() {},
+    async logout(token: string) {
+      loggedOut.push(token);
+    },
   };
-  return { api, rows, calls, setOnline: (v: boolean) => (online = v) };
+  return { api, rows, calls, loggedOut, setOnline: (v: boolean) => (online = v) };
 }
 
 const user = { id: 1, name: 'Anh Ba', phone: '0912345678' };
@@ -177,6 +180,18 @@ describe('SyncEngine', () => {
     expect(a.ledger.getSnapshot().meta).toMatchObject({ storage_mode: 'local' });
     expect(a.ledger.getSnapshot().meta.account).toBeUndefined();
     expect(a.sync.getStatus()).toBe('off');
+  });
+
+  it('tắt đồng bộ: hủy token trên server, trừ khi token còn dùng để xem giá (keepToken)', async () => {
+    const server = fakeServer();
+    const a = await device(server);
+    await a.sync.enable('tok-1', user);
+    await a.sync.disable(false, { keepToken: true });
+    expect(server.loggedOut).toEqual([]);
+
+    await a.sync.enable('tok-2', user);
+    await a.sync.disable(false);
+    expect(server.loggedOut).toEqual(['tok-2']);
   });
 
   it('tự gửi sau khi ghi (start)', async () => {

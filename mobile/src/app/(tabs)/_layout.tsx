@@ -18,7 +18,18 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Bảng giá', tabBarIcon: icon('🌾') }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Bảng giá',
+          tabBarIcon: icon('🌾'),
+          headerRight: () => (
+            <Text accessibilityRole="button" accessibilityLabel="Tài khoản" onPress={() => router.push('/account')} style={{ color: colors.primary, fontSize: 16, padding: 12 }}>
+              👤 Tài khoản
+            </Text>
+          ),
+        }}
+      />
       <Tabs.Screen
         name="ledger"
         options={{

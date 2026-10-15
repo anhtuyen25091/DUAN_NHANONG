@@ -5,6 +5,7 @@ import { router, Stack } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, Switch, Text, View } from 'react-native';
 import { Button, Card, styles } from '../../components/ui';
+import { getAuth } from '../../lib/auth';
 import { useLedger } from '../../lib/ledger';
 import { disableDueReminders, dueRemindersEnabled, enableDueReminders, remindersUnsupported } from '../../lib/reminders';
 import { getSync, useSyncStatus } from '../../lib/sync';
@@ -67,7 +68,7 @@ export default function LedgerSettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             // Đang lưu cả trên mạng: đăng xuất trên máy này, sổ trên mạng vẫn giữ
-            if (synced) await getSync().disable(false);
+            if (synced) await getSync().disable(false, { keepToken: tokenShared(data) });
             await ledger.reset();
             showToast({ message: 'Đã xóa hết sổ thu chi trên máy này.' });
           },
@@ -187,7 +188,7 @@ function StoragePlace({ data }: { data: LedgerSnapshot }) {
   const switchToLocal = async (deleteFromServer: boolean) => {
     setBusy(true);
     try {
-      await getSync().disable(deleteFromServer);
+      await getSync().disable(deleteFromServer, { keepToken: tokenShared(data) });
       setAsking(false);
       showToast({ message: deleteFromServer ? 'Đã xóa sổ trên mạng. Từ nay chỉ lưu trên máy này.' : 'Từ nay chỉ lưu trên máy này.' });
     } catch (error) {
@@ -232,3 +233,9 @@ function StoragePlace({ data }: { data: LedgerSnapshot }) {
 }
 
 const heading = { fontSize: font.body + 1, fontWeight: '700' as const, color: colors.text, marginBottom: 6 };
+
+/** Token của sổ đang dùng chung cho đăng nhập xem giá: tắt đồng bộ thì giữ token, không làm người dùng bị đăng xuất */
+function tokenShared(data: LedgerSnapshot): boolean {
+  const auth = getAuth();
+  return !!auth?.shared && auth.token === data.meta.account?.token;
+}

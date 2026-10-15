@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { Button, Card, Chip, styles } from '../../components/ui';
 import { api } from '../../lib/api';
+import { setAuth, useAuth } from '../../lib/auth';
 import { useLedger } from '../../lib/ledger';
 import { deviceName, getSync } from '../../lib/sync';
 import { colors, font } from '../../lib/theme';
@@ -20,6 +21,7 @@ export default function SignInScreen() {
 
 function SignInForm({ data }: { data: LedgerSnapshot }) {
   const account = data.meta.account;
+  const signedIn = useAuth();
   // Phiên hết hạn thì đăng nhập lại, số điện thoại điền sẵn
   const [tab, setTab] = useState<Tab>(account ? 'login' : 'register');
   const [name, setName] = useState('');
@@ -39,6 +41,8 @@ function SignInForm({ data }: { data: LedgerSnapshot }) {
       const input = { phone: phone.trim(), password, device_name: deviceName() };
       const { token, user } = tab === 'register' ? await api.register({ ...input, name: name.trim() }) : await api.login(input);
       await getSync().enable(token, user);
+      // Dùng luôn tài khoản này để xem lịch sử giá dài hơn
+      setAuth({ token, user, shared: true });
       showToast({ message: `Đã bật lưu cả trên mạng cho tài khoản ${user.phone ?? user.name}.` });
       router.back();
     } catch (error) {
@@ -66,6 +70,21 @@ function SignInForm({ data }: { data: LedgerSnapshot }) {
   const generalMessage = message && Object.keys(errors).length === 0 ? message : null;
   const canSubmit = !sending && phone.trim() !== '' && password !== '' && (tab === 'login' || name.trim() !== '');
 
+  const enableWithSignedIn = async () => {
+    if (!signedIn) return;
+    setSending(true);
+    setMessage(null);
+    try {
+      await getSync().enable(signedIn.token, signedIn.user);
+      setAuth({ ...signedIn, shared: true });
+      showToast({ message: `Đã bật lưu cả trên mạng cho tài khoản ${signedIn.user.phone ?? signedIn.user.name}.` });
+      router.back();
+    } catch (error) {
+      setMessage((error as Error).message);
+      setSending(false);
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 6 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: 'Lưu cả trên mạng' }} />
@@ -73,6 +92,14 @@ function SignInForm({ data }: { data: LedgerSnapshot }) {
         Dùng số điện thoại để đăng nhập. Đổi máy hoặc mất máy chỉ cần đăng nhập lại là có đủ sổ.
         {hasData ? ' Sổ đang có trên máy này sẽ được gửi lên tài khoản.' : ''}
       </Text>
+      {signedIn && !account && (
+        <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary, gap: 10 }}>
+          <Text style={styles.body}>
+            Bạn đang đăng nhập tài khoản <Text style={{ fontWeight: '700' }}>{signedIn.user.phone ?? signedIn.user.name}</Text>.
+          </Text>
+          <Button label="Dùng tài khoản này" onPress={enableWithSignedIn} disabled={sending} />
+        </Card>
+      )}
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
         <Chip label="Tạo tài khoản mới" active={tab === 'register'} onPress={() => setTab('register')} />
         <Chip label="Đã có tài khoản" active={tab === 'login'} onPress={() => setTab('login')} />

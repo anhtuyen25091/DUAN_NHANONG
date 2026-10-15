@@ -1,6 +1,7 @@
 import { formatVnd, SYNC_STATUS_LABELS, totals, type Ledger, type LedgerSnapshot } from '@nhanong/shared'
 import { useState } from 'react'
 import { go, href } from '../../hooks'
+import { getAuth } from '../../auth'
 import { getSync, useSyncStatus } from '../../ledger/sync'
 import { showToast } from '../../ledger/toast'
 
@@ -40,7 +41,7 @@ export function LedgerSettings({ ledger, data }: { ledger: Ledger; data: LedgerS
     )
     if (!ok) return
     // Đang lưu cả trên mạng: đăng xuất trên máy này, sổ trên mạng vẫn giữ
-    if (data.meta.storage_mode === 'sync') await getSync().disable(false)
+    if (data.meta.storage_mode === 'sync') await getSync().disable(false, { keepToken: tokenShared(data) })
     await ledger.reset()
     showToast({ message: 'Đã xóa hết sổ thu chi trên máy này.' })
     go('so')
@@ -111,7 +112,7 @@ function StoragePlace({ data }: { data: LedgerSnapshot }) {
   const switchToLocal = async (deleteFromServer: boolean) => {
     setBusy(true)
     try {
-      await getSync().disable(deleteFromServer)
+      await getSync().disable(deleteFromServer, { keepToken: tokenShared(data) })
       setAsking(false)
       showToast({ message: deleteFromServer ? 'Đã xóa sổ trên mạng. Từ nay chỉ lưu trên máy này.' : 'Từ nay chỉ lưu trên máy này.' })
     } catch (error) {
@@ -171,4 +172,10 @@ function StoragePlace({ data }: { data: LedgerSnapshot }) {
       )}
     </section>
   )
+}
+
+/** Token của sổ đang dùng chung cho đăng nhập xem giá: tắt đồng bộ thì giữ token, không làm người dùng bị đăng xuất */
+function tokenShared(data: LedgerSnapshot): boolean {
+  const auth = getAuth()
+  return !!auth?.shared && auth.token === data.meta.account?.token
 }

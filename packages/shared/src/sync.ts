@@ -169,10 +169,11 @@ export class SyncEngine {
    * Về "chỉ lưu trên máy". deleteFromServer = true: xóa hẳn sổ trên mạng (dữ liệu trên máy vẫn giữ).
    * Không có mạng thì báo lỗi, không đổi gì (để người dùng không tưởng đã xóa).
    */
-  async disable(deleteFromServer: boolean): Promise<void> {
+  async disable(deleteFromServer: boolean, options: { keepToken?: boolean } = {}): Promise<void> {
     const token = this.ledger.getSnapshot().meta.account?.token;
     if (token && deleteFromServer) await this.api.deleteServerLedger(token);
-    if (token) await this.api.logout(token).catch(() => {});
+    // keepToken: token còn dùng cho việc khác (đăng nhập để xem lịch sử giá) thì không hủy trên server
+    if (token && !options.keepToken) await this.api.logout(token).catch(() => {});
     await this.ledger.setMeta({ storage_mode: 'local', account: undefined, sync_version: undefined, last_pushed_at: undefined, last_synced_at: undefined });
     clearTimeout(this.timer);
     this.setStatus('off');

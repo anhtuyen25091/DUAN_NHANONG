@@ -23,7 +23,7 @@ export function PriceChart({ points, unit, interval = 'day' }: { points: History
   if (points.length === 1)
     return (
       <p className="muted center">
-        Mới có giá ngày {formatDate(points[0].date)}: <strong>{formatNumber(points[0].avg)} đ/{unit}</strong>. Biểu đồ sẽ hiện khi có thêm
+        Mới có giá {interval === 'day' ? `ngày ${formatDate(points[0].date)}` : pointLabel(points[0].date, interval)}: <strong>{formatNumber(points[0].avg)} đ/{unit}</strong>. Biểu đồ sẽ hiện khi có thêm
         ngày.
       </p>
     )

@@ -1,29 +1,63 @@
-import { ALERT_CONDITION_LABELS, ApiError, formatDate, formatNumber, formatPriceRange, parseVnd, readVnd, type AlertCondition } from '@nhanong/shared';
+import { ALERT_CONDITION_LABELS, ApiError, formatDate, formatNumber, formatPriceRange, parseVnd, readVnd, type AccessTier, type AlertCondition } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { PriceChart } from '../../components/PriceChart';
 import { Button, Card, Change, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
+import { setAuth, updateAuthUser, useAuth } from '../../lib/auth';
 import { registerPush } from '../../lib/push';
 import { colors, font } from '../../lib/theme';
 import { useAsync } from '../../lib/useAsync';
 
-const RANGES = [7, 30, 90];
+const RANGES: Array<{ days: number; label: string }> = [
+  { days: 10, label: '10 ngày' },
+  { days: 30, label: '30 ngày' },
+  { days: 90, label: '3 tháng' },
+  { days: 365, label: '1 năm' },
+  { days: 1827, label: '5 năm' },
+];
+
+/** Xem được bao nhiêu ngày theo mức tài khoản (khớp config/nhanong.php của backend) */
+const TIER_DAYS: Record<AccessTier, number> = { guest: 10, member: 30, premium: Infinity };
 const CONDITIONS = Object.keys(ALERT_CONDITION_LABELS) as AlertCondition[];
 
 export default function ProductScreen() {
   const params = useLocalSearchParams<{ code: string; region?: string }>();
   const code = params.code;
   const [region, setRegion] = useState(params.region ?? '');
-  const [days, setDays] = useState(30);
+  const auth = useAuth();
+  const tier: AccessTier = auth?.user.tier ?? (auth ? 'member' : 'guest');
+  // Chưa chọn khoảng: khách xem 10 ngày, đã đăng nhập xem 30 ngày
+  const [chosenDays, setDays] = useState<number | null>(null);
+  const days = chosenDays ?? (tier === 'guest' ? 10 : 30);
+  const locked = (d: number) => d > TIER_DAYS[tier];
   const [showForm, setShowForm] = useState(false);
 
   const latest = useAsync(() => api.prices({ product: code }), [code]);
-  const history = useAsync(() => api.history(code, { region: region || null, days }), [code, region, days]);
+  const history = useAsync(
+    () =>
+      api.history(code, { region: region || null, days, token: auth?.token }).catch((error) => {
+        // Token hết hạn / bị hủy: đăng xuất trên máy rồi xem như khách
+        if (error instanceof ApiError && error.status === 401 && auth) {
+          setAuth(null);
+          return api.history(code, { region: region || null, days });
+        }
+        throw error;
+      }),
+    [code, region, days, auth?.token],
+  );
+  // Mức xem thật do server trả về (admin vừa kích hoạt gói…)
+  const served = history.state.status === 'ok' ? history.state.data.access.tier : null;
+  useEffect(() => {
+    // Lấy lại đủ thông tin tài khoản (mức xem + hạn gói) khi server báo mức xem khác
+    if (auth && served && served !== 'guest' && served !== auth.user.tier) api.me(auth.token).then(updateAuthUser, () => {});
+  }, [auth, served]);
 
   const rows = latest.state.status === 'ok' ? latest.state.data.data : [];
   const product = history.state.status === 'ok' ? history.state.data.product : rows[0]?.product;
+  const interval = history.state.status === 'ok' ? history.state.data.interval : 'day';
+  const points = history.state.status === 'ok' ? history.state.data.points : [];
   const regionName = rows.find((r) => r.region.code === region)?.region.name ?? 'Trung bình các vùng';
 
   return (
@@ -49,15 +83,19 @@ export default function ProductScreen() {
           <Chip key={row.region.code} label={row.region.name} active={row.region.code === region} onPress={() => setRegion(row.region.code)} />
         ))}
       </ScrollView>
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-        {RANGES.map((d) => (
-          <Chip key={d} label={`${d} ngày`} active={d === days} onPress={() => setDays(d)} />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+        {RANGES.map((r) => (
+          <Chip key={r.days} label={`${locked(r.days) ? '🔒 ' : ''}${r.label}`} active={r.days === days} onPress={() => setDays(r.days)} />
         ))}
       </View>
 
+      {history.state.status === 'ok' && history.state.data.access.limited && (
+        <UpgradeNotice tier={history.state.data.access.tier} firstDate={history.state.data.access.first_date} />
+      )}
+
       <Card>
         <Status state={history.state} retry={history.reload} />
-        {history.state.status === 'ok' && <PriceChart points={history.state.data.points} unit={product?.unit ?? 'kg'} />}
+        {history.state.status === 'ok' && <PriceChart points={points} unit={product?.unit ?? 'kg'} interval={interval} />}
       </Card>
 
       {product && (
@@ -96,7 +134,49 @@ export default function ProductScreen() {
           ))}
         </Card>
       )}
+
+      {points.length > 0 && (
+        <Card>
+          <Text style={{ fontSize: font.body + 1, fontWeight: '700', marginBottom: 4, color: colors.text }}>
+            {interval !== 'day' ? `Giá trung bình từng ${interval === 'week' ? 'tuần' : 'tháng'}` : 'Giá từng ngày'}
+          </Text>
+          {[...points].reverse().map((p) => (
+            <View key={p.date} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
+              <Text style={[styles.body, { flex: 1 }]}>{interval === 'month' ? `Tháng ${Number(p.date.slice(5, 7))}/${p.date.slice(0, 4)}` : formatDate(p.date)}</Text>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ fontSize: font.body, fontWeight: '700', color: colors.text }}>{formatNumber(p.avg)}</Text>
+                {p.min !== p.max && <Text style={styles.muted}>{formatPriceRange({ price_min: p.min, price_max: p.max })}</Text>}
+              </View>
+            </View>
+          ))}
+        </Card>
+      )}
     </ScrollView>
+  );
+}
+
+/** Khoảng xem bị giới hạn: mời đăng ký (khách) hoặc mua gói (thành viên) */
+function UpgradeNotice({ tier, firstDate }: { tier: AccessTier; firstDate: string | null }) {
+  const since = firstDate ? ` (có dữ liệu từ ${formatDate(firstDate)})` : '';
+  const openAccount = () => router.push({ pathname: '/account', params: { back: '1' } });
+  return (
+    <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary, gap: 10 }}>
+      {tier === 'guest' ? (
+        <>
+          <Text style={styles.body}>
+            Bạn đang xem <Text style={{ fontWeight: '700' }}>{TIER_DAYS.guest} ngày gần nhất</Text>. Đăng ký miễn phí để xem {TIER_DAYS.member} ngày; mua gói để xem toàn bộ lịch sử giá{since}.
+          </Text>
+          <Button label="Đăng ký / Đăng nhập" onPress={openAccount} />
+        </>
+      ) : (
+        <>
+          <Text style={styles.body}>
+            Tài khoản thường xem được <Text style={{ fontWeight: '700' }}>{TIER_DAYS.member} ngày gần nhất</Text>. Mua gói tháng / năm để xem toàn bộ lịch sử giá{since}.
+          </Text>
+          <Button label="Xem các gói" onPress={openAccount} />
+        </>
+      )}
+    </Card>
   );
 }
 
