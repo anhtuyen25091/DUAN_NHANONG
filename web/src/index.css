@@ -1204,3 +1204,29 @@ table.schedule tr.next {
   margin: 8px 0 0;
   padding: 0;
 }
+
+/* ---- Quyết toán hợp đồng bán cho lái ---- */
+.card.settle dl {
+  margin: 8px 0;
+}
+
+.card.settle dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.card.settle dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.card.settle fieldset.form {
+  border: 0;
+  padding: 0;
+  margin: 12px 0;
+}

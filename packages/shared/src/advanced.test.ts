@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addMonths, allocatedEntries, contractSummaries, debtsByParty, debtStatus, dueReminders, interestPaid, loanSchedule, monthlyInterest, debtSummary, seasonRange, seasonsOf, suggestSeasonName, supplyStock, supplyUsedValue } from './advanced';
+import { addMonths, allocatedEntries, contractSettlement, contractSummaries, debtsByParty, debtStatus, dueReminders, interestPaid, loanSchedule, monthlyInterest, debtSummary, seasonRange, seasonsOf, suggestSeasonName, supplyStock, supplyUsedValue } from './advanced';
 import { filterEntries, Ledger, totals, type LedgerMeta, type LedgerStorage } from './ledger';
 import type { SyncRecord } from './types';
 
@@ -380,5 +380,43 @@ describe('Lịch trả nợ vay + nhắc hạn', () => {
       ['Cửa hàng A: hạn trả nợ 5.000.000 đ', '2026-10-10', true],
       ['Agribank: kỳ 1, lãi 750.000 đ', '2026-10-20', false],
     ]);
+  });
+});
+
+describe('Hoàn tất hợp đồng bán cho lái (quyết toán)', () => {
+  const twoCuts = async () => {
+    const { ledger, a } = await setup();
+    const hd = await ledger.addContract({ garden_id: a.id, buyer: 'Lái Tư', deposit: 100_000_000, date: '2026-08-01' });
+    // Cắt 2 đợt, mới trừ cọc 30tr + 20tr
+    await ledger.addCut({ contract_id: hd.id, date: '2026-08-20', lines: [{ grade: 'Loại A', kg: 1000, price: 80_000 }], deposit_deduct: 30_000_000 });
+    await ledger.addCut({ contract_id: hd.id, date: '2026-09-20', lines: [{ grade: 'Loại A', kg: 900, price: 90_000 }], deposit_deduct: 20_000_000 });
+    const summary = () => contractSummaries(ledger.getSnapshot())[0];
+    return { ledger, hd, summary, settlement: () => contractSettlement(summary(), ledger.getSnapshot().transactions) };
+  };
+
+  it('trừ nốt cọc còn dư vào tiền hàng (đợt cuối trước) rồi đóng', async () => {
+    const { ledger, hd, summary, settlement } = await twoCuts();
+    expect(settlement().deductRoom).toBe(161_000_000 - 50_000_000);
+    await ledger.settleContract(hd.id, 'deduct');
+    expect(summary()).toMatchObject({ depositLeft: 0, deducted: 100_000_000, contract: { status: 'done' } });
+    expect(summary().cuts.map((c) => c.deposit_deduct)).toEqual([30_000_000, 70_000_000]);
+    expect(settlement()).toMatchObject({ delivered: 161_000_000, received: 161_000_000, profit: 161_000_000, refunded: 0 });
+  });
+
+  it('trả lại phần cọc dư / lái bỏ phần cọc dư', async () => {
+    let t = await twoCuts();
+    await t.ledger.settleContract(t.hd.id, 'refund');
+    expect(t.settlement()).toMatchObject({ refunded: 50_000_000, received: 100_000_000 + 111_000_000 - 50_000_000, profit: 161_000_000 });
+
+    t = await twoCuts();
+    await t.ledger.settleContract(t.hd.id, 'forfeit');
+    expect(t.settlement()).toMatchObject({ forfeited: 50_000_000, received: 211_000_000, profit: 211_000_000 });
+  });
+
+  it('tiền hàng ít hơn cọc thì không trừ nốt được, phải trả lại hoặc lái bỏ', async () => {
+    const { ledger, a } = await setup();
+    const hd = await ledger.addContract({ garden_id: a.id, buyer: 'Lái Năm', deposit: 100_000_000 });
+    await ledger.addCut({ contract_id: hd.id, lines: [{ grade: 'Loại A', kg: 500, price: 80_000 }], deposit_deduct: 0 });
+    await expect(ledger.settleContract(hd.id, 'deduct')).rejects.toThrow('thiếu 60.000.000 đ');
   });
 });

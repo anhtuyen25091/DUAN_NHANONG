@@ -960,6 +960,37 @@ export class Ledger {
     await this.write('harvest_contracts', [{ ...contract, status: 'done', closed_on: date ?? today(this.now()), updated_at: this.stamp() }]);
   }
 
+  /**
+   * Hoàn tất hợp đồng (quyết toán). Cọc còn dư thì xử lý theo `how`:
+   * - deduct: trừ nốt vào tiền hàng các đợt (đợt cuối trước), rồi đóng
+   * - refund: trả lại phần cọc dư cho lái
+   * - forfeit: lái bỏ phần cọc dư (thành tiền vào)
+   * Cọc đã trừ hết thì `how` không cần.
+   */
+  async settleContract(contractId: string, how: 'deduct' | 'refund' | 'forfeit' = 'deduct', date?: string): Promise<void> {
+    const contract = this.openContract(contractId);
+    let left = contract.deposit - this.deductedFor(contractId);
+    if (left <= 0) return this.closeContract(contractId, date);
+    if (how === 'refund') return this.refundDeposit(contractId, left, date);
+    if (how === 'forfeit') return this.forfeitDeposit(contractId, date);
+    const cuts = this.live('harvest_cuts')
+      .filter((c) => c.contract_id === contractId)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at));
+    const room = cuts.reduce((s, c) => s + cutValue(c.lines) - c.deposit_deduct, 0);
+    if (room < left) throw new Error(`Tiền hàng các đợt chỉ còn ${formatVnd(room)} để trừ cọc, thiếu ${formatVnd(left - room)}. Hãy trả lại phần dư cho lái hoặc ghi lái bỏ cọc.`);
+    const at = this.stamp();
+    const changed: HarvestCut[] = [];
+    for (const cut of cuts) {
+      if (left <= 0) break;
+      const add = Math.min(left, cutValue(cut.lines) - cut.deposit_deduct);
+      if (add <= 0) continue;
+      changed.push({ ...cut, deposit_deduct: cut.deposit_deduct + add, updated_at: at });
+      left -= add;
+    }
+    await this.write('harvest_cuts', changed);
+    await this.closeContract(contractId, date);
+  }
+
   /** Mở lại hợp đồng đã kết thúc (xóa khoản bỏ cọc / đền cọc nếu có) */
   async reopenContract(contractId: string): Promise<Undo> {
     const contract = this.alive('harvest_contracts', contractId);

@@ -95,6 +95,26 @@ cd backend && php artisan crawl:run && php artisan shops:import-osm
 
 ---
 
+## 15/10/2026: Bán cho lái: nút Hoàn tất + bảng quyết toán ✅
+
+**Lỗi anh Tuyên gặp:** cọc 100 triệu, cắt 2 lần, nhưng không có nút hoàn tất để ra số liệu.
+- Nguyên nhân: nút "Cắt xong, đóng hợp đồng" chỉ hiện khi cọc đã trừ hết. Các đợt chưa trừ đủ cọc thì chỉ thấy "Lái bỏ cọc" / "Trả lại cọc".
+
+**Đã sửa**
+- Luôn có nút **"✅ Hoàn tất hợp đồng"**. Bấm vào thì hiện **bảng quyết toán**: tiền hàng các đợt (kg), tiền cọc, đã trừ cọc, cọc còn dư.
+- Cọc còn dư thì chọn 1 trong 3 cách (`Ledger.settleContract`):
+  1. **Trừ nốt vào tiền hàng** (mặc định): trừ thêm vào đợt cuối trước. Chỉ chọn được khi tiền hàng đủ để trừ.
+  2. **Trả lại lái** phần dư: không đổi lời/lỗ. Muốn đền thêm thì bấm "Trả lại cọc kèm tiền đền…".
+  3. **Lái bỏ cọc** phần dư: thành tiền vào.
+- Hợp đồng đã xong có bảng **📋 Quyết toán** (`contractSettlement`): tiền hàng, lái bỏ cọc / trả lại / đền thêm, tiền lái thực trả, **phần tính vào lời/lỗ của vườn**, giá bình quân/kg. Vẫn mở lại được.
+
+**Kiểm tra**
+- 61 test shared (thêm 3).
+- Web 8/8 bước qua: cọc 100 triệu, 2 đợt (trừ 30 + 20 triệu) → hoàn tất trừ nốt → đợt 2 trừ 70 triệu; lời/lỗ 161 triệu, giá bình quân 84.737 đ/kg.
+- App (Expo web) 3/3 bước qua.
+
+---
+
 ## 15/10/2026: Khoản vay: bên cho vay, lịch trả nợ, tổng lãi, nhắc hạn ✅
 
 **Yêu cầu:**

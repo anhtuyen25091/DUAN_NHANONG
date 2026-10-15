@@ -1,5 +1,6 @@
 import {
   CONTRACT_STATUS_LABELS,
+  contractSettlement,
   contractSummaries,
   CUT_GRADES,
   cutKg,
@@ -147,8 +148,8 @@ export function ContractForm({ ledger, data, id, query }: { ledger: Ledger; data
 /** #/so/ban/:id: tình hình hợp đồng, các đợt cắt, kết thúc */
 export function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot; id: string }) {
   const summary = contractSummaries(data).find((s) => s.contract.id === id)
-  const [ending, setEnding] = useState<null | 'refund'>(null)
-  const [refund, setRefund] = useState(summary?.depositLeft ?? 0)
+  const [settling, setSettling] = useState(false)
+  const [how, setHow] = useState<'deduct' | 'refund' | 'forfeit'>('deduct')
   const [error, setError] = useState<string | null>(null)
 
   if (!summary)
@@ -160,12 +161,15 @@ export function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: Led
   const { contract, cuts, delivered, kg, deducted, depositLeft, paidByCuts } = summary
   const garden = data.gardens.find((g) => g.id === contract.garden_id)
   const open = contract.status === 'open'
+  const settlement = contractSettlement(summary, data.transactions)
+  const canDeduct = settlement.deductRoom >= depositLeft
+  const choice = depositLeft > 0 && !canDeduct && how === 'deduct' ? 'refund' : how
 
   const run = async (action: () => Promise<unknown>, message: string) => {
     setError(null)
     try {
       await action()
-      setEnding(null)
+      setSettling(false)
       showToast({ message })
     } catch (err) {
       setError((err as Error).message)
@@ -248,57 +252,147 @@ export function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: Led
         ))}
       </div>
 
-      {open ? (
-        <section className="card">
-          <h2>Kết thúc hợp đồng</h2>
-          {depositLeft === 0 ? (
-            <button type="button" className="wide primary" onClick={() => run(() => ledger.closeContract(id), 'Đã đóng hợp đồng')}>
-              ✅ Cắt xong, đóng hợp đồng
-            </button>
-          ) : (
-            <p className="small muted">Còn {formatVnd(depositLeft)} cọc chưa trừ: trừ vào đợt cuối, hoặc chọn một cách dưới đây.</p>
-          )}
-          {depositLeft > 0 && (
-            <div className="actions">
-              <button
-                type="button"
-                onClick={() =>
-                  window.confirm(`Lái ${contract.buyer} bỏ cọc? ${formatVnd(depositLeft)} cọc còn lại sẽ ghi thành tiền vào của vườn.`) &&
-                  run(() => ledger.forfeitDeposit(id), `Đã ghi lái bỏ cọc: +${formatVnd(depositLeft)}`)
-                }
-              >
-                Lái bỏ cọc
-              </button>
-              <button type="button" onClick={() => setEnding(ending ? null : 'refund')}>
-                Trả lại cọc
-              </button>
-            </div>
-          )}
-          {ending === 'refund' && (
-            <form
-              className="form switch-mode"
-              onSubmit={(e) => {
-                e.preventDefault()
-                void run(() => ledger.refundDeposit(id, refund), `Đã ghi trả lại cọc ${formatVnd(refund)}`)
-              }}
-            >
-              <MoneyField label="Số tiền trả lại lái" value={refund} onChange={setRefund} />
-              {refund > depositLeft && <p className="small out">Đền thêm {formatVnd(refund - depositLeft)}: ghi thành tiền ra của vườn.</p>}
-              <button type="submit" className="wide primary">
-                Ghi trả lại cọc
-              </button>
-            </form>
-          )}
-        </section>
-      ) : (
-        <button type="button" className="wide" onClick={() => run(() => ledger.reopenContract(id), 'Đã mở lại hợp đồng')}>
-          Mở lại hợp đồng
+      {open && !settling && (
+        <button type="button" className="wide primary" onClick={() => setSettling(true)}>
+          ✅ Hoàn tất hợp đồng
         </button>
+      )}
+      {open && settling && (
+        <section className="card settle">
+          <h2>Quyết toán với lái {contract.buyer}</h2>
+          <dl>
+            <div>
+              <dt>Tiền hàng {cuts.length} đợt ({formatQty(kg)} kg)</dt>
+              <dd>{formatVnd(delivered)}</dd>
+            </div>
+            <div>
+              <dt>Tiền cọc</dt>
+              <dd>{formatVnd(contract.deposit)}</dd>
+            </div>
+            <div>
+              <dt>Đã trừ cọc vào các đợt</dt>
+              <dd>{formatVnd(deducted)}</dd>
+            </div>
+            <div>
+              <dt>
+                <b>Cọc còn dư</b>
+              </dt>
+              <dd className={depositLeft > 0 ? 'out' : ''}>{formatVnd(depositLeft)}</dd>
+            </div>
+          </dl>
+          {depositLeft > 0 && (
+            <fieldset className="form">
+              <legend>Phần cọc dư {formatVnd(depositLeft)} xử lý thế nào?</legend>
+              <label className="radio-card">
+                <input type="radio" name="settle" checked={choice === 'deduct'} disabled={!canDeduct} onChange={() => setHow('deduct')} />
+                <span>
+                  <b>Trừ nốt vào tiền hàng</b>
+                  <span className="small muted">
+                    {canDeduct
+                      ? `Lái đã trả tiền hàng sau khi trừ đủ cọc. App trừ thêm vào đợt cuối trước; lái thực trả tổng ${formatVnd(delivered)}.`
+                      : `Không đủ: tiền hàng chỉ còn ${formatVnd(settlement.deductRoom)} để trừ.`}
+                  </span>
+                </span>
+              </label>
+              <label className="radio-card">
+                <input type="radio" name="settle" checked={choice === 'refund'} onChange={() => setHow('refund')} />
+                <span>
+                  <b>Trả lại lái {formatVnd(depositLeft)}</b>
+                  <span className="small muted">Không đổi lời/lỗ. Đền thêm cho lái thì dùng "Trả lại cọc" ở dưới.</span>
+                </span>
+              </label>
+              <label className="radio-card">
+                <input type="radio" name="settle" checked={choice === 'forfeit'} onChange={() => setHow('forfeit')} />
+                <span>
+                  <b>Lái bỏ cọc {formatVnd(depositLeft)}</b>
+                  <span className="small muted">Phần cọc dư thành tiền vào của vườn.</span>
+                </span>
+              </label>
+            </fieldset>
+          )}
+          <div className="actions">
+            <button type="button" className="primary" onClick={() => run(() => ledger.settleContract(id, choice), `Đã hoàn tất hợp đồng với lái ${contract.buyer}`)}>
+              Xác nhận hoàn tất
+            </button>
+            <button type="button" onClick={() => setSettling(false)}>
+              Hủy
+            </button>
+          </div>
+          {depositLeft > 0 && <RefundWithPenalty depositLeft={depositLeft} onRefund={(amount) => run(() => ledger.refundDeposit(id, amount), `Đã ghi trả lại cọc ${formatVnd(amount)}`)} />}
+        </section>
+      )}
+      {!open && (
+        <section className="card settle">
+          <h2>📋 Quyết toán</h2>
+          <dl>
+            <div>
+              <dt>Tiền hàng {cuts.length} đợt ({formatQty(kg)} kg)</dt>
+              <dd className="in">{formatVnd(delivered)}</dd>
+            </div>
+            {settlement.forfeited > 0 && (
+              <div>
+                <dt>Lái bỏ cọc</dt>
+                <dd className="in">+{formatVnd(settlement.forfeited)}</dd>
+              </div>
+            )}
+            {settlement.refunded > 0 && (
+              <div>
+                <dt>Trả lại cọc cho lái</dt>
+                <dd>{formatVnd(settlement.refunded)}</dd>
+              </div>
+            )}
+            {settlement.penalty > 0 && (
+              <div>
+                <dt>Đền thêm cho lái</dt>
+                <dd className="out">-{formatVnd(settlement.penalty)}</dd>
+              </div>
+            )}
+            <div>
+              <dt>Tiền lái thực trả (cọc + các đợt − trả lại)</dt>
+              <dd>{formatVnd(settlement.received)}</dd>
+            </div>
+            <div>
+              <dt>
+                <b>Tính vào lời/lỗ của vườn</b>
+              </dt>
+              <dd className="in">
+                <b>{formatVnd(settlement.profit)}</b>
+              </dd>
+            </div>
+          </dl>
+          {kg > 0 && <p className="small muted">Giá bình quân: {formatVnd(Math.round(delivered / kg))}/kg</p>}
+          <button type="button" className="wide" onClick={() => run(() => ledger.reopenContract(id), 'Đã mở lại hợp đồng')}>
+            Mở lại hợp đồng
+          </button>
+        </section>
       )}
       {error && <div className="notice error">{error}</div>}
 
       <button type="button" className="wide danger-outline" onClick={remove}>
         Xóa hợp đồng
+      </button>
+    </div>
+  )
+}
+
+/** Trả lại cọc kèm tiền đền (mình không bán nữa, phải đền cho lái) */
+function RefundWithPenalty({ depositLeft, onRefund }: { depositLeft: number; onRefund: (amount: number) => void }) {
+  const [open, setOpen] = useState(false)
+  const [amount, setAmount] = useState(depositLeft)
+  if (!open)
+    return (
+      <p className="small">
+        <button type="button" className="linklike" onClick={() => setOpen(true)}>
+          Trả lại cọc kèm tiền đền…
+        </button>
+      </p>
+    )
+  return (
+    <div className="form switch-mode">
+      <MoneyField label="Số tiền trả lại lái" value={amount} onChange={setAmount} />
+      {amount > depositLeft && <p className="small out">Đền thêm {formatVnd(amount - depositLeft)}: ghi thành tiền ra của vườn.</p>}
+      <button type="button" className="wide primary" onClick={() => onRefund(amount)}>
+        Ghi trả lại cọc
       </button>
     </div>
   )

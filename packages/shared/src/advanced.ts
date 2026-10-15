@@ -189,6 +189,42 @@ export function contractSummaries(data: Pick<LedgerSnapshot, 'harvest_contracts'
     .sort((a, b) => Number(a.contract.status !== 'open') - Number(b.contract.status !== 'open') || b.contract.date.localeCompare(a.contract.date));
 }
 
+/** Kết quả quyết toán 1 hợp đồng (dùng cho bảng quyết toán) */
+export interface ContractSettlement {
+  /** Tiền hàng các đợt (đã tính vào lời/lỗ) */
+  delivered: number;
+  /** Tiền lái thực trả = cọc + trả thêm qua các đợt − trả lại cọc */
+  received: number;
+  /** Số tiền trả lại lái (gồm phần đền thêm, nếu có) */
+  refunded: number;
+  /** Phần cọc lái bỏ (tiền vào thêm) */
+  forfeited: number;
+  /** Phần đền thêm cho lái (tiền ra) */
+  penalty: number;
+  /** Ảnh hưởng tới lời/lỗ = tiền hàng + lái bỏ cọc − đền thêm */
+  profit: number;
+  /** Phần cọc chưa trừ có thể trừ nốt vào tiền hàng các đợt */
+  deductRoom: number;
+}
+
+export function contractSettlement(summary: ContractSummary, transactions: Transaction[]): ContractSettlement {
+  const { contract, delivered, deducted, paidByCuts } = summary;
+  const settle = contract.settle_transaction_id ? transactions.find((t) => t.id === contract.settle_transaction_id) : undefined;
+  const leftover = Math.max(0, contract.deposit - deducted);
+  const forfeited = contract.status === 'forfeited' ? (settle?.amount ?? 0) : 0;
+  const penalty = contract.status === 'refunded' ? (settle?.amount ?? 0) : 0;
+  const refunded = contract.status === 'refunded' ? leftover + penalty : 0;
+  return {
+    delivered,
+    received: contract.deposit + paidByCuts - refunded,
+    refunded,
+    forfeited,
+    penalty,
+    profit: delivered + forfeited - penalty,
+    deductRoom: Math.max(0, delivered - deducted),
+  };
+}
+
 export const CONTRACT_STATUS_LABELS: Record<HarvestContract['status'], string> = {
   open: 'Đang cắt',
   done: 'Đã xong',
