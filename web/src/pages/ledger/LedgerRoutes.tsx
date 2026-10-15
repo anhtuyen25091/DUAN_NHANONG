@@ -1,8 +1,10 @@
+import type { DebtKind } from '@nhanong/shared'
 import { useLedger } from '../../ledger/useLedger'
 import { hideToast, useToast } from '../../ledger/toast'
 import { AddEntry } from './AddEntry'
 import { ChooseMode } from './ChooseMode'
-import { DebtDetail, DebtForm, DebtList } from './Debts'
+import { ContractDetail, ContractForm, ContractList, CutForm } from './Contracts'
+import { DebtDetail, DebtForm, DebtList, PartyDebts } from './Debts'
 import { GardenDetail } from './GardenDetail'
 import { GardenForm } from './GardenForm'
 import { LedgerHome } from './LedgerHome'
@@ -49,6 +51,8 @@ export default function LedgerRoutes({ path, query }: { path: string[]; query: U
         <SupplyDetail key={id} ledger={ledger} data={data} id={id} />
       ) : page === 'kho' ? (
         <SupplyList data={data} />
+      ) : page === 'no' && id === 'nguoi' && action && sub ? (
+        <PartyDebts key={`${action}|${sub}`} ledger={ledger} data={data} kind={action as DebtKind} party={sub} />
       ) : page === 'no' && id === 'moi' ? (
         <DebtForm key="new" ledger={ledger} data={data} />
       ) : page === 'no' && id && action === 'sua' ? (
@@ -57,6 +61,18 @@ export default function LedgerRoutes({ path, query }: { path: string[]; query: U
         <DebtDetail key={id} ledger={ledger} data={data} id={id} />
       ) : page === 'no' ? (
         <DebtList data={data} />
+      ) : page === 'ban' && id === 'moi' ? (
+        <ContractForm key="new" ledger={ledger} data={data} query={query} />
+      ) : page === 'ban' && id && action === 'sua' ? (
+        <ContractForm key={id} ledger={ledger} data={data} id={id} query={query} />
+      ) : page === 'ban' && id && action === 'dot-moi' ? (
+        <CutForm key="new" ledger={ledger} data={data} contractId={id} />
+      ) : page === 'ban' && id && action === 'dot' && sub ? (
+        <CutForm key={sub} ledger={ledger} data={data} contractId={id} id={sub} />
+      ) : page === 'ban' && id ? (
+        <ContractDetail key={id} ledger={ledger} data={data} id={id} />
+      ) : page === 'ban' ? (
+        <ContractList data={data} />
       ) : page === 'cai-dat' ? (
         <LedgerSettings ledger={ledger} data={data} />
       ) : (

@@ -3,7 +3,7 @@
  * Dùng chung cho web, mobile và test.
  */
 import type { LedgerSnapshot } from './ledger';
-import type { Debt, DebtKind, Season, Supply, Transaction } from './types';
+import type { CutLine, Debt, DebtKind, HarvestContract, HarvestCut, Season, Supply, Transaction } from './types';
 
 // ---- Kho vật tư ----
 
@@ -116,6 +116,7 @@ export function suggestSeasonName(seasons: Season[], gardenId: string, date: str
 export const DEBT_KIND_LABELS: Record<DebtKind, string> = {
   payable: 'Mình nợ người ta',
   receivable: 'Người ta nợ mình',
+  loan: 'Tiền mình đi vay',
 };
 
 export interface DebtStatus {
@@ -142,7 +143,94 @@ export function debtStatus(data: Pick<LedgerSnapshot, 'debts' | 'debt_payments'>
 
 /** Tổng còn nợ hai chiều */
 export function debtSummary(statuses: DebtStatus[]): Record<DebtKind, number> {
-  const sum: Record<DebtKind, number> = { payable: 0, receivable: 0 };
+  const sum: Record<DebtKind, number> = { payable: 0, receivable: 0, loan: 0 };
   for (const s of statuses) sum[s.debt.kind] += s.left;
   return sum;
+}
+
+// ---- Bán cho lái (cọc + cắt nhiều đợt) ----
+
+/** Loại hàng gợi ý khi ghi đợt cắt */
+export const CUT_GRADES = ['Loại A', 'Loại B', 'Loại C', 'Hàng dạt', 'Hàng kem'];
+
+export function cutValue(lines: CutLine[]): number {
+  return lines.reduce((sum, l) => sum + Math.round(l.kg * l.price), 0);
+}
+
+export function cutKg(lines: CutLine[]): number {
+  return lines.reduce((sum, l) => sum + l.kg, 0);
+}
+
+export interface ContractSummary {
+  contract: HarvestContract;
+  cuts: HarvestCut[];
+  /** Tổng giá trị hàng đã giao (= tiền vào sổ) */
+  delivered: number;
+  kg: number;
+  /** Cọc đã trừ vào các đợt */
+  deducted: number;
+  /** Cọc còn lại chưa trừ (0 khi đã kết thúc bằng bỏ cọc / trả cọc) */
+  depositLeft: number;
+  /** Tiền lái trả thêm qua các đợt (giá trị hàng − số trừ cọc) */
+  paidByCuts: number;
+}
+
+/** Tình hình từng hợp đồng: đang cắt trước, đã kết thúc sau */
+export function contractSummaries(data: Pick<LedgerSnapshot, 'harvest_contracts' | 'harvest_cuts'>): ContractSummary[] {
+  return data.harvest_contracts
+    .map((contract) => {
+      const cuts = data.harvest_cuts.filter((c) => c.contract_id === contract.id).sort((a, b) => a.date.localeCompare(b.date) || a.updated_at.localeCompare(b.updated_at));
+      const delivered = cuts.reduce((s, c) => s + cutValue(c.lines), 0);
+      const deducted = cuts.reduce((s, c) => s + c.deposit_deduct, 0);
+      const left = contract.status === 'forfeited' || contract.status === 'refunded' ? 0 : Math.max(0, contract.deposit - deducted);
+      return { contract, cuts, delivered, kg: cuts.reduce((s, c) => s + cutKg(c.lines), 0), deducted, depositLeft: left, paidByCuts: delivered - deducted };
+    })
+    .sort((a, b) => Number(a.contract.status !== 'open') - Number(b.contract.status !== 'open') || b.contract.date.localeCompare(a.contract.date));
+}
+
+export const CONTRACT_STATUS_LABELS: Record<HarvestContract['status'], string> = {
+  open: 'Đang cắt',
+  done: 'Đã xong',
+  forfeited: 'Lái bỏ cọc',
+  refunded: 'Đã trả lại cọc',
+};
+
+/** Nợ gom theo người (cửa hàng mua thiếu nhiều lần): còn nợ, số lần, quá hạn */
+export interface PartyDebt {
+  kind: DebtKind;
+  party: string;
+  phone: string | null;
+  count: number;
+  amount: number;
+  left: number;
+  overdue: boolean;
+  statuses: DebtStatus[];
+}
+
+export function debtsByParty(statuses: DebtStatus[]): PartyDebt[] {
+  const groups = new Map<string, PartyDebt>();
+  for (const s of statuses) {
+    const key = `${s.debt.kind}|${s.debt.party}`;
+    const g = groups.get(key) ?? { kind: s.debt.kind, party: s.debt.party, phone: null, count: 0, amount: 0, left: 0, overdue: false, statuses: [] };
+    g.count++;
+    g.amount += s.debt.amount;
+    g.left += s.left;
+    g.overdue ||= s.overdue;
+    g.phone ??= s.debt.phone;
+    g.statuses.push(s);
+    groups.set(key, g);
+  }
+  return [...groups.values()].sort((a, b) => Number(b.left > 0) - Number(a.left > 0) || Number(b.overdue) - Number(a.overdue) || b.left - a.left);
+}
+
+/** Lãi vay đã trả (theo khoảng ngày, nếu có) */
+export function interestPaid(data: Pick<LedgerSnapshot, 'debt_payments'>, range: { from?: string; to?: string } = {}): number {
+  return data.debt_payments
+    .filter((p) => (!range.from || p.date >= range.from) && (!range.to || p.date <= range.to))
+    .reduce((sum, p) => sum + (p.interest ?? 0), 0);
+}
+
+/** Lãi ước tính 1 tháng của khoản vay còn lại (lãi suất %/năm, tính đơn giản theo dư nợ) */
+export function monthlyInterest(left: number, ratePerYear: number | null | undefined): number {
+  return ratePerYear ? Math.round((left * ratePerYear) / 100 / 12) : 0;
 }

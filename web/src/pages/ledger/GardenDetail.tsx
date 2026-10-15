@@ -8,6 +8,8 @@ import {
   seasonRange,
   seasonsOf,
   supplyUsedValue,
+  contractSummaries,
+  CONTRACT_STATUS_LABELS,
   today,
   totals,
   type Ledger,
@@ -55,10 +57,15 @@ export function GardenDetail({ ledger, data, id, query }: { ledger: Ledger; data
 
   const remove = async () => {
     if (!garden) return
-    const undo = await ledger.removeGarden(garden.id)
-    showToast({ message: `Đã xóa ${garden.name}. Các khoản của vườn chuyển sang chi chung.`, undo })
-    go('so')
+    try {
+      const undo = await ledger.removeGarden(garden.id)
+      showToast({ message: `Đã xóa ${garden.name}. Các khoản của vườn chuyển sang chi chung.`, undo })
+      go('so')
+    } catch (err) {
+      showToast({ message: (err as Error).message })
+    }
   }
+  const contracts = gardenId ? contractSummaries(data).filter((c) => c.contract.garden_id === gardenId) : []
 
   const endSeason = async () => {
     if (!season) return
@@ -135,6 +142,28 @@ export function GardenDetail({ ledger, data, id, query }: { ledger: Ledger; data
         <h2>6 tháng gần đây</h2>
         <MonthBars months={monthlyTotals(allocated, 6, today())} />
       </section>
+
+      {advanced && garden && (
+        <>
+          <h2 className="section">🤝 Bán cho lái</h2>
+          {contracts.map(({ contract, cuts, delivered, depositLeft }) => (
+            <a key={contract.id} className="card garden-row" href={href(`so/ban/${contract.id}`)}>
+              <span className="garden-name">
+                {contract.buyer}
+                <span className="small muted">
+                  {' '}
+                  · {cuts.length} đợt · {CONTRACT_STATUS_LABELS[contract.status]}
+                  {contract.status === 'open' && depositLeft > 0 && ` · cọc còn ${formatVnd(depositLeft)}`}
+                </span>
+              </span>
+              <span className="profit gain">{formatVnd(delivered)}</span>
+            </a>
+          ))}
+          <a className="button" href={href('so/ban/moi', { vuon: garden.id })}>
+            ＋ Nhận cọc của lái
+          </a>
+        </>
+      )}
 
       {usages.length > 0 && (
         <>

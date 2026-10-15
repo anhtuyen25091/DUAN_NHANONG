@@ -2,7 +2,7 @@
  * Sổ thu chi: dữ liệu nằm trong bộ nhớ, ghi xuống máy (IndexedDB trên web, SQLite trên mobile)
  * qua LedgerStorage. Web và mobile dùng chung class này; mỗi nơi chỉ viết phần lưu trữ.
  */
-import { formatQty, supplyCost, supplyEntryNote } from './advanced';
+import { cutKg, cutValue, formatQty, supplyCost, supplyEntryNote } from './advanced';
 import { randomUuid } from './api';
 import { formatVnd } from './money';
 import {
@@ -11,7 +11,10 @@ import {
   type DebtKind,
   type DebtPayment,
   type EntryType,
+  type CutLine,
   type Garden,
+  type HarvestContract,
+  type HarvestCut,
   type LedgerCategory,
   type Season,
   type StorageMode,
@@ -21,8 +24,19 @@ import {
   type Transaction,
 } from './types';
 
-/** Bảng của sổ; 5 bảng sau dùng cho chế độ Nâng cao (mùa vụ, kho vật tư, công nợ) */
-export const LEDGER_TABLES = ['gardens', 'categories', 'transactions', 'seasons', 'supplies', 'supply_usages', 'debts', 'debt_payments'] as const;
+/** Bảng của sổ; các bảng sau `transactions` dùng cho chế độ Nâng cao (mùa vụ, kho vật tư, công nợ, bán cho lái) */
+export const LEDGER_TABLES = [
+  'gardens',
+  'categories',
+  'transactions',
+  'seasons',
+  'supplies',
+  'supply_usages',
+  'debts',
+  'debt_payments',
+  'harvest_contracts',
+  'harvest_cuts',
+] as const;
 export type LedgerTable = (typeof LEDGER_TABLES)[number];
 
 export interface LedgerRecords {
@@ -34,6 +48,8 @@ export interface LedgerRecords {
   supply_usages: SupplyUsage[];
   debts: Debt[];
   debt_payments: DebtPayment[];
+  harvest_contracts: HarvestContract[];
+  harvest_cuts: HarvestCut[];
 }
 
 /** Cài đặt của sổ, lưu cùng chỗ với dữ liệu */
@@ -105,6 +121,7 @@ export interface NewUsage {
 
 export interface NewDebt {
   kind: DebtKind;
+  interest_rate?: number | null;
   party: string;
   phone?: string | null;
   amount: number;
@@ -114,9 +131,29 @@ export interface NewDebt {
   note?: string | null;
 }
 
+export interface NewContract {
+  garden_id: string;
+  buyer: string;
+  phone?: string | null;
+  crop?: string | null;
+  deposit: number;
+  date?: string;
+  category_id?: string;
+  note?: string | null;
+}
+
+export interface NewCut {
+  contract_id: string;
+  date?: string;
+  lines: CutLine[];
+  deposit_deduct?: number;
+  note?: string | null;
+}
+
 export interface NewPayment {
   debt_id: string;
   amount: number;
+  interest?: number;
   date?: string;
   note?: string | null;
 }
@@ -165,6 +202,8 @@ export class Ledger {
     supply_usages: new Map(),
     debts: new Map(),
     debt_payments: new Map(),
+    harvest_contracts: new Map(),
+    harvest_cuts: new Map(),
   };
   private meta: LedgerMeta = {};
   private listeners = new Set<Listener>();
@@ -215,6 +254,8 @@ export class Ledger {
       supply_usages: alive(this.tables.supply_usages).sort((a, b) => b.used_on.localeCompare(a.used_on) || b.updated_at.localeCompare(a.updated_at)),
       debts: alive(this.tables.debts).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)),
       debt_payments: alive(this.tables.debt_payments).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)),
+      harvest_contracts: alive(this.tables.harvest_contracts).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)),
+      harvest_cuts: alive(this.tables.harvest_cuts).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)),
       meta: { ...this.meta },
     };
     this.listeners.forEach((l) => l());
@@ -258,12 +299,17 @@ export class Ledger {
     await this.storage.saveMeta(this.meta);
   }
 
+  /** Tạo hạng mục mặc định còn thiếu (sổ cũ được thêm các mục mới như "Lãi vay") */
   private async ensureDefaultCategories() {
-    if (this.tables.categories.size > 0) return;
+    const existing = [...this.tables.categories.values()];
+    const missing = DEFAULT_CATEGORIES.map((c, i) => ({ c, i })).filter(
+      ({ c, i }) => !this.tables.categories.has(defaultCategoryId(i)) && !existing.some((e) => e.name === c.name && e.type === c.type),
+    );
+    if (missing.length === 0) return;
     const at = this.stamp();
     await this.write(
       'categories',
-      DEFAULT_CATEGORIES.map((c, i) => ({ ...c, id: defaultCategoryId(i), sort: i, updated_at: at, deleted_at: null })),
+      missing.map(({ c, i }) => ({ ...c, id: defaultCategoryId(i), sort: i, updated_at: at, deleted_at: null })),
     );
   }
 
@@ -294,6 +340,7 @@ export class Ledger {
   async removeGarden(id: string): Promise<Undo> {
     const garden = this.tables.gardens.get(id);
     if (!garden) return async () => {};
+    if (this.live('harvest_contracts').some((c) => c.garden_id === id)) throw new Error('Vườn này còn hợp đồng bán cho lái. Hãy xóa hợp đồng trước.');
     const at = this.stamp();
     const moved = this.live('transactions').filter((t) => t.garden_id === id);
     const movedDebts = this.live('debts').filter((d) => d.garden_id === id);
@@ -348,6 +395,12 @@ export class Ledger {
     if (entry.supply_id && this.alive('supplies', entry.supply_id)) return this.removeSupply(entry.supply_id);
     const debt = this.live('debts').find((d) => d.transaction_id === id);
     if (debt) return this.removeDebt(debt.id);
+    const cut = this.live('harvest_cuts').find((c) => c.transaction_id === id);
+    if (cut) return this.removeCut(cut.id);
+    const payment = this.live('debt_payments').find((p) => p.interest_transaction_id === id);
+    if (payment) return this.removePayment(payment.id);
+    const settled = this.live('harvest_contracts').find((c) => c.settle_transaction_id === id);
+    if (settled) return this.reopenContract(settled.id);
     return this.removeRecords([['transactions', entry]]);
   }
 
@@ -546,7 +599,8 @@ export class Ledger {
     const at = this.stamp();
     const date = input.date ?? today(this.now());
     let entry: Transaction | null = null;
-    if (input.record_entry !== false) {
+    // Tiền vay là tiền mượn, không phải tiền vào: không ghi vào sổ thu chi
+    if (input.record_entry !== false && input.kind !== 'loan') {
       const type: EntryType = input.kind === 'payable' ? 'expense' : 'income';
       const categoryId = input.category_id ?? this.snapshot.categories.find((c) => c.type === type)?.id;
       if (!categoryId) throw new Error('Chưa có hạng mục để ghi khoản này.');
@@ -576,6 +630,7 @@ export class Ledger {
       garden_id: input.garden_id ?? null,
       transaction_id: entry?.id ?? null,
       supply_id: null,
+      interest_rate: input.kind === 'loan' && input.interest_rate ? input.interest_rate : null,
       note: input.note?.trim() || null,
       updated_at: at,
       deleted_at: null,
@@ -614,10 +669,13 @@ export class Ledger {
     const debt = this.alive('debts', id);
     if (!debt) return async () => {};
     const entry = debt.transaction_id ? this.alive('transactions', debt.transaction_id) : undefined;
+    const payments = this.live('debt_payments').filter((p) => p.debt_id === id);
+    const interestIds = new Set(payments.map((p) => p.interest_transaction_id).filter(Boolean));
     return this.removeRecords([
       ['debts', debt],
       ...(entry ? [['transactions', entry] as const] : []),
-      ...this.live('debt_payments').filter((p) => p.debt_id === id).map((r) => ['debt_payments', r] as const),
+      ...payments.map((r) => ['debt_payments', r] as const),
+      ...this.live('transactions').filter((t) => interestIds.has(t.id)).map((r) => ['transactions', r] as const),
     ]);
   }
 
@@ -627,29 +685,327 @@ export class Ledger {
       .reduce((sum, p) => sum + p.amount, 0);
   }
 
-  /** Ghi 1 lần trả nợ (mình trả đại lý) / thu nợ (người mua trả mình) */
+  /**
+   * Ghi 1 lần trả nợ (mình trả đại lý / trả nợ vay) hoặc thu nợ (người mua trả mình).
+   * amount: tiền gốc; interest (khoản vay): tiền lãi trả kèm, ghi thành tiền ra hạng mục "Lãi vay".
+   */
   async payDebt(input: NewPayment): Promise<DebtPayment> {
     const debt = this.alive('debts', input.debt_id);
     if (!debt) throw new Error('Không tìm thấy khoản nợ.');
-    if (!(input.amount > 0)) throw new Error('Số tiền phải lớn hơn 0.');
+    const amount = Math.round(input.amount);
+    const interest = debt.kind === 'loan' ? Math.round(input.interest ?? 0) : 0;
+    if (amount < 0 || interest < 0 || amount + interest <= 0) throw new Error('Số tiền phải lớn hơn 0.');
     const left = debt.amount - this.paidAmount(debt.id);
-    if (input.amount > left) throw new Error(`Chỉ còn nợ ${formatVnd(left)}.`);
+    if (amount > left) throw new Error(`Chỉ còn nợ ${formatVnd(left)}.`);
+    const at = this.stamp();
+    const date = input.date ?? today(this.now());
+    let interestEntry: Transaction | null = null;
+    if (interest > 0) {
+      interestEntry = {
+        id: randomUuid(),
+        type: 'expense',
+        amount: interest,
+        date,
+        garden_id: debt.garden_id,
+        season_id: null,
+        category_id: this.categoryByName('expense', 'Lãi vay'),
+        supply_id: null,
+        note: `Lãi vay ${debt.party}`,
+        updated_at: at,
+        deleted_at: null,
+      };
+      await this.write('transactions', [interestEntry]);
+    }
     const payment: DebtPayment = {
       id: randomUuid(),
       debt_id: debt.id,
-      amount: Math.round(input.amount),
-      date: input.date ?? today(this.now()),
+      amount,
+      interest,
+      interest_transaction_id: interestEntry?.id ?? null,
+      date,
       note: input.note?.trim() || null,
-      updated_at: this.stamp(),
+      updated_at: at,
       deleted_at: null,
     };
     await this.write('debt_payments', [payment]);
     return payment;
   }
 
+  /**
+   * Trả gộp cho 1 người (ví dụ cửa hàng phân bón mua thiếu nhiều lần): trừ vào khoản nợ cũ nhất trước.
+   * Trả về số khoản nợ đã ghi trả.
+   */
+  async payParty(input: { kind: DebtKind; party: string; amount: number; date?: string }): Promise<number> {
+    let rest = Math.round(input.amount);
+    if (rest <= 0) throw new Error('Số tiền phải lớn hơn 0.');
+    const open = this.live('debts')
+      .filter((d) => d.kind === input.kind && d.party === input.party)
+      .map((d) => ({ d, left: d.amount - this.paidAmount(d.id) }))
+      .filter((x) => x.left > 0)
+      .sort((a, b) => a.d.date.localeCompare(b.d.date) || a.d.updated_at.localeCompare(b.d.updated_at));
+    const total = open.reduce((s, x) => s + x.left, 0);
+    if (rest > total) throw new Error(`${input.party} chỉ còn ${formatVnd(total)}.`);
+    let count = 0;
+    for (const { d, left } of open) {
+      if (rest <= 0) break;
+      const pay = Math.min(left, rest);
+      await this.payDebt({ debt_id: d.id, amount: pay, date: input.date, note: 'Trả gộp' });
+      rest -= pay;
+      count++;
+    }
+    return count;
+  }
+
   async removePayment(id: string): Promise<Undo> {
     const payment = this.alive('debt_payments', id);
-    return payment ? this.removeRecords([['debt_payments', payment]]) : async () => {};
+    if (!payment) return async () => {};
+    const interest = payment.interest_transaction_id ? this.alive('transactions', payment.interest_transaction_id) : undefined;
+    return this.removeRecords([['debt_payments', payment], ...(interest ? [['transactions', interest] as const] : [])]);
+  }
+
+  // ---- Chế độ Nâng cao: bán cho lái (cọc + cắt nhiều đợt) ----
+
+  /** Nhận cọc của lái. Cọc chưa tính vào lời/lỗ: chỉ tính khi giao hàng (từng đợt) hoặc lái bỏ cọc. */
+  async addContract(input: NewContract): Promise<HarvestContract> {
+    if (!input.buyer.trim()) throw new Error('Cần ghi tên lái.');
+    if (!(input.deposit >= 0)) throw new Error('Tiền cọc không hợp lệ.');
+    const contract: HarvestContract = {
+      id: randomUuid(),
+      garden_id: input.garden_id,
+      buyer: input.buyer.trim(),
+      phone: input.phone?.trim() || null,
+      crop: input.crop?.trim() || null,
+      deposit: Math.round(input.deposit),
+      date: input.date ?? today(this.now()),
+      category_id: input.category_id ?? this.incomeCategory('Bán nông sản'),
+      status: 'open',
+      closed_on: null,
+      settle_transaction_id: null,
+      note: input.note?.trim() || null,
+      updated_at: this.stamp(),
+      deleted_at: null,
+    };
+    await this.write('harvest_contracts', [contract]);
+    return contract;
+  }
+
+  async updateContract(id: string, patch: Partial<Omit<NewContract, 'garden_id'>>): Promise<void> {
+    const contract = this.alive('harvest_contracts', id);
+    if (!contract) return;
+    const deducted = this.deductedFor(id);
+    if (patch.deposit !== undefined && patch.deposit < deducted) throw new Error(`Đã trừ ${formatVnd(deducted)} cọc vào các đợt, tiền cọc không thể ít hơn.`);
+    const at = this.stamp();
+    const next: HarvestContract = {
+      ...contract,
+      ...patch,
+      buyer: (patch.buyer ?? contract.buyer).trim(),
+      phone: patch.phone === undefined ? contract.phone : patch.phone?.trim() || null,
+      crop: patch.crop === undefined ? contract.crop : patch.crop?.trim() || null,
+      note: patch.note === undefined ? contract.note : patch.note?.trim() || null,
+      deposit: Math.round(patch.deposit ?? contract.deposit),
+      updated_at: at,
+    };
+    await this.write('harvest_contracts', [next]);
+    // Đổi tên lái / hạng mục: ghi chú và hạng mục của các đợt đổi theo
+    for (const cut of this.live('harvest_cuts').filter((c) => c.contract_id === id)) {
+      const entry = cut.transaction_id ? this.alive('transactions', cut.transaction_id) : undefined;
+      if (entry) await this.write('transactions', [{ ...entry, category_id: next.category_id, note: this.cutNote(next, cut), updated_at: at }]);
+    }
+  }
+
+  /** Xóa hợp đồng cùng các đợt cắt và khoản thu chi đi kèm */
+  async removeContract(id: string): Promise<Undo> {
+    const contract = this.alive('harvest_contracts', id);
+    if (!contract) return async () => {};
+    const cuts = this.live('harvest_cuts').filter((c) => c.contract_id === id);
+    const entryIds = new Set([...cuts.map((c) => c.transaction_id), contract.settle_transaction_id].filter(Boolean));
+    return this.removeRecords([
+      ['harvest_contracts', contract],
+      ...cuts.map((r) => ['harvest_cuts', r] as const),
+      ...this.live('transactions').filter((t) => entryIds.has(t.id)).map((r) => ['transactions', r] as const),
+    ]);
+  }
+
+  /** Ghi 1 đợt cắt: tiền vào = giá trị hàng; deposit_deduct: số cọc trừ vào đợt này */
+  async addCut(input: NewCut): Promise<HarvestCut> {
+    const contract = this.alive('harvest_contracts', input.contract_id);
+    if (!contract) throw new Error('Không tìm thấy hợp đồng.');
+    if (contract.status !== 'open') throw new Error('Hợp đồng đã kết thúc. Mở lại để ghi thêm đợt.');
+    const lines = this.cleanLines(input.lines);
+    const value = cutValue(lines);
+    const deduct = Math.round(input.deposit_deduct ?? 0);
+    this.checkDeduct(contract, deduct, value);
+    const at = this.stamp();
+    const cut: HarvestCut = {
+      id: randomUuid(),
+      contract_id: contract.id,
+      date: input.date ?? today(this.now()),
+      lines,
+      deposit_deduct: deduct,
+      transaction_id: null,
+      note: input.note?.trim() || null,
+      updated_at: at,
+      deleted_at: null,
+    };
+    const entry: Transaction = {
+      id: randomUuid(),
+      type: 'income',
+      amount: value,
+      date: cut.date,
+      garden_id: contract.garden_id,
+      season_id: null,
+      category_id: contract.category_id,
+      supply_id: null,
+      note: this.cutNote(contract, cut),
+      updated_at: at,
+      deleted_at: null,
+    };
+    cut.transaction_id = entry.id;
+    await this.write('transactions', [entry]);
+    await this.write('harvest_cuts', [cut]);
+    return cut;
+  }
+
+  async updateCut(id: string, patch: Partial<Omit<NewCut, 'contract_id'>>): Promise<void> {
+    const cut = this.alive('harvest_cuts', id);
+    const contract = cut && this.alive('harvest_contracts', cut.contract_id);
+    if (!cut || !contract) return;
+    const lines = patch.lines ? this.cleanLines(patch.lines) : cut.lines;
+    const deduct = Math.round(patch.deposit_deduct ?? cut.deposit_deduct);
+    this.checkDeduct(contract, deduct, cutValue(lines), cut.id);
+    const at = this.stamp();
+    const next: HarvestCut = { ...cut, ...patch, lines, deposit_deduct: deduct, note: patch.note === undefined ? cut.note : patch.note?.trim() || null, updated_at: at };
+    await this.write('harvest_cuts', [next]);
+    const entry = cut.transaction_id ? this.alive('transactions', cut.transaction_id) : undefined;
+    if (entry) await this.write('transactions', [{ ...entry, amount: cutValue(lines), date: next.date, note: this.cutNote(contract, next), updated_at: at }]);
+  }
+
+  async removeCut(id: string): Promise<Undo> {
+    const cut = this.alive('harvest_cuts', id);
+    if (!cut) return async () => {};
+    const entry = cut.transaction_id ? this.alive('transactions', cut.transaction_id) : undefined;
+    return this.removeRecords([['harvest_cuts', cut], ...(entry ? [['transactions', entry] as const] : [])]);
+  }
+
+  /** Lái bỏ cọc (không vào cắt nữa): phần cọc chưa trừ thành tiền vào của mình */
+  async forfeitDeposit(contractId: string, date?: string): Promise<void> {
+    const contract = this.openContract(contractId);
+    const left = contract.deposit - this.deductedFor(contractId);
+    const at = this.stamp();
+    let entry: Transaction | null = null;
+    if (left > 0) {
+      entry = {
+        id: randomUuid(),
+        type: 'income',
+        amount: left,
+        date: date ?? today(this.now()),
+        garden_id: contract.garden_id,
+        season_id: null,
+        category_id: this.incomeCategory('Thu khác'),
+        supply_id: null,
+        note: `Lái ${contract.buyer} bỏ cọc`,
+        updated_at: at,
+        deleted_at: null,
+      };
+      await this.write('transactions', [entry]);
+    }
+    await this.write('harvest_contracts', [{ ...contract, status: 'forfeited', closed_on: date ?? today(this.now()), settle_transaction_id: entry?.id ?? null, updated_at: at }]);
+  }
+
+  /**
+   * Trả lại cọc cho lái (mình không bán nữa). amount: số tiền trả lại thật.
+   * Trả đúng phần cọc chưa trừ thì không đổi lời/lỗ; trả nhiều hơn (đền cọc) thì phần dư là tiền ra.
+   */
+  async refundDeposit(contractId: string, amount: number, date?: string): Promise<void> {
+    const contract = this.openContract(contractId);
+    const left = contract.deposit - this.deductedFor(contractId);
+    if (Math.round(amount) < left) throw new Error(`Cọc còn ${formatVnd(left)}, số trả lại không thể ít hơn. Nếu lái chịu mất một phần cọc, hãy ghi "Lái bỏ cọc".`);
+    const extra = Math.round(amount) - left;
+    const at = this.stamp();
+    let entry: Transaction | null = null;
+    if (extra > 0) {
+      entry = {
+        id: randomUuid(),
+        type: 'expense',
+        amount: extra,
+        date: date ?? today(this.now()),
+        garden_id: contract.garden_id,
+        season_id: null,
+        category_id: this.snapshot.categories.find((c) => c.type === 'expense' && c.name === 'Khác')?.id ?? this.snapshot.categories.find((c) => c.type === 'expense')!.id,
+        supply_id: null,
+        note: `Đền cọc cho lái ${contract.buyer}`,
+        updated_at: at,
+        deleted_at: null,
+      };
+      await this.write('transactions', [entry]);
+    }
+    await this.write('harvest_contracts', [{ ...contract, status: 'refunded', closed_on: date ?? today(this.now()), settle_transaction_id: entry?.id ?? null, updated_at: at }]);
+  }
+
+  /** Cắt xong, cọc đã trừ hết: đóng hợp đồng */
+  async closeContract(contractId: string, date?: string): Promise<void> {
+    const contract = this.openContract(contractId);
+    const left = contract.deposit - this.deductedFor(contractId);
+    if (left > 0) throw new Error(`Còn ${formatVnd(left)} cọc chưa trừ. Hãy trừ vào đợt cuối, trả lại cọc, hoặc ghi lái bỏ cọc.`);
+    await this.write('harvest_contracts', [{ ...contract, status: 'done', closed_on: date ?? today(this.now()), updated_at: this.stamp() }]);
+  }
+
+  /** Mở lại hợp đồng đã kết thúc (xóa khoản bỏ cọc / đền cọc nếu có) */
+  async reopenContract(contractId: string): Promise<Undo> {
+    const contract = this.alive('harvest_contracts', contractId);
+    if (!contract || contract.status === 'open') return async () => {};
+    const entry = contract.settle_transaction_id ? this.alive('transactions', contract.settle_transaction_id) : undefined;
+    const at = this.stamp();
+    if (entry) await this.write('transactions', [{ ...entry, deleted_at: at, updated_at: at }]);
+    await this.write('harvest_contracts', [{ ...contract, status: 'open', closed_on: null, settle_transaction_id: null, updated_at: at }]);
+    return async () => {
+      const back = this.stamp();
+      if (entry) await this.write('transactions', [{ ...entry, deleted_at: null, updated_at: back }]);
+      await this.write('harvest_contracts', [{ ...contract, updated_at: back }]);
+    };
+  }
+
+  private openContract(id: string): HarvestContract {
+    const contract = this.alive('harvest_contracts', id);
+    if (!contract) throw new Error('Không tìm thấy hợp đồng.');
+    if (contract.status !== 'open') throw new Error('Hợp đồng đã kết thúc.');
+    return contract;
+  }
+
+  private deductedFor(contractId: string, exceptCutId?: string): number {
+    return this.live('harvest_cuts')
+      .filter((c) => c.contract_id === contractId && c.id !== exceptCutId)
+      .reduce((sum, c) => sum + c.deposit_deduct, 0);
+  }
+
+  private checkDeduct(contract: HarvestContract, deduct: number, value: number, exceptCutId?: string) {
+    if (deduct < 0) throw new Error('Số trừ cọc không hợp lệ.');
+    const left = contract.deposit - this.deductedFor(contract.id, exceptCutId);
+    if (deduct > left) throw new Error(`Cọc chỉ còn ${formatVnd(left)} để trừ.`);
+    if (deduct > value) throw new Error(`Số trừ cọc không thể lớn hơn tiền hàng đợt này (${formatVnd(value)}).`);
+  }
+
+  private cleanLines(lines: CutLine[]): CutLine[] {
+    const clean = lines.filter((l) => l.kg > 0).map((l) => ({ grade: l.grade.trim() || 'Hàng', kg: l.kg, price: Math.round(l.price) }));
+    if (clean.length === 0) throw new Error('Cần ghi ít nhất 1 loại hàng có số kg.');
+    if (clean.some((l) => !(l.price > 0))) throw new Error('Cần ghi giá cho mỗi loại hàng.');
+    return clean;
+  }
+
+  private cutNote(contract: HarvestContract, cut: Pick<HarvestCut, 'contract_id' | 'lines' | 'id' | 'date'>): string {
+    const order = this.live('harvest_cuts')
+      .filter((c) => c.contract_id === contract.id && c.id !== cut.id)
+      .filter((c) => c.date <= cut.date).length + 1;
+    return `Đợt ${order} · lái ${contract.buyer} · ${formatQty(cutKg(cut.lines))} kg`;
+  }
+
+  private incomeCategory(name: string): string {
+    return this.categoryByName('income', name);
+  }
+
+  private categoryByName(type: EntryType, name: string): string {
+    const list = this.snapshot.categories.filter((c) => c.type === type);
+    return (list.find((c) => c.name === name) ?? list[0]).id;
   }
 
   // ---- Tiện ích nội bộ ----

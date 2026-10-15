@@ -77,11 +77,13 @@ export interface SupplyUsage extends SyncRecord {
 }
 
 /** payable: mình nợ người ta (mua thiếu phân, thuốc…); receivable: người ta nợ mình (bán chịu) */
-export type DebtKind = 'payable' | 'receivable';
+/** loan: mình đi vay tiền (ngân hàng, người quen): tiền gốc không tính lời/lỗ, tiền lãi là tiền ra */
+export type DebtKind = 'payable' | 'receivable' | 'loan';
 
 /**
  * Khoản nợ. Tiền đã tính vào lời/lỗ lúc mua/bán (khoản thu chi transaction_id, nếu có);
  * trả nợ chỉ làm giảm số còn nợ, không tính lại vào lời/lỗ.
+ * Khoản vay: không có transaction_id; lãi trả kèm từng lần trả (DebtPayment.interest) mới là tiền ra.
  */
 export interface Debt extends SyncRecord {
   kind: DebtKind;
@@ -93,13 +95,55 @@ export interface Debt extends SyncRecord {
   garden_id: string | null;
   transaction_id: string | null;
   supply_id: string | null; // nợ sinh ra khi mua vật tư thiếu
+  /** Khoản vay: lãi suất %/năm (để ước tính lãi), có thể trống */
+  interest_rate?: number | null;
   note: string | null;
 }
 
 export interface DebtPayment extends SyncRecord {
   debt_id: string;
-  amount: number;
+  amount: number; // tiền gốc trả (giảm số còn nợ)
+  /** Tiền lãi trả kèm (khoản vay); ghi thành tiền ra hạng mục "Lãi vay" */
+  interest?: number;
+  interest_transaction_id?: string | null;
   date: string;
+  note: string | null;
+}
+
+/**
+ * Bán vườn cho lái (sầu riêng…): lái đặt cọc trước, sau đó cắt nhiều đợt.
+ * Cọc không tính vào lời/lỗ (là tiền lái trả trước); mỗi đợt ghi tiền vào = giá trị hàng giao.
+ */
+export type ContractStatus = 'open' | 'done' | 'forfeited' | 'refunded';
+
+export interface HarvestContract extends SyncRecord {
+  garden_id: string;
+  buyer: string; // tên lái
+  phone: string | null;
+  crop: string | null;
+  deposit: number; // tiền cọc
+  date: string; // ngày nhận cọc
+  category_id: string; // hạng mục tiền vào của các đợt (mặc định Bán nông sản)
+  status: ContractStatus;
+  closed_on: string | null;
+  /** Khoản thu chi khi kết thúc: tiền vào khi lái bỏ cọc, tiền ra khi mình đền thêm lúc trả cọc */
+  settle_transaction_id: string | null;
+  note: string | null;
+}
+
+/** 1 dòng hàng trong đợt cắt: loại A 1.200 kg × 85.000 đ */
+export interface CutLine {
+  grade: string;
+  kg: number;
+  price: number; // đồng / kg
+}
+
+export interface HarvestCut extends SyncRecord {
+  contract_id: string;
+  date: string;
+  lines: CutLine[];
+  deposit_deduct: number; // số tiền cọc trừ vào đợt này (hai bên tự thỏa thuận)
+  transaction_id: string | null; // khoản tiền vào = giá trị hàng của đợt
   note: string | null;
 }
 
@@ -133,4 +177,6 @@ export const DEFAULT_CATEGORIES: Array<Pick<LedgerCategory, 'type' | 'name' | 'i
   { type: 'expense', name: 'Khác', icon: '📦', color: '#64748b' },
   { type: 'income', name: 'Bán nông sản', icon: '💰', color: '#15803d' },
   { type: 'income', name: 'Thu khác', icon: '💵', color: '#0f766e' },
+  // Thêm hạng mục mặc định thì luôn thêm ở cuối, để mã cố định (defaultCategoryId) của các mục cũ không đổi
+  { type: 'expense', name: 'Lãi vay', icon: '🏦', color: '#b45309' },
 ];

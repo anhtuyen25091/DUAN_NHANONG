@@ -1,4 +1,4 @@
-import { allocatedEntries, debtStatus, debtSummary, filterEntries, formatVnd, supplyStock, today, totals, type Ledger, type LedgerSnapshot } from '@nhanong/shared'
+import { allocatedEntries, contractSummaries, debtStatus, interestPaid, debtSummary, filterEntries, formatVnd, supplyStock, today, totals, type Ledger, type LedgerSnapshot } from '@nhanong/shared'
 import { useState } from 'react'
 import { href } from '../../hooks'
 import { PERIOD_LABELS, periodRange, type Period } from '../../ledger/period'
@@ -34,6 +34,7 @@ export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnaps
       </nav>
 
       <ProfitCard label={`Tất cả các vườn · ${PERIOD_LABELS[period].toLowerCase()}`} {...all} />
+      {data.meta.advanced && <FinanceCard data={data} profit={all.profit} range={range} periodLabel={PERIOD_LABELS[period].toLowerCase()} />}
       {data.meta.advanced && <AdvancedShortcuts data={data} />}
 
       <h2 className="section">Vườn của tôi</h2>
@@ -92,13 +93,59 @@ export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnaps
   )
 }
 
+/**
+ * Tình hình tài chính: lời/lỗ đã gồm phân thuốc mua thiếu và lãi vay;
+ * kèm các khoản còn nợ / được nợ để biết sau khi thanh toán hết thì còn bao nhiêu.
+ */
+function FinanceCard({ data, profit, range, periodLabel }: { data: LedgerSnapshot; profit: number; range: { from?: string }; periodLabel: string }) {
+  const debts = debtSummary(debtStatus(data, today()))
+  const deposit = contractSummaries(data).reduce((s, c) => s + c.depositLeft, 0)
+  const interest = interestPaid(data, range)
+  const rows: Array<[string, number, 'in' | 'out']> = [
+    ['🏦 Tiền vay còn phải trả (gốc)', debts.loan, 'out'],
+    ['🔴 Còn nợ cửa hàng (phân, thuốc mua thiếu)', debts.payable, 'out'],
+    ['🟢 Người ta còn nợ mình', debts.receivable, 'in'],
+    ['🤝 Cọc lái chưa trừ (còn nợ hàng)', deposit, 'out'],
+  ]
+  if (rows.every(([, v]) => v === 0) && interest === 0) return null
+  return (
+    <section className="card finance">
+      <h2>Tình hình tài chính</h2>
+      <p className="small muted">
+        Lời/lỗ {periodLabel} ở trên đã tính cả phân thuốc mua thiếu{interest > 0 ? ` và ${formatVnd(interest)} lãi vay` : ' và lãi vay'}. Tiền gốc vay là tiền mượn nên không tính vào lời/lỗ.
+      </p>
+      <dl>
+        {rows
+          .filter(([, v]) => v > 0)
+          .map(([label, value, dir]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd className={dir}>{formatVnd(value)}</dd>
+            </div>
+          ))}
+      </dl>
+      <p className="small">
+        <a href={href('so/no')}>Xem công nợ &amp; tiền vay ›</a>
+      </p>
+      {profit !== 0 && <p className="small muted">Ghi chú: lời/lỗ là chênh lệch tiền vào – tiền ra; số tiền mặt thực có còn tùy các khoản nợ trên.</p>}
+    </section>
+  )
+}
+
 /** Chế độ Nâng cao: lối tắt vào Kho vật tư và Công nợ, kèm con số chính */
 function AdvancedShortcuts({ data }: { data: LedgerSnapshot }) {
   const stock = supplyStock(data)
   const inStock = stock.filter((s) => s.left > 1e-9)
   const debts = debtSummary(debtStatus(data, today()))
+  const openContracts = contractSummaries(data).filter((c) => c.contract.status === 'open')
   return (
     <div className="shortcut-grid">
+      <a className="card shortcut" href={href('so/ban')}>
+        <b>🤝 Bán cho lái</b>
+        <span className="small muted">
+          {openContracts.length ? `${openContracts.length} lái đang cắt · cọc còn ${formatVnd(openContracts.reduce((s, c) => s + c.depositLeft, 0))}` : 'Lái đặt cọc, cắt nhiều đợt'}
+        </span>
+      </a>
       <a className="card shortcut" href={href('so/kho')}>
         <b>📦 Kho vật tư</b>
         <span className="small muted">{inStock.length ? `${inStock.length} loại · còn ${formatVnd(inStock.reduce((s, x) => s + x.leftValue, 0))}` : 'Chưa có gì trong kho'}</span>
@@ -106,8 +153,9 @@ function AdvancedShortcuts({ data }: { data: LedgerSnapshot }) {
       <a className="card shortcut" href={href('so/no')}>
         <b>🧾 Công nợ</b>
         <span className="small muted">
-          {debts.payable || debts.receivable ? (
+          {debts.payable || debts.receivable || debts.loan ? (
             <>
+              {debts.loan > 0 && <span className="out">Vay {formatVnd(debts.loan)} · </span>}
               {debts.payable > 0 && <span className="out">Nợ {formatVnd(debts.payable)}</span>}
               {debts.payable > 0 && debts.receivable > 0 && ' · '}
               {debts.receivable > 0 && <span className="in">Được nợ {formatVnd(debts.receivable)}</span>}

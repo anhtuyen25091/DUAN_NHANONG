@@ -112,11 +112,11 @@ class LedgerSyncApiTest extends TestCase
     {
         $user = User::factory()->create();
         $at = '2026-10-14T08:00:00.000Z';
-        $tables = ['seasons', 'supplies', 'supply_usages', 'debts', 'debt_payments'];
+        $tables = ['seasons', 'supplies', 'supply_usages', 'debts', 'debt_payments', 'harvest_contracts', 'harvest_cuts'];
 
         $this->actingAs($user)->postJson(route('api.v1.sync.push'), [
             'records' => array_map(fn (string $tbl) => ['tbl' => $tbl, 'data' => $this->record([], $at)], $tables),
-        ])->assertOk()->assertJsonPath('accepted', 5);
+        ])->assertOk()->assertJsonPath('accepted', 7);
 
         $pulled = $this->getJson(route('api.v1.sync.pull'))->assertOk()->json('records');
         $this->assertEqualsCanonicalizing($tables, array_keys($pulled));

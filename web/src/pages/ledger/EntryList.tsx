@@ -12,11 +12,31 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
 
   // Khoản sinh ra khi mua vật tư / ghi nợ: mở vật tư / khoản nợ để sửa, để 2 bên không lệch nhau
   const debtOf = new Map(data.debts.filter((d) => d.transaction_id).map((d) => [d.transaction_id!, d.id]))
+  // Khoản của đợt cắt / bỏ cọc / đền cọc: mở hợp đồng bán cho lái
+  const contractOf = new Map<string, string>()
+  for (const c of data.harvest_cuts) if (c.transaction_id) contractOf.set(c.transaction_id, c.contract_id)
+  for (const c of data.harvest_contracts) if (c.settle_transaction_id) contractOf.set(c.settle_transaction_id, c.id)
+  // Khoản lãi vay: mở khoản vay
+  for (const p of data.debt_payments) if (p.interest_transaction_id) debtOf.set(p.interest_transaction_id, p.debt_id)
   const entryHref = (t: Transaction) =>
-    t.supply_id ? href(`so/kho/${t.supply_id}`) : debtOf.has(t.id) ? href(`so/no/${debtOf.get(t.id)}`) : href('so/ghi', { sua: t.id })
+    t.supply_id
+      ? href(`so/kho/${t.supply_id}`)
+      : debtOf.has(t.id)
+        ? href(`so/no/${debtOf.get(t.id)}`)
+        : contractOf.has(t.id)
+          ? href(`so/ban/${contractOf.get(t.id)}`)
+          : href('so/ghi', { sua: t.id })
 
   const remove = async (entry: Transaction) => {
-    const linked = entry.supply_id ? ' (xóa cả vật tư trong kho)' : debtOf.has(entry.id) ? ' (xóa cả khoản nợ)' : ''
+    const linked = entry.supply_id
+      ? ' (xóa cả vật tư trong kho)'
+      : debtOf.has(entry.id)
+        ? ' (xóa cả khoản nợ)'
+        : data.harvest_cuts.some((c) => c.transaction_id === entry.id)
+          ? ' (xóa đợt cắt)'
+          : contractOf.has(entry.id)
+            ? ' (mở lại hợp đồng)'
+            : ''
     const undo = await ledger.removeEntry(entry.id)
     showToast({ message: `Đã xóa ${formatVnd(entry.amount)}${linked}`, undo })
   }

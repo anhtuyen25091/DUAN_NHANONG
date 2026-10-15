@@ -1019,3 +1019,87 @@ a.entry.entry-main {
   color: inherit;
   text-decoration: none;
 }
+
+/* ---- Bán cho lái ---- */
+.cut-line {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.cut-line > input {
+  grid-column: 1 / -1;
+}
+
+.cut-line input {
+  width: 100%;
+  min-width: 0;
+}
+
+.cut-line-total {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cut-line .entry-del {
+  justify-self: end;
+}
+
+.garden-row.faded-row {
+  opacity: 0.6;
+}
+
+.button.wide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin: 8px 0;
+}
+
+/* ---- Tiền vay / tình hình tài chính ---- */
+.split-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.split-3 p {
+  margin: 0;
+}
+
+.split-3 .big {
+  font-size: 1.1rem;
+}
+
+@media (max-width: 420px) {
+  .split-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card.finance dl {
+  margin: 8px 0;
+}
+
+.card.finance dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.card.finance dt {
+  font-size: 0.95rem;
+}
+
+.card.finance dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

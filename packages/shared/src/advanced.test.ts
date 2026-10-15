@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allocatedEntries, debtStatus, debtSummary, seasonRange, seasonsOf, suggestSeasonName, supplyStock, supplyUsedValue } from './advanced';
+import { allocatedEntries, contractSummaries, debtsByParty, debtStatus, interestPaid, monthlyInterest, debtSummary, seasonRange, seasonsOf, suggestSeasonName, supplyStock, supplyUsedValue } from './advanced';
 import { filterEntries, Ledger, totals, type LedgerMeta, type LedgerStorage } from './ledger';
 import type { SyncRecord } from './types';
 
@@ -147,7 +147,7 @@ describe('Công nợ', () => {
     await ledger.addDebt({ kind: 'payable', party: 'Đại lý A', amount: 3_000_000, record_entry: false });
     const sold = await ledger.addDebt({ kind: 'receivable', party: 'Anh Năm', amount: 8_000_000 });
     expect(ledger.getSnapshot().transactions).toHaveLength(1);
-    expect(debtSummary(debtStatus(ledger.getSnapshot(), '2026-10-14'))).toEqual({ payable: 3_000_000, receivable: 8_000_000 });
+    expect(debtSummary(debtStatus(ledger.getSnapshot(), '2026-10-14'))).toEqual({ payable: 3_000_000, receivable: 8_000_000, loan: 0 });
 
     await ledger.updateDebt(sold.id, { amount: 9_000_000 });
     expect(ledger.getSnapshot().transactions[0].amount).toBe(9_000_000);
@@ -176,5 +176,146 @@ describe('Sao lưu và đồng bộ có dữ liệu Nâng cao', () => {
 
     const oldFile = { app: 'nha-nong', kind: 'ledger-backup', version: 1, exported_at: '2026-10-01T00:00:00Z', records: { gardens: [], categories: [], transactions: [] } };
     await expect(other.importBackup(JSON.stringify(oldFile))).resolves.toBe(0);
+  });
+});
+
+describe('Bán cho lái (sầu riêng: cọc + cắt nhiều đợt)', () => {
+  it('cọc chưa tính lời/lỗ; mỗi đợt tính giá trị hàng nhiều loại; trừ cọc từng đợt tùy nhập', async () => {
+    const { ledger, a } = await setup();
+    const snap = () => ledger.getSnapshot();
+    const hd = await ledger.addContract({ garden_id: a.id, buyer: 'Tư Sầu Riêng', deposit: 100_000_000, date: '2026-07-20', crop: 'Sầu riêng Ri6' });
+    expect(snap().transactions).toHaveLength(0);
+
+    await ledger.addCut({
+      contract_id: hd.id,
+      date: '2026-08-10',
+      lines: [
+        { grade: 'Loại A', kg: 1200, price: 85_000 },
+        { grade: 'Loại B', kg: 300, price: 60_000 },
+        { grade: 'Hàng dạt', kg: 50, price: 20_000 },
+      ],
+      deposit_deduct: 30_000_000,
+    });
+    await ledger.addCut({ contract_id: hd.id, date: '2026-09-05', lines: [{ grade: 'Loại A', kg: 800, price: 90_000 }], deposit_deduct: 50_000_000 });
+
+    let [sum] = contractSummaries(snap());
+    expect(sum).toMatchObject({ delivered: 102_000_000 + 1_000_000 + 18_000_000 + 72_000_000, kg: 2350, deducted: 80_000_000, depositLeft: 20_000_000 });
+    expect(sum.paidByCuts).toBe(sum.delivered - 80_000_000);
+    // Lời/lỗ của vườn = giá trị hàng giao, không cộng cọc
+    expect(totals(filterEntries(snap().transactions, { gardenId: a.id })).income).toBe(193_000_000);
+    expect(snap().transactions.map((t) => t.note).sort()).toEqual(['Đợt 1 · lái Tư Sầu Riêng · 1550 kg', 'Đợt 2 · lái Tư Sầu Riêng · 800 kg']);
+
+    await expect(ledger.addCut({ contract_id: hd.id, lines: [{ grade: 'Loại A', kg: 100, price: 90_000 }], deposit_deduct: 25_000_000 })).rejects.toThrow('Cọc chỉ còn 20.000.000 đ');
+    await expect(ledger.addCut({ contract_id: hd.id, lines: [{ grade: 'Loại A', kg: 100, price: 90_000 }], deposit_deduct: 10_000_000 })).rejects.toThrow('lớn hơn tiền hàng đợt này');
+    await expect(ledger.closeContract(hd.id)).rejects.toThrow('Còn 20.000.000 đ cọc chưa trừ');
+
+    // Đợt cuối trừ nốt cọc rồi đóng
+    const last = await ledger.addCut({ contract_id: hd.id, date: '2026-10-01', lines: [{ grade: 'Loại A', kg: 500, price: 80_000 }], deposit_deduct: 20_000_000 });
+    await ledger.closeContract(hd.id, '2026-10-02');
+    [sum] = contractSummaries(snap());
+    expect(sum).toMatchObject({ depositLeft: 0, contract: { status: 'done' } });
+    await expect(ledger.addCut({ contract_id: hd.id, lines: [{ grade: 'A', kg: 1, price: 1 }] })).rejects.toThrow('đã kết thúc');
+
+    // Sửa đợt: tiền vào đổi theo
+    await ledger.reopenContract(hd.id);
+    await ledger.updateCut(last.id, { lines: [{ grade: 'Loại A', kg: 600, price: 80_000 }] });
+    expect(snap().transactions.find((t) => t.id === last.transaction_id)!.amount).toBe(48_000_000);
+    await expect(ledger.updateContract(hd.id, { deposit: 90_000_000 })).rejects.toThrow('Đã trừ 100.000.000 đ');
+  });
+
+  it('lái bỏ cọc: phần cọc chưa trừ thành tiền vào; mở lại thì bỏ khoản đó', async () => {
+    const { ledger, a } = await setup();
+    const hd = await ledger.addContract({ garden_id: a.id, buyer: 'Lái Năm', deposit: 100_000_000 });
+    await ledger.addCut({ contract_id: hd.id, lines: [{ grade: 'Loại A', kg: 500, price: 80_000 }], deposit_deduct: 40_000_000 });
+    await ledger.forfeitDeposit(hd.id);
+    const income = () => totals(ledger.getSnapshot().transactions).income;
+    expect(income()).toBe(40_000_000 + 60_000_000);
+    expect(contractSummaries(ledger.getSnapshot())[0]).toMatchObject({ depositLeft: 0, contract: { status: 'forfeited' } });
+
+    // Xóa khoản "bỏ cọc" trong danh sách = mở lại hợp đồng
+    const forfeitEntry = ledger.getSnapshot().transactions.find((t) => t.note === 'Lái Lái Năm bỏ cọc')!;
+    const undo = await ledger.removeEntry(forfeitEntry.id);
+    expect(income()).toBe(40_000_000);
+    expect(ledger.getSnapshot().harvest_contracts[0].status).toBe('open');
+    await undo();
+    expect(income()).toBe(100_000_000);
+  });
+
+  it('trả lại cọc: đúng phần còn lại thì không đổi lời/lỗ; đền thêm thì phần dư là tiền ra', async () => {
+    const { ledger, a, b } = await setup();
+    const one = await ledger.addContract({ garden_id: a.id, buyer: 'Lái Sáu', deposit: 50_000_000 });
+    await expect(ledger.refundDeposit(one.id, 40_000_000)).rejects.toThrow('số trả lại không thể ít hơn');
+    await ledger.refundDeposit(one.id, 50_000_000);
+    expect(ledger.getSnapshot().transactions).toHaveLength(0);
+
+    const two = await ledger.addContract({ garden_id: b.id, buyer: 'Lái Bảy', deposit: 50_000_000 });
+    await ledger.refundDeposit(two.id, 100_000_000);
+    expect(totals(ledger.getSnapshot().transactions)).toMatchObject({ income: 0, expense: 50_000_000 });
+
+    // Vườn còn hợp đồng thì không cho xóa vườn; xóa hợp đồng thì xóa luôn khoản đi kèm
+    await expect(ledger.removeGarden(b.id)).rejects.toThrow('còn hợp đồng');
+    await ledger.removeContract(two.id);
+    expect(ledger.getSnapshot().transactions).toHaveLength(0);
+  });
+});
+
+describe('Khoản vay + nợ cửa hàng nhiều lần', () => {
+  it('vay ngân hàng: gốc không tính lời/lỗ, lãi là tiền ra "Lãi vay"; xóa lần trả thì xóa luôn lãi', async () => {
+    const { ledger } = await setup();
+    const snap = () => ledger.getSnapshot();
+    const loan = await ledger.addDebt({ kind: 'loan', party: 'Agribank', amount: 100_000_000, date: '2026-01-05', interest_rate: 9 });
+    expect(snap().transactions).toHaveLength(0);
+    expect(loan.interest_rate).toBe(9);
+    expect(monthlyInterest(100_000_000, 9)).toBe(750_000);
+
+    const p1 = await ledger.payDebt({ debt_id: loan.id, amount: 0, interest: 750_000, date: '2026-02-05' }); // chỉ trả lãi
+    await ledger.payDebt({ debt_id: loan.id, amount: 40_000_000, interest: 750_000, date: '2026-03-05' });
+    const lai = snap().transactions.filter((t) => t.note === 'Lãi vay Agribank');
+    expect(lai).toHaveLength(2);
+    expect(snap().categories.find((c) => c.id === lai[0].category_id)?.name).toBe('Lãi vay');
+    expect(totals(snap().transactions)).toMatchObject({ income: 0, expense: 1_500_000 });
+    expect(interestPaid(snap())).toBe(1_500_000);
+    expect(debtSummary(debtStatus(snap(), '2026-10-15'))).toEqual({ payable: 0, receivable: 0, loan: 60_000_000 });
+
+    const undo = await ledger.removePayment(p1.id);
+    expect(totals(snap().transactions).expense).toBe(750_000);
+    await undo();
+    expect(totals(snap().transactions).expense).toBe(1_500_000);
+    await expect(ledger.payDebt({ debt_id: loan.id, amount: 0, interest: 0 })).rejects.toThrow('lớn hơn 0');
+  });
+
+  it('mua thiếu cửa hàng 5 lần: gom theo cửa hàng, trả gộp trừ khoản cũ nhất trước', async () => {
+    const { ledger, cat } = await setup();
+    for (let i = 1; i <= 5; i++) {
+      await ledger.addSupply({ name: `Phân lần ${i}`, category_id: cat('Phân bón'), unit: 'bao', quantity: 10, unit_price: 2_000_000, bought_on: `2026-0${i}-10`, shop_name: 'Cửa hàng A', on_credit: true });
+    }
+    let [shop] = debtsByParty(debtStatus(ledger.getSnapshot(), '2026-10-15'));
+    expect(shop).toMatchObject({ party: 'Cửa hàng A', count: 5, amount: 100_000_000, left: 100_000_000 });
+    // Phân mua thiếu đã tính vào lời/lỗ
+    expect(totals(ledger.getSnapshot().transactions).expense).toBe(100_000_000);
+
+    await expect(ledger.payParty({ kind: 'payable', party: 'Cửa hàng A', amount: 120_000_000 })).rejects.toThrow('chỉ còn 100.000.000 đ');
+    expect(await ledger.payParty({ kind: 'payable', party: 'Cửa hàng A', amount: 50_000_000 })).toBe(3);
+    const statuses = debtStatus(ledger.getSnapshot(), '2026-10-15');
+    [shop] = debtsByParty(statuses);
+    expect(shop.left).toBe(50_000_000);
+    const byDate = statuses.sort((a, b) => a.debt.date.localeCompare(b.debt.date)).map((s) => s.left);
+    expect(byDate).toEqual([0, 0, 10_000_000, 20_000_000, 20_000_000]);
+    // Trả nợ không đổi lời/lỗ
+    expect(totals(ledger.getSnapshot().transactions).expense).toBe(100_000_000);
+  });
+
+  it('sổ cũ chưa có hạng mục "Lãi vay" thì tự thêm khi mở', async () => {
+    const storage = memoryStorage();
+    const old = await Ledger.open(storage, now);
+    const laiVay = old.getSnapshot().categories.find((c) => c.name === 'Lãi vay')!;
+    await storage.save('categories', [{ ...laiVay, deleted_at: null, id: laiVay.id, updated_at: laiVay.updated_at, name: 'x' } as never]);
+    // Giả lập sổ cũ: xóa hạng mục Lãi vay khỏi bộ nhớ lưu
+    const { records, meta } = await storage.load();
+    const store2 = memoryStorage();
+    for (const [table, rows] of Object.entries(records)) await store2.save(table as never, (rows as SyncRecord[]).filter((r) => (r as { name?: string }).name !== 'x'));
+    await store2.saveMeta(meta);
+    const reopened = await Ledger.open(store2, now);
+    expect(reopened.getSnapshot().categories.filter((c) => c.name === 'Lãi vay')).toHaveLength(1);
   });
 });
