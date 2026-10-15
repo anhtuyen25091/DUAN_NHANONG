@@ -91,6 +91,18 @@ cd backend && php artisan crawl:run && php artisan shops:import-osm
 
 ---
 
+## 15/10/2026: Đưa mã nguồn lên GitHub ✅
+- Repo: https://github.com/anhtuyen25091/DUAN_NHANONG (nhánh `main`)
+- Commit đầu tiên `2df37bf` "Khởi tạo dự án Nhà Nông": 329 file.
+- Trước khi push đã kiểm tra:
+  - Không đưa lên các thư mục `.env`, `vendor/`, `node_modules/`, `dist/`, database SQLite (đã có trong `.gitignore`).
+  - Quét nội dung các file: không có mật khẩu admin, APP_KEY hay khóa bí mật nào.
+  - `DB_PASSWORD=secret` trong `backend/.env.example` là mật khẩu MySQL mặc định của môi trường dev (giống `docker-compose.yml`).
+- Cấu hình git riêng cho dự án này (không đổi cấu hình chung của máy): tên `anhtuyen25091`, email `tuyencnt10@gmail.com`.
+- Từ nay, làm xong mỗi phần sẽ commit và push để dễ theo dõi.
+
+---
+
 ## 14/10/2026: Giai đoạn 4, Đồng bộ (lưu trên máy + trên mạng), đang làm
 
 ### Bước 4.1: Backend: tài khoản và API đồng bộ ✅
