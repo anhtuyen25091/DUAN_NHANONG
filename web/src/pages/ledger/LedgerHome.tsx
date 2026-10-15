@@ -1,4 +1,4 @@
-import { allocatedEntries, contractSummaries, debtStatus, dueReminders, formatDate, interestPaid, debtSummary, filterEntries, formatVnd, supplyStock, today, totals, type Ledger, type LedgerSnapshot } from '@nhanong/shared'
+import { allocatedEntries, contractSummaries, debtStatus, dueReminders, formatDate, interestPaid, debtSummary, filterEntries, formatVnd, supplyStock, today, totals, type Ledger, type LedgerSnapshot, workerBalances } from '@nhanong/shared'
 import { useState } from 'react'
 import { href } from '../../hooks'
 import { PERIOD_LABELS, periodRange, type Period } from '../../ledger/period'
@@ -161,6 +161,7 @@ function AdvancedShortcuts({ data }: { data: LedgerSnapshot }) {
   const inStock = stock.filter((s) => s.left > 1e-9)
   const debts = debtSummary(debtStatus(data, today()))
   const openContracts = contractSummaries(data).filter((c) => c.contract.status === 'open')
+  const owedWages = workerBalances(data).reduce((s, b) => s + b.owed, 0)
   return (
     <div className="shortcut-grid">
       <a className="card shortcut" href={href('so/ban')}>
@@ -172,6 +173,10 @@ function AdvancedShortcuts({ data }: { data: LedgerSnapshot }) {
       <a className="card shortcut" href={href('so/kho')}>
         <b>📦 Kho vật tư</b>
         <span className="small muted">{inStock.length ? `${inStock.length} loại · còn ${formatVnd(inStock.reduce((s, x) => s + x.leftValue, 0))}` : 'Chưa có gì trong kho'}</span>
+      </a>
+      <a className="card shortcut" href={href('so/cong')}>
+        <b>👷 Nhân công</b>
+        <span className="small muted">{owedWages ? <span className="out">Chưa trả công {formatVnd(owedWages)}</span> : data.workers.length ? `${data.workers.length} người · đã trả đủ` : 'Chấm công, trả công'}</span>
       </a>
       <a className="card shortcut" href={href('so/no')}>
         <b>🧾 Công nợ</b>

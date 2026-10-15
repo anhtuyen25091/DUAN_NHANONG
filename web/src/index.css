@@ -1606,3 +1606,106 @@ a.button.small-btn {
 .calendar-actions button {
   flex: 1;
 }
+
+/* ---- Khoản hay dùng, nhân công, ô tự thêm (mục 19) ---- */
+.templates h2 {
+  margin: 4px 0 6px;
+}
+
+.template-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+button.template {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 64px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  white-space: nowrap;
+  text-align: left;
+}
+
+button.template.out b {
+  color: var(--loss);
+}
+
+button.template.in b {
+  color: var(--gain);
+}
+
+.template-item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-item p {
+  margin: 2px 0 0;
+}
+
+label.checkbox.keep-template {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  margin: 0 0 12px;
+}
+
+label.checkbox.keep-template input {
+  width: 22px;
+  min-height: 22px;
+}
+
+button.subtle-danger {
+  color: var(--error);
+  border-color: transparent;
+}
+
+.work-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.work-row .segmented {
+  margin: 0;
+}
+
+input.days-input {
+  width: 84px;
+}
+
+.field-def {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.settings-links {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-links .card {
+  margin-bottom: 8px;
+}
+
+.amount.muted {
+  color: var(--muted);
+  font-weight: 500;
+}

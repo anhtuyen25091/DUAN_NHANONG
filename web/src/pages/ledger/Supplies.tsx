@@ -5,6 +5,8 @@ import { showToast } from '../../ledger/toast'
 import { parseQty, qtyText } from '../../ledger/qty'
 import { CategoryPicker, GardenPicker, MoneyField, QtyField } from './fields'
 import { DateField } from '../../components/DateField'
+import { extraTexts, saveExtra } from '../../ledger/extra'
+import { CustomFieldInputs, FieldLines } from './extraFields'
 
 const UNITS = ['bao', 'chai', 'gói', 'kg', 'lít', 'cây', 'thùng']
 
@@ -71,6 +73,7 @@ export function SupplyForm({ ledger, data, id }: { ledger: Ledger; data: LedgerS
   const [note, setNote] = useState(supply?.note ?? '')
   const [onCredit, setOnCredit] = useState(false)
   const [useFor, setUseFor] = useState<string | null>(null)
+  const [extra, setExtra] = useState(() => extraTexts(data.custom_fields, 'supply', supply?.extra))
   const [error, setError] = useState<string | null>(null)
 
   const quantity = parseQty(qty)
@@ -85,9 +88,11 @@ export function SupplyForm({ ledger, data, id }: { ledger: Ledger; data: LedgerS
     try {
       if (supply) {
         await ledger.updateSupply(supply.id, input)
+        await saveExtra(ledger, data.custom_fields, 'supply', supply.id, extra)
         go(`so/kho/${supply.id}`)
       } else {
         const created = await ledger.addSupply({ ...input, on_credit: onCredit, use_for: useFor })
+        await saveExtra(ledger, data.custom_fields, 'supply', created.id, extra)
         showToast({ message: `Đã ghi mua ${name.trim()}: ${formatVnd(total)}${onCredit ? ' (mua thiếu, đã ghi công nợ)' : ''}` })
         go(`so/kho/${created.id}`)
       }
@@ -130,6 +135,7 @@ export function SupplyForm({ ledger, data, id }: { ledger: Ledger; data: LedgerS
         Ghi chú
         <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
       </label>
+      <CustomFieldInputs fields={data.custom_fields} target="supply" texts={extra} onChange={setExtra} />
 
       {!supply && (
         <>
@@ -220,6 +226,7 @@ export function SupplyDetail({ ledger, data, id }: { ledger: Ledger; data: Ledge
         Mua {formatDate(supply.bought_on)}
         {supply.shop_name && ` ở ${supply.shop_name}`} · {formatQty(supply.quantity)} {supply.unit} × {formatVnd(supply.unit_price)} = <b>{formatVnd(supplyCost(supply))}</b>
       </p>
+      <FieldLines fields={data.custom_fields} target="supply" extra={supply.extra} />
       {debt && (
         <p>
           <a href={href(`so/no/${debt.id}`)}>🧾 Mua thiếu: xem công nợ</a>

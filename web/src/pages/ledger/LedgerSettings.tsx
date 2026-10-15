@@ -57,12 +57,30 @@ export function LedgerSettings({ ledger, data }: { ledger: Ledger; data: LedgerS
       <StoragePlace data={data} />
 
       <section className="card">
+        <h2>Ghi nhanh &amp; thông tin riêng</h2>
+        <div className="settings-links">
+          <a className="card garden-row" href={href('so/mau')}>
+            <span className="garden-name">
+              ⭐ Khoản hay dùng <span className="small muted">· {data.templates.length} khoản</span>
+            </span>
+            <span aria-hidden>›</span>
+          </a>
+          <a className="card garden-row" href={href('so/o-tu-them')}>
+            <span className="garden-name">
+              🏷️ Thông tin tự thêm <span className="small muted">· {data.custom_fields.length} ô (số gốc cây, giống…)</span>
+            </span>
+            <span aria-hidden>›</span>
+          </a>
+        </div>
+      </section>
+
+      <section className="card">
         <h2>Chế độ Nâng cao</h2>
         <label className="toggle">
           <input type="checkbox" checked={!!data.meta.advanced} onChange={(e) => ledger.setMeta({ advanced: e.target.checked })} />
           <span>
-            <b>Bật mùa vụ, kho vật tư, công nợ</b>
-            <span className="small muted">Chia lời/lỗ theo vụ; mua phân thuốc về kho rồi ghi dùng cho vườn nào; ghi mua thiếu, bán chịu. Tắt đi thì dữ liệu vẫn giữ.</span>
+            <b>Bật mùa vụ, kho vật tư, công nợ, nhân công, thu hoạch</b>
+            <span className="small muted">Chia lời/lỗ theo vụ; mua phân thuốc về kho rồi ghi dùng cho vườn nào; ghi mua thiếu, bán chịu; chấm công, trả công; ghi sản lượng để biết giá thành mỗi kg. Tắt đi thì dữ liệu vẫn giữ.</span>
           </span>
         </label>
       </section>

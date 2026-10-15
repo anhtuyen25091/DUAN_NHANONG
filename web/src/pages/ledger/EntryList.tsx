@@ -1,4 +1,4 @@
-import { formatDate, formatVnd, groupByDate, today, type Ledger, type LedgerSnapshot, type Transaction } from '@nhanong/shared'
+import { fieldLines, formatDate, formatVnd, groupByDate, today, type Ledger, type LedgerSnapshot, type Transaction } from '@nhanong/shared'
 import { href } from '../../hooks'
 import { showToast } from '../../ledger/toast'
 
@@ -19,6 +19,9 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
   // Khoản lãi vay: mở khoản vay; xóa thì chỉ xóa lần trả đó
   const interestOf = new Map<string, string>()
   for (const p of data.debt_payments) if (p.interest_transaction_id) interestOf.set(p.interest_transaction_id, p.debt_id)
+  // Khoản tiền bán ghi kèm sản lượng: mở lần thu hoạch; khoản trả công: mở người làm
+  const harvestOf = new Map(data.harvests.filter((h) => h.transaction_id).map((h) => [h.transaction_id!, h.id]))
+  const workerOf = new Map(data.work_logs.filter((l) => l.transaction_id).map((l) => [l.transaction_id!, l.worker_id]))
   const entryHref = (t: Transaction) =>
     ledger.dealOf(t)
       ? href(`don/${ledger.dealOf(t)}`)
@@ -28,7 +31,11 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
         ? href(`so/no/${debtOf.get(t.id) ?? interestOf.get(t.id)}`)
         : contractOf.has(t.id)
           ? href(`so/ban/${contractOf.get(t.id)}`)
-          : href('so/ghi', { sua: t.id })
+          : harvestOf.has(t.id)
+            ? href(`so/thu-hoach/${harvestOf.get(t.id)}`)
+            : workerOf.has(t.id)
+              ? href(`so/cong/nguoi/${workerOf.get(t.id)}`)
+              : href('so/ghi', { sua: t.id })
 
   const remove = async (entry: Transaction) => {
     if (ledger.dealOf(entry)) {
@@ -45,7 +52,11 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
           ? ' (xóa đợt cắt)'
           : contractOf.has(entry.id)
             ? ' (mở lại hợp đồng)'
-            : ''
+            : harvestOf.has(entry.id)
+              ? ' (xóa cả lần thu hoạch)'
+              : workerOf.has(entry.id)
+                ? ' (bỏ lần trả công, công thành chưa trả)'
+                : ''
     const undo = await ledger.removeEntry(entry.id)
     showToast({ message: `Đã xóa ${formatVnd(entry.amount)}${linked}`, undo })
   }
@@ -66,7 +77,13 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
                   <span className="entry-text">
                     <span>{cat?.name ?? 'Khác'}</span>
                     <span className="small muted">
-                      {[showGarden ? (t.garden_id ? gardens.get(t.garden_id)?.name : 'Chi chung') : null, t.note].filter(Boolean).join(' · ')}
+                      {[
+                        showGarden ? (t.garden_id ? gardens.get(t.garden_id)?.name : 'Chi chung') : null,
+                        t.note,
+                        ...fieldLines(data.custom_fields, 'transaction', t.extra).map((l) => `${l.label}: ${l.value}`),
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </span>
                   </span>
                   <span className={`amount ${t.type === 'income' ? 'in' : 'out'}`}>

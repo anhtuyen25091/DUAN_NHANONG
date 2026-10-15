@@ -10,6 +10,10 @@ import {
   supplyUsedValue,
   contractSummaries,
   CONTRACT_STATUS_LABELS,
+  costPerUnit,
+  formatHarvest,
+  formatQtyGrouped,
+  harvestTotals,
   today,
   totals,
   type Ledger,
@@ -19,6 +23,7 @@ import { go, href, replaceQuery } from '../../hooks'
 import { MonthBars } from '../../components/MonthBars'
 import { showToast } from '../../ledger/toast'
 import { EntryList } from './EntryList'
+import { FieldLines } from './extraFields'
 import { ProfitCard } from './LedgerHome'
 
 /**
@@ -93,6 +98,7 @@ export function GardenDetail({ ledger, data, id, query }: { ledger: Ledger; data
       {garden && (garden.crop || garden.area_m2) && (
         <p className="muted">{[garden.crop, garden.area_m2 ? `${garden.area_m2.toLocaleString('vi-VN')} m²` : null].filter(Boolean).join(' · ')}</p>
       )}
+      {garden && <FieldLines fields={data.custom_fields} target="garden" extra={garden.extra} />}
 
       {advanced && garden ? (
         <>
@@ -162,6 +168,8 @@ export function GardenDetail({ ledger, data, id, query }: { ledger: Ledger; data
           <a className="button" href={href('so/ban/moi', { vuon: garden.id })}>
             ＋ Nhận cọc của lái
           </a>
+
+          <HarvestSection data={data} gardenId={garden.id} range={range} label={label} expense={totals(filterEntries(allocated, range)).expense} />
         </>
       )}
 
@@ -203,5 +211,53 @@ export function GardenDetail({ ledger, data, id, query }: { ledger: Ledger; data
         ＋ Ghi tiền
       </a>
     </div>
+  )
+}
+
+/** Sản lượng thu hoạch của vườn trong vụ / năm đang xem, kèm giá thành mỗi kg */
+function HarvestSection({ data, gardenId, range, label, expense }: { data: LedgerSnapshot; gardenId: string; range: { from?: string; to?: string }; label: string; expense: number }) {
+  const sum = harvestTotals(data, gardenId, range)
+  const perKg = costPerUnit(expense, sum.kg)
+  const list = data.harvests.filter((h) => h.garden_id === gardenId && (!range.from || h.date >= range.from) && (!range.to || h.date <= range.to))
+  return (
+    <>
+      <h2 className="section">🌾 Thu hoạch</h2>
+      {sum.byUnit.length > 0 ? (
+        <section className="card">
+          <p className="small muted">Sản lượng · {label}</p>
+          <p className="big">{sum.byUnit.map((u) => `${formatQtyGrouped(u.quantity)} ${u.unit}`).join(' · ')}</p>
+          {sum.cutKg > 0 && <p className="small muted">Gồm {formatQtyGrouped(sum.cutKg)} kg đã cắt bán cho lái (tự cộng, không cần ghi lại).</p>}
+          {perKg !== null && (
+            <p>
+              Giá thành: <b>{formatVnd(perKg)}/kg</b> <span className="small muted">(tiền chi {formatVnd(expense)} ÷ {formatQtyGrouped(sum.kg)} kg)</span>
+            </p>
+          )}
+        </section>
+      ) : (
+        <p className="small muted">Ghi sản lượng mỗi lần hái / cắt để biết mỗi kg tốn bao nhiêu tiền (giá thành), so với giá bán.</p>
+      )}
+      {list.length > 0 && (
+        <div className="entries">
+          {list.map((h) => (
+            <a key={h.id} className="entry entry-main" href={href(`so/thu-hoach/${h.id}`)}>
+              <span className="entry-icon" aria-hidden>
+                🌾
+              </span>
+              <span className="entry-text">
+                <span>{formatHarvest(h)}</span>
+                <span className="small muted">
+                  {formatDate(h.date)}
+                  {h.note ? ` · ${h.note}` : ''}
+                </span>
+              </span>
+              <span className={`amount ${h.price ? 'in' : 'muted'}`}>{h.price ? `+${formatVnd(Math.round(h.quantity * h.price))}` : 'chưa bán'}</span>
+            </a>
+          ))}
+        </div>
+      )}
+      <a className="button" href={href(`so/vuon/${gardenId}/thu-hoach-moi`)}>
+        ＋ Ghi thu hoạch
+      </a>
+    </>
   )
 }

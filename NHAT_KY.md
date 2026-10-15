@@ -65,6 +65,39 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 **Kiểm tra:** 89 test `packages/shared` qua (thêm 18 test); typecheck shared, web, mobile sạch.
 
+#### 19.2 Giao diện web ✅
+**Đã làm**
+- **Khoản hay dùng:**
+  - Màn Ghi tiền có hàng "⭐ Khoản hay dùng" ở trên lưới icon. Bấm một mẫu là điền sẵn hạng mục, số tiền, vườn, ghi chú rồi nhảy thẳng sang bước số tiền; chỉ cần bấm Lưu (2 lần bấm). Gõ phím số đầu tiên thì thay số của mẫu.
+  - Khi ghi khoản mới có ô tích "⭐ Lưu làm khoản hay dùng".
+  - Trang `#/so/mau` (vào từ Cài đặt sổ): Ghi ngay, Sửa tên / số tiền, Xóa (có hoàn tác).
+- **Thu hoạch** (chế độ Nâng cao), mục "🌾 Thu hoạch" trong trang vườn:
+  - sản lượng theo vụ / năm đang xem (tự cộng số kg đã cắt bán cho lái)
+  - **giá thành đ/kg** (tiền chi ÷ số kg) và danh sách các lần thu hoạch
+- Form `#/so/vuon/:id/thu-hoach-moi` và `#/so/thu-hoach/:id`:
+  - nhập sản lượng; đơn vị kg / tạ / tấn / trái / buồng / bao
+  - tích "Đã bán" và nhập giá thì tự ghi tiền vào
+  - nút xóa (kèm khoản tiền bán)
+- **Nhân công** (chế độ Nâng cao):
+  - Ô lối tắt "👷 Nhân công" ở trang chính, hiện công chưa trả.
+  - `#/so/cong`: danh sách người làm và số tiền còn nợ.
+  - `#/so/cong/cham`: chấm công 1 ngày cho nhiều người. Mỗi người chọn Nghỉ / Nửa ngày / Cả ngày hoặc gõ số khác; nút Lưu hiện luôn tổng tiền.
+  - `#/so/cong/nguoi/:id`: các ngày công; nút "💵 Trả công" (chọn được ngày trả); nút ↩ bỏ lần trả.
+- **Ô tự thêm:**
+  - `#/so/o-tu-them` (vào từ Cài đặt sổ): thêm ô cho Vườn / Khoản thu chi / Vật tư, loại Chữ / Số / Ngày / Chọn 1 trong danh sách; đổi tên, xóa.
+  - Các ô hiện trong form vườn, form vật tư, và phần "Ngày · ghi chú · thông tin thêm" của màn Ghi tiền.
+  - Giá trị hiện ở trang vườn, trang vật tư và danh sách khoản.
+- Khoản tự ghi từ thu hoạch hoặc trả công: bấm vào thì mở lần thu hoạch / người làm; xóa thì báo rõ sẽ xóa gì.
+- Hàm `extraTexts` / `saveExtra` tách ra `web/src/ledger/extra.ts`, vì lint báo file component không nên export kèm hàm thường.
+
+**Kiểm tra** (bấm thử trong Chrome headless, sổ mới, bật Nâng cao)
+- Khoản hay dùng: ghi Thuốc 350.000 đ và tích lưu mẫu → lần sau bấm mẫu được 🧪 Thuốc, 350.000 đ, đúng vườn → gõ phím 4 thì số thành 4 đ (thay chứ không nối).
+- Ô tự thêm: thêm "Số gốc cây" (số) → nhập 1200 ở form vườn → trang vườn hiện "Số gốc cây: 1.200".
+- Thu hoạch: 1.200 kg × 45.000 đ → tự ghi tiền vào 54.000.000 đ; giá thành 4.256.000 ÷ 1.200 = **3.547 đ/kg** (đúng).
+- Nhân công: thêm Anh Ba 300.000 đ/ngày → chấm cả ngày → nợ 300.000 đ → Trả công → còn 0 đ; sổ có khoản "Nhân công · Trả công Anh Ba: 1 ngày −300.000 đ" đúng vườn.
+- Lint, typecheck sạch.
+- Lưu ý khi viết test: script bấm theo chữ có thể bấm nhầm (chữ "5" khớp với ô ngày "15/10/2026"), nên bàn phím số phải bấm đúng `.keypad button`.
+
 ---
 
 ## 15/10/2026 (tối): Pull code mới + nạp backup giá trên máy dev Docker (192.168.1.10)

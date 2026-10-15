@@ -1,8 +1,10 @@
-import { formatVnd, pressAmountKey, readVnd, today, type AmountKey, type EntryType, type Ledger, type LedgerSnapshot } from '@nhanong/shared'
+import { fieldsFor, formatVnd, pressAmountKey, readVnd, today, type AmountKey, type EntryType, type Ledger, type LedgerSnapshot, type QuickTemplate } from '@nhanong/shared'
 import { useEffect, useState } from 'react'
 import { go, href } from '../../hooks'
 import { showToast } from '../../ledger/toast'
 import { DateField } from '../../components/DateField'
+import { extraTexts, saveExtra } from '../../ledger/extra'
+import { CustomFieldInputs } from './extraFields'
 
 const KEYS: AmountKey[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0', 'xóa']
 
@@ -24,6 +26,18 @@ export function AddEntry({ ledger, data, query }: { ledger: Ledger; data: Ledger
   const [saving, setSaving] = useState(false)
   // Khi sửa: phím số đầu tiên thay số cũ (như máy tính bỏ túi), không gõ nối vào
   const [fresh, setFresh] = useState(!!editing)
+  const [extra, setExtra] = useState(() => extraTexts(data.custom_fields, 'transaction', editing?.extra))
+  const [keepAsTemplate, setKeepAsTemplate] = useState(false)
+
+  /** Bấm 1 khoản hay dùng: điền sẵn mọi thứ, nhảy thẳng sang bước số tiền (vẫn sửa được trước khi Lưu) */
+  const applyTemplate = (t: QuickTemplate) => {
+    setType(t.type)
+    setCategoryId(data.categories.some((c) => c.id === t.category_id) ? t.category_id : null)
+    setAmount(t.amount)
+    setFresh(true)
+    if (t.garden_id === null || data.gardens.some((g) => g.id === t.garden_id)) setGardenId(t.garden_id)
+    setNote(t.note ?? '')
+  }
 
   const category = data.categories.find((c) => c.id === categoryId)
   const press = (key: AmountKey) => {
@@ -49,9 +63,12 @@ export function AddEntry({ ledger, data, query }: { ledger: Ledger; data: Ledger
     if (!category || amount <= 0) return
     setSaving(true)
     const entry = { type, amount, category_id: category.id, garden_id: gardenId, date, note }
+    let id = editing?.id
     if (editing) await ledger.updateEntry(editing.id, entry)
-    else await ledger.addEntry(entry)
-    showToast({ message: `Đã lưu ${type === 'income' ? 'tiền vào' : 'tiền ra'} ${formatVnd(amount)}` })
+    else id = (await ledger.addEntry(entry)).id
+    await saveExtra(ledger, data.custom_fields, 'transaction', id!, extra)
+    if (keepAsTemplate && !editing) await ledger.templateFromEntry(id!)
+    showToast({ message: `Đã lưu ${type === 'income' ? 'tiền vào' : 'tiền ra'} ${formatVnd(amount)}${keepAsTemplate && !editing ? ' · đã thêm vào khoản hay dùng' : ''}` })
     go(back)
   }
 
@@ -70,6 +87,19 @@ export function AddEntry({ ledger, data, query }: { ledger: Ledger; data: Ledger
             Tiền vào
           </button>
         </div>
+        {!editing && data.templates.length > 0 && (
+          <section className="templates" aria-label="Khoản hay dùng">
+            <h2 className="small muted">⭐ Khoản hay dùng</h2>
+            <div className="template-row">
+              {data.templates.map((t) => (
+                <button key={t.id} type="button" className={`template ${t.type === 'income' ? 'in' : 'out'}`} onClick={() => applyTemplate(t)}>
+                  <span>{data.categories.find((c) => c.id === t.category_id)?.icon ?? '📦'} {t.label}</span>
+                  <b>{formatVnd(t.amount)}</b>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
         <h1>{type === 'expense' ? 'Chi cho việc gì?' : 'Tiền vào từ đâu?'}</h1>
         <div className="icon-grid">
           {data.categories
@@ -135,14 +165,24 @@ export function AddEntry({ ledger, data, query }: { ledger: Ledger; data: Ledger
         </fieldset>
       )}
 
-      <details className="more">
-        <summary>Ngày ({date === today() ? 'hôm nay' : date.split('-').reverse().join('/')}) · ghi chú</summary>
+      <details className="more" open={fieldsFor(data.custom_fields, 'transaction').length > 0 && Object.values(extra).some(Boolean)}>
+        <summary>
+          Ngày ({date === today() ? 'hôm nay' : date.split('-').reverse().join('/')}) · ghi chú{fieldsFor(data.custom_fields, 'transaction').length > 0 ? ' · thông tin thêm' : ''}
+        </summary>
         <DateField label="Ngày" value={date} onChange={setDate} max={today()} />
         <label>
           Ghi chú
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="Ví dụ: 4 bao NPK" />
         </label>
+        <CustomFieldInputs fields={data.custom_fields} target="transaction" texts={extra} onChange={setExtra} />
       </details>
+
+      {!editing && (
+        <label className="checkbox keep-template">
+          <input type="checkbox" checked={keepAsTemplate} onChange={(e) => setKeepAsTemplate(e.target.checked)} />
+          ⭐ Lưu làm khoản hay dùng (lần sau bấm 1 lần là ghi)
+        </label>
+      )}
 
       <button type="button" className="wide primary save" disabled={amount <= 0 || saving} onClick={save}>
         {saving ? 'Đang lưu…' : 'Lưu'}

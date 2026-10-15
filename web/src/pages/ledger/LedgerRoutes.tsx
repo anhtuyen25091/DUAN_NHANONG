@@ -6,6 +6,7 @@ import { AddEntry } from './AddEntry'
 import { ChooseMode } from './ChooseMode'
 import { ContractDetail, ContractForm, ContractList, CutForm } from './Contracts'
 import { DebtDetail, DebtForm, DebtList, PartyDebts } from './Debts'
+import { CustomFieldSettings, HarvestForm, TemplateList, WorkDayForm, WorkerDetail, WorkerForm, WorkerList } from './Extras'
 import { GardenDetail } from './GardenDetail'
 import { GardenForm } from './GardenForm'
 import { LedgerHome } from './LedgerHome'
@@ -42,6 +43,24 @@ export default function LedgerRoutes({ path, query }: { path: string[]; query: U
         <GardenForm ledger={ledger} data={data} back={query.get('ve')} />
       ) : page === 'vuon' && id && action === 'sua' ? (
         <GardenForm ledger={ledger} data={data} id={id} />
+      ) : page === 'vuon' && id && action === 'thu-hoach-moi' ? (
+        <HarvestForm key="new" ledger={ledger} data={data} gardenId={id} />
+      ) : page === 'thu-hoach' && id ? (
+        <HarvestForm key={id} ledger={ledger} data={data} id={id} />
+      ) : page === 'mau' ? (
+        <TemplateList ledger={ledger} data={data} />
+      ) : page === 'o-tu-them' ? (
+        <CustomFieldSettings ledger={ledger} data={data} />
+      ) : page === 'cong' && id === 'cham' ? (
+        <WorkDayForm key={query.get('nguoi') ?? 'all'} ledger={ledger} data={data} query={query} />
+      ) : page === 'cong' && id === 'nguoi-moi' ? (
+        <WorkerForm key="new" ledger={ledger} data={data} />
+      ) : page === 'cong' && id === 'nguoi' && action && sub === 'sua' ? (
+        <WorkerForm key={action} ledger={ledger} data={data} id={action} />
+      ) : page === 'cong' && id === 'nguoi' && action ? (
+        <WorkerDetail key={action} ledger={ledger} data={data} id={action} />
+      ) : page === 'cong' ? (
+        <WorkerList data={data} />
       ) : page === 'vuon' && id && action === 'vu-moi' ? (
         <SeasonForm key="new" ledger={ledger} data={data} gardenId={id} />
       ) : page === 'vuon' && id && action === 'vu' && sub ? (
