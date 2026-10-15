@@ -8,6 +8,7 @@ import { MoneyField } from '../ledger/fields'
 import { DealDetail } from './DealDetail'
 import { counterpartName } from './dealText'
 import { EntryForm } from './EntryForm'
+import { DateField } from '../../components/DateField'
 
 /**
  * #/don/...: đơn mua bán chung 2 bên (tải riêng).
@@ -156,10 +157,7 @@ function DealCreate({ token }: { token: string }) {
       </label>
       <MoneyField label="Tiền cọc (nếu có)" value={deposit} onChange={setDeposit} />
       {deposit > 0 && (
-        <label>
-          Ngày cọc
-          <input type="date" value={depositDate} max={today()} onChange={(e) => setDepositDate(e.target.value || today())} />
-        </label>
+        <DateField label="Ngày cọc" value={depositDate} onChange={setDepositDate} max={today()} />
       )}
       <label>
         Ghi chú

@@ -2,6 +2,7 @@ import { suggestSeasonName, today, type Ledger, type LedgerSnapshot } from '@nha
 import { useState, type FormEvent } from 'react'
 import { go, href } from '../../hooks'
 import { showToast } from '../../ledger/toast'
+import { DateField } from '../../components/DateField'
 
 /** #/so/vuon/:gardenId/vu-moi, #/so/vuon/:gardenId/vu/:id */
 export function SeasonForm({ ledger, data, gardenId, id }: { ledger: Ledger; data: LedgerSnapshot; gardenId: string; id?: string }) {
@@ -52,14 +53,8 @@ export function SeasonForm({ ledger, data, gardenId, id }: { ledger: Ledger; dat
         <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={60} placeholder="Ví dụ: Vụ cà phê 2026" />
       </label>
       <div className="row-2">
-        <label>
-          Bắt đầu *
-          <input type="date" value={startedOn} onChange={(e) => setStartedOn(e.target.value || today())} required />
-        </label>
-        <label>
-          Kết thúc
-          <input type="date" value={endedOn} min={startedOn} onChange={(e) => setEndedOn(e.target.value)} />
-        </label>
+        <DateField label="Bắt đầu *" value={startedOn} onChange={setStartedOn} />
+        <DateField label="Kết thúc" value={endedOn} onChange={setEndedOn} min={startedOn} optional />
       </div>
       <p className="small muted">Để trống ngày kết thúc nếu vụ đang làm.</p>
       {error && <div className="notice error">{error}</div>}

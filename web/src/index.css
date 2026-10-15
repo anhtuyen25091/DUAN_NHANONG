@@ -1492,3 +1492,117 @@ a.button.small-btn {
   margin: 12px 0 6px;
   font-weight: 600;
 }
+
+/* ---- Ô chọn ngày tiếng Việt (DateField) ---- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 14px;
+}
+
+.date-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.date-row button.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.date-button {
+  flex: 1 1 220px;
+  min-height: 48px;
+  text-align: left;
+}
+
+.calendar {
+  width: min(400px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.calendar::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 1.15rem;
+}
+
+.calendar-nav {
+  width: 48px;
+  min-height: 48px;
+  border-radius: 24px;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--primary);
+  padding: 0;
+}
+
+.calendar-nav:disabled {
+  opacity: 0.3;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar-week {
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 6px 0;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-day.today {
+  border: 2px solid var(--primary);
+  font-weight: 700;
+}
+
+.calendar-day.selected {
+  background: var(--primary);
+  color: var(--surface);
+  font-weight: 700;
+}
+
+.sunday:not(.selected) {
+  color: var(--loss, #c2410c);
+}
+
+.calendar-day:disabled {
+  color: var(--border);
+  cursor: default;
+}
+
+.calendar-actions {
+  margin-top: 12px;
+}
+
+.calendar-actions button {
+  flex: 1;
+}

@@ -21,6 +21,7 @@ import { showToast } from '../../ledger/toast'
 import { CategoryPicker, GardenPicker, MoneyField } from './fields'
 import { loanDraft, loanTermsOf } from '../../ledger/loanDraft'
 import { LenderFields, LoanFields, LoanScheduleCard } from './Loan'
+import { DateField } from '../../components/DateField'
 
 const KIND_ICON: Record<DebtKind, string> = { loan: '🏦', payable: '🔴', receivable: '🟢' }
 const partyHref = (kind: DebtKind, party: string) => href(`so/no/nguoi/${kind}/${encodeURIComponent(party)}`)
@@ -156,10 +157,7 @@ export function PartyDebts({ ledger, data, kind, party }: { ledger: Ledger; data
               {receive ? 'Thu hết' : 'Trả hết'} {formatVnd(group.left)}
             </button>
           </div>
-          <label>
-            Ngày
-            <input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value || today())} />
-          </label>
+          <DateField label="Ngày" value={date} onChange={setDate} max={today()} />
           {error && <div className="notice error">{error}</div>}
           <button type="submit" className="wide primary" disabled={amount <= 0}>
             Lưu
@@ -269,17 +267,11 @@ export function DebtForm({ ledger, data, id }: { ledger: Ledger; data: LedgerSna
       <MoneyField label={loan ? 'Số tiền vay *' : 'Số tiền *'} value={amount} onChange={setAmount} required />
       {loan && <LoanFields draft={terms} onChange={setTerms} party={party} amount={amount} date={date} />}
       <div className="row-2">
-        <label>
-          Ngày
-          <input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value || today())} />
-        </label>
+        <DateField label="Ngày" value={date} onChange={setDate} max={today()} />
         {loan && loanTermsOf(terms).loan_plan ? (
           <p className="small muted">Hạn trả: tự tính theo kỳ hạn vay.</p>
         ) : (
-          <label>
-            {loan ? 'Hạn trả hết nợ' : 'Hẹn trả ngày'}
-            <input type="date" value={dueOn} min={date} onChange={(e) => setDueOn(e.target.value)} />
-          </label>
+          <DateField label={loan ? 'Hạn trả hết nợ' : 'Hẹn trả ngày'} value={dueOn} onChange={setDueOn} min={date} optional />
         )}
       </div>
       {data.gardens.length > 0 && <GardenPicker data={data} value={gardenId} onChange={setGardenId} allowShared legend={loan ? 'Tiền lãi tính cho vườn nào (vay chung cho các vườn: chọn Chi chung)' : 'Vườn'} />}
@@ -437,10 +429,7 @@ export function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerS
               {payable ? 'Trả hết' : 'Thu hết'} {formatVnd(left)}
             </button>
           </div>
-          <label>
-            Ngày
-            <input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value || today())} />
-          </label>
+          <DateField label="Ngày" value={date} onChange={setDate} max={today()} />
           {error && <div className="notice error">{error}</div>}
           <button type="submit" className="wide primary" disabled={amount + interest <= 0}>
             Lưu

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PriceRow } from './api';
-import { directionsUrl, foldVietnamese, formatChange, formatDate, formatDateLong, formatDateTime, formatDistance, formatPriceRange, groupByProduct, matchesSearch, telHref, trendOf } from './format';
+import { addDays, calendarCells, directionsUrl, foldVietnamese, formatChange, formatDate, formatDateLong, formatDateTime, formatDistance, formatPriceRange, groupByProduct, matchesSearch, telHref, trendOf } from './format';
 
 const row = (code: string, region: string, extra: Partial<PriceRow> = {}): PriceRow => ({
   product: { id: 1, code, name: code === 'ho-tieu' ? 'Hồ tiêu' : 'Cà phê', unit: 'kg' },
@@ -88,5 +88,26 @@ describe('formatDateTime', () => {
   it('ngày/tháng/năm giờ:phút theo giờ máy', () => {
     const d = new Date(2026, 9, 5, 7, 3);
     expect(formatDateTime(d.toISOString())).toBe('05/10/2026 07:03');
+  });
+});
+
+describe('lịch', () => {
+  it('addDays qua tháng, qua năm, năm nhuận', () => {
+    expect(addDays('2026-10-15', -1)).toBe('2026-10-14');
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+  });
+
+  it('calendarCells: tháng 10/2026 bắt đầu Thứ Năm → 3 ô trống đầu', () => {
+    const cells = calendarCells(2026, 10);
+    expect(cells.slice(0, 4)).toEqual([null, null, null, 1]);
+    expect(cells.filter((c) => c !== null)).toHaveLength(31);
+    expect(cells.length % 7).toBe(0);
+  });
+
+  it('calendarCells: tháng bắt đầu Chủ Nhật → 6 ô trống (CN là cột cuối)', () => {
+    // 01/02/2026 là Chủ Nhật
+    expect(calendarCells(2026, 2).slice(0, 7)).toEqual([null, null, null, null, null, null, 1]);
   });
 });

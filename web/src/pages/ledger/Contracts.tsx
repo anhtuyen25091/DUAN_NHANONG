@@ -19,6 +19,7 @@ import { go, href } from '../../hooks'
 import { parseQty, qtyText } from '../../ledger/qty'
 import { showToast } from '../../ledger/toast'
 import { CategoryPicker, GardenPicker, MoneyField } from './fields'
+import { DateField } from '../../components/DateField'
 
 /** #/so/ban: các hợp đồng bán cho lái (đang cắt trước) */
 export function ContractList({ data }: { data: LedgerSnapshot }) {
@@ -127,10 +128,7 @@ export function ContractForm({ ledger, data, id, query }: { ledger: Ledger; data
         <input value={crop} onChange={(e) => setCrop(e.target.value)} maxLength={60} placeholder="Ví dụ: Sầu riêng Ri6, Monthong" />
       </label>
       <MoneyField label="Tiền cọc" value={deposit} onChange={setDeposit} />
-      <label>
-        Ngày nhận cọc
-        <input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value || today())} />
-      </label>
+      <DateField label="Ngày nhận cọc" value={date} onChange={setDate} max={today()} />
       <CategoryPicker data={data} type="income" value={categoryId} onChange={setCategoryId} legend="Ghi tiền các đợt cắt vào hạng mục" />
       <label>
         Ghi chú
@@ -454,10 +452,7 @@ export function CutForm({ ledger, data, contractId, id }: { ledger: Ledger; data
         ‹ Lái {summary.contract.buyer}
       </a>
       <h1>{cut ? 'Sửa đợt cắt' : '✂️ Ghi đợt cắt'}</h1>
-      <label>
-        Ngày cắt
-        <input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value || today())} />
-      </label>
+      <DateField label="Ngày cắt" value={date} onChange={setDate} max={today()} />
 
       <fieldset>
         <legend>Hàng cắt đợt này</legend>

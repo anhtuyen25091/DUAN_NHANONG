@@ -2,6 +2,7 @@ import { formatVnd, pressAmountKey, readVnd, today, type AmountKey, type EntryTy
 import { useEffect, useState } from 'react'
 import { go, href } from '../../hooks'
 import { showToast } from '../../ledger/toast'
+import { DateField } from '../../components/DateField'
 
 const KEYS: AmountKey[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0', 'xóa']
 
@@ -136,10 +137,7 @@ export function AddEntry({ ledger, data, query }: { ledger: Ledger; data: Ledger
 
       <details className="more">
         <summary>Ngày ({date === today() ? 'hôm nay' : date.split('-').reverse().join('/')}) · ghi chú</summary>
-        <label>
-          Ngày
-          <input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value || today())} />
-        </label>
+        <DateField label="Ngày" value={date} onChange={setDate} max={today()} />
         <label>
           Ghi chú
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="Ví dụ: 4 bao NPK" />

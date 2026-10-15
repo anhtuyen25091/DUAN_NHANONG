@@ -6,6 +6,7 @@ import { go, href, useAsync } from '../../hooks'
 import { parseQty, qtyText } from '../../ledger/qty'
 import { showToast } from '../../ledger/toast'
 import { MoneyField } from '../ledger/fields'
+import { DateField } from '../../components/DateField'
 
 const TITLES: Record<DealEntryKind, string> = { deposit: '💰 Ghi tiền cọc', cut: '✂️ Ghi đợt cân', payment: '💵 Ghi lần trả tiền', cost: '🧾 Chi phí riêng' }
 
@@ -71,10 +72,7 @@ function EntryFormInner({ token, deal, kind, entryUuid }: { token: string; deal:
       <h1>{entry ? `Sửa: ${TITLES[kind].slice(3)}` : TITLES[kind]}</h1>
       {entry?.status === 'confirmed' && <div className="notice">Mục này bên kia đã xác nhận. Sửa xong sẽ cần bên kia xác nhận lại.</div>}
       {kind === 'cost' && <p className="small muted">Chi phí riêng (xe, công cắt, bốc vác…) chỉ mình thấy, dùng để tính lời cả lô. Bên kia không thấy.</p>}
-      <label>
-        Ngày
-        <input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value || today())} />
-      </label>
+      <DateField label="Ngày" value={date} onChange={setDate} max={today()} />
 
       {kind === 'cut' ? (
         <>

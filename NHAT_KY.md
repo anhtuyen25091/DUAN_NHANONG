@@ -11,6 +11,27 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 15/10/2026 (tối): Mục 17 + 19 trong "Việc còn lại"
+
+### Mục 17: Lịch chọn ngày tiếng Việt cho bản web ✅
+**Đã làm**
+- Component mới `web/src/components/DateField.tsx`, giống lịch của app:
+  - ô hiện "📅 Thứ Năm, 15/10/2026"; bấm vào mở lịch (thẻ `<dialog>`, bấm Esc hoặc bấm ra ngoài thì đóng)
+  - tuần bắt đầu từ Thứ 2, Chủ Nhật màu đỏ, ngày hôm nay có viền, ngày ngoài giới hạn bị mờ và không bấm được
+  - lật tháng trước/sau, có nút nhanh "Hôm nay" và "Hôm qua"; ô không bắt buộc thì có nút "Bỏ ngày"
+- Thay toàn bộ **13** ô `<input type="date">` của trình duyệt, vì mỗi trình duyệt hiện một kiểu, có máy hiện tiếng Anh hoặc đảo tháng/ngày:
+  - Ghi tiền, Vụ (bắt đầu / kết thúc), Công nợ (4 ô), Kho vật tư (2 ô), Bán cho lái (2 ô), Đơn mua bán (2 ô)
+- Chuyển 2 hàm tính lịch sang `packages/shared/src/format.ts` (`addDays`, `calendarCells`), web và app dùng chung. App bỏ bản viết riêng.
+
+**Kiểm tra**
+- Thêm 3 test lịch: qua tháng, qua năm, năm nhuận; tháng bắt đầu Thứ Năm / Chủ Nhật. Typecheck web + mobile sạch, lint sạch.
+- Bấm thử trong Chrome (form Ghi tiền):
+  - mở lịch được; ngày 16–31/10 bị khóa vì ngày ghi không được sau hôm nay
+  - lùi về tháng 9, chọn ngày 14: lịch tự đóng, ô hiện "Thứ Hai, 14/09/2026", dòng tóm tắt đổi theo
+  - nút Hôm qua / Hôm nay đổi đúng ngày
+
+---
+
 ## 15/10/2026 (tối): Pull code mới + nạp backup giá trên máy dev Docker (192.168.1.10)
 - **Pull:** từ `1c8353b` lên `a1a330a` (25 commit).
   - Lần pull đầu bị ngắt giữa chừng, để lại `.git/index.lock` và đã chép dở một phần file.
@@ -161,7 +182,7 @@ Máy khác muốn lấy tiếp: nạp file `exports/*.sql.gz` (có cả `crawl_l
 | 14 | Quên mật khẩu | Cần OTP qua SMS (dịch vụ trả phí) |
 | 15 | Bản đồ điểm bán | Hiện chỉ có danh sách + nút chỉ đường |
 | 16 | Lọc điểm bán theo tỉnh | Nhiều điểm từ OpenStreetMap không ghi tỉnh; cần suy ra tỉnh từ tọa độ |
-| 17 | Lịch chọn ngày tiếng Việt cho bản web | App đã có; web còn dùng ô chọn ngày của trình duyệt |
+| 17 | ~~Lịch chọn ngày tiếng Việt cho bản web~~ | ✅ Xong 15/10 tối |
 | 18 | Sổ thu chi: ghi chú bằng giọng nói, chụp ảnh hóa đơn | Có trong kế hoạch |
 | 19 | Bảng đã khai báo nhưng chưa có chức năng: trường tự thêm, mẫu ghi nhanh, thu hoạch, nhân công | |
 

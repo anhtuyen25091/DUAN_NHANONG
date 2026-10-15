@@ -1,4 +1,4 @@
-import { formatDateLong, today } from '@nhanong/shared';
+import { addDays, calendarCells, formatDateLong, today } from '@nhanong/shared';
 import { useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import { colors, font } from '../lib/theme';
@@ -9,23 +9,6 @@ const WEEK_HEAD = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const iso = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
-
-/** "YYYY-MM-DD" của ngày cách hôm nay `days` ngày (âm = trước) */
-function shiftDays(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return today(d);
-}
-
-/** Các ô của tháng: null là ô trống đầu/cuối tháng */
-function monthCells(year: number, month: number): Array<number | null> {
-  const first = new Date(year, month - 1, 1).getDay(); // 0 = CN
-  const lead = (first + 6) % 7; // số ô trống trước ngày 1 khi tuần bắt đầu Thứ 2
-  const days = new Date(year, month, 0).getDate();
-  const cells: Array<number | null> = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
-  while (cells.length % 7) cells.push(null);
-  return cells;
-}
 
 /**
  * Ô chọn ngày: hiện "Thứ Năm, 15/10/2026", bấm vào mở lịch.
@@ -53,7 +36,7 @@ export function DatePicker({
   const allowed = (d: string) => (!max || d <= max) && (!min || d >= min);
   const quick = [
     { label: 'Hôm nay', date: now },
-    { label: 'Hôm qua', date: shiftDays(-1) },
+    { label: 'Hôm qua', date: addDays(now, -1) },
   ].filter((q) => allowed(q.date));
 
   const show = () => {
@@ -121,7 +104,7 @@ export function DatePicker({
               ))}
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              {monthCells(view.y, view.m).map((day, i) => {
+              {calendarCells(view.y, view.m).map((day, i) => {
                 if (day === null) return <View key={`e${i}`} style={{ width: `${100 / 7}%`, aspectRatio: 1 }} />;
                 const d = iso(view.y, view.m, day);
                 const selected = d === value;

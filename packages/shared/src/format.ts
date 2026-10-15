@@ -95,3 +95,23 @@ export function formatDistance(km: number): string {
   if (km < 1) return `${Math.round(km * 1000)} m`;
   return `${(Math.round(km * 10) / 10).toString().replace('.', ',')} km`;
 }
+
+/** "YYYY-MM-DD" cộng thêm `days` ngày (âm = lùi lại), tính theo lịch, không lệch múi giờ */
+export function addDays(date: string, days: number): string {
+  const [y, m, d] = date.slice(0, 10).split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + days));
+  return t.toISOString().slice(0, 10);
+}
+
+/**
+ * Các ô của lịch 1 tháng, tuần bắt đầu từ Thứ 2 như lịch treo tường ở Việt Nam.
+ * Mỗi ô là số ngày, null là ô trống đầu/cuối tháng; số ô luôn chia hết cho 7.
+ */
+export function calendarCells(year: number, month: number): Array<number | null> {
+  const first = new Date(Date.UTC(year, month - 1, 1)).getUTCDay(); // 0 = CN
+  const lead = (first + 6) % 7;
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const cells: Array<number | null> = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
+  while (cells.length % 7) cells.push(null);
+  return cells;
+}

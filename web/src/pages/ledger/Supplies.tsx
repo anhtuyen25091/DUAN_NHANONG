@@ -4,6 +4,7 @@ import { go, href } from '../../hooks'
 import { showToast } from '../../ledger/toast'
 import { parseQty, qtyText } from '../../ledger/qty'
 import { CategoryPicker, GardenPicker, MoneyField, QtyField } from './fields'
+import { DateField } from '../../components/DateField'
 
 const UNITS = ['bao', 'chai', 'gói', 'kg', 'lít', 'cây', 'thùng']
 
@@ -120,10 +121,7 @@ export function SupplyForm({ ledger, data, id }: { ledger: Ledger; data: LedgerS
       </div>
       <MoneyField label={`Giá 1 ${unit || 'đơn vị'} *`} value={Math.round(unitPrice)} onChange={setUnitPrice} />
       <MoneyField label="Thành tiền (gõ vào đây nếu chỉ nhớ tổng tiền)" value={total} onChange={(t) => setUnitPrice(quantity > 0 ? t / quantity : 0)} />
-      <label>
-        Ngày mua
-        <input type="date" value={boughtOn} max={today()} onChange={(e) => setBoughtOn(e.target.value || today())} />
-      </label>
+      <DateField label="Ngày mua" value={boughtOn} onChange={setBoughtOn} max={today()} />
       <label>
         Mua ở đâu
         <input value={shop} onChange={(e) => setShop(e.target.value)} maxLength={80} placeholder="Ví dụ: Đại lý Hai Lúa" />
@@ -245,10 +243,7 @@ export function SupplyDetail({ ledger, data, id }: { ledger: Ledger; data: Ledge
           <h2>Dùng cho vườn</h2>
           <GardenPicker data={data} value={gardenId} onChange={setGardenId} />
           <QtyField label="Số lượng" text={qty} onText={setQty} suffix={supply.unit} />
-          <label>
-            Ngày dùng
-            <input type="date" value={usedOn} max={today()} onChange={(e) => setUsedOn(e.target.value || today())} />
-          </label>
+          <DateField label="Ngày dùng" value={usedOn} onChange={setUsedOn} max={today()} />
           {error && <div className="notice error">{error}</div>}
           <button type="submit" className="wide primary" disabled={!gardenId || !(parseQty(qty) > 0)}>
             Ghi đã dùng · {formatVnd(Math.round(parseQty(qty) * supply.unit_price))}
