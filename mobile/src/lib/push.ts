@@ -1,19 +1,57 @@
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { api } from './api';
 
+type NotificationsModule = typeof import('expo-notifications');
+
 export const ALERT_CHANNEL = 'price-alerts';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+/**
+ * Lý do máy này không dùng được thông báo đẩy (null = dùng được).
+ * Từ SDK 53, chỉ cần nạp expo-notifications trong Expo Go trên Android là báo lỗi và làm sập màn hình,
+ * nên phải kiểm tra trước rồi mới nạp thư viện.
+ */
+const unsupported: string | null =
+  Platform.OS === 'web'
+    ? 'Trình duyệt không hỗ trợ thông báo của app.'
+    : Platform.OS === 'android' && Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+      ? 'Expo Go trên Android không nhận được thông báo đẩy. Cần cài bản build riêng của app.'
+      : null;
+
+let loaded: NotificationsModule | null = null;
+
+/** Nạp expo-notifications khi cần (null nếu máy không hỗ trợ) */
+function notifications(): NotificationsModule | null {
+  if (unsupported) return null;
+  if (!loaded) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    loaded = require('expo-notifications') as NotificationsModule;
+    loaded.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  }
+  return loaded;
+}
+
+type OpenedData = { product?: string; region?: string | null } | undefined;
+
+/** Bấm vào thông báo (kể cả thông báo đã mở app từ trước): gọi onOpen với data; trả về hàm hủy */
+export function onNotificationOpened(onOpen: (data: OpenedData) => void): () => void {
+  const N = notifications();
+  if (!N) return () => {};
+  const read = (response: import('expo-notifications').NotificationResponse | null) => {
+    if (response) onOpen(response.notification.request.content.data as OpenedData);
+  };
+  read(N.getLastNotificationResponse());
+  const subscription = N.addNotificationResponseReceivedListener(read);
+  return () => subscription.remove();
+}
 
 export type PushResult = { ok: true } | { ok: false; reason: string };
 
@@ -22,7 +60,8 @@ export type PushResult = { ok: true } | { ok: false; reason: string };
  * Thông báo đẩy cần máy thật + bản build (development build / EAS), không chạy trong Expo Go trên Android.
  */
 export async function registerPush(askPermission: boolean): Promise<PushResult> {
-  if (Platform.OS === 'web') return { ok: false, reason: 'Trình duyệt không hỗ trợ thông báo của app.' };
+  const Notifications = notifications();
+  if (!Notifications) return { ok: false, reason: unsupported! };
 
   if (Platform.OS === 'android') {
     // Backend gửi với channelId "price-alerts"

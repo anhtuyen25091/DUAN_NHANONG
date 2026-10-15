@@ -95,6 +95,26 @@ cd backend && php artisan crawl:run && php artisan shops:import-osm
 
 ---
 
+## 15/10/2026: Thử app trên điện thoại thật bằng Expo Go
+
+**Cách chạy** (máy tính và điện thoại cùng Wi-Fi GODY.VN, IP máy lúc ghi là `192.168.1.13`):
+```bash
+cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.13 npx expo start --go --lan --port 8081
+```
+- Phải ép IP Wi-Fi, vì máy còn mạng dây `172.16.100.x` và Expo có thể chọn nhầm.
+- Link mở trong Expo Go: `exp://192.168.1.13:8081`. App tự gọi backend ở `http://192.168.1.13:8000`.
+- Chạy không cần `CI=1` vẫn không bị segfault.
+
+**Lỗi gặp và cách sửa**
+- Expo Go trên Android là bản cho **SDK 58** (bản thử nghiệm), còn dự án dùng **SDK 57** (bản ổn định mới nhất).
+  - Cách sửa: cài Expo Go cho SDK 57 từ https://expo.dev/go?sdkVersion=57&platform=android&device=true.
+- **Lỗi code:** `expo-notifications` được nạp ngay khi mở app. Từ SDK 53, Expo Go trên Android báo lỗi khi nạp thư viện này, làm sập `_layout`, `alerts`, `product/[code]` ("ErrorBoundary of undefined").
+  - Cách sửa: `mobile/src/lib/push.ts` chỉ nạp thư viện khi máy hỗ trợ (`require` khi cần). Trên web và Expo Go Android thì báo "Cần cài bản build riêng của app" thay vì sập.
+  - Phần mở thông báo trong `_layout.tsx` chuyển sang `onNotificationOpened()`.
+- **Metro và Vite không nhận thay đổi file** trên ổ `/Volumes/MacOS` (máy chưa có watchman). Sửa code xong phải khởi động lại, Metro thì thêm `--clear`. Có thể cài watchman (`brew install watchman`) để thử khắc phục.
+
+---
+
 ## 15/10/2026: Giai đoạn 4b, Sổ thu chi Nâng cao: mùa vụ, kho vật tư, công nợ ✅
 
 **Cách tính (quyết định thiết kế)**

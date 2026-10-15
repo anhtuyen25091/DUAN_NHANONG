@@ -1,14 +1,11 @@
-import * as Notifications from 'expo-notifications';
 import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
 import { ToastHost } from '../components/ledger';
-import { registerPush } from '../lib/push';
+import { onNotificationOpened, registerPush } from '../lib/push';
 import { colors } from '../lib/theme';
 
-function openFromNotification(response: Notifications.NotificationResponse | null) {
-  const data = response?.notification.request.content.data as { product?: string; region?: string | null } | undefined;
+function openFromNotification(data: { product?: string; region?: string | null } | undefined) {
   if (data?.product) {
     router.push({ pathname: '/product/[code]', params: { code: data.product, region: data.region ?? '' } });
   }
@@ -16,16 +13,12 @@ function openFromNotification(response: Notifications.NotificationResponse | nul
 
 export default function RootLayout() {
   useEffect(() => {
-    // Bản xem trước trên trình duyệt không có thông báo đẩy
-    if (Platform.OS === 'web') return;
-
-    // Token có thể đổi: cập nhật mỗi lần mở app, không hỏi quyền (chỉ hỏi khi người dùng đặt cảnh báo)
+    // Token có thể đổi: cập nhật mỗi lần mở app, không hỏi quyền (chỉ hỏi khi người dùng đặt cảnh báo).
+    // Máy không hỗ trợ (web, Expo Go trên Android) thì registerPush / onNotificationOpened không làm gì.
     registerPush(false).catch(() => {});
 
     // Bấm vào thông báo: mở trang mặt hàng
-    openFromNotification(Notifications.getLastNotificationResponse());
-    const subscription = Notifications.addNotificationResponseReceivedListener(openFromNotification);
-    return () => subscription.remove();
+    return onNotificationOpened(openFromNotification);
   }, []);
 
   return (
