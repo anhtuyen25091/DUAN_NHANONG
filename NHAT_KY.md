@@ -11,6 +11,29 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 15/10/2026 (tối): Dữ liệu demo cho tài khoản 0900000003
+- Tạo dữ liệu demo trên server (máy dev Docker) để thử các chức năng mục 19 trên app.
+  - Script chạy đúng `Ledger` + `SyncEngine` của dự án, qua `vite.runnerImport`. Script nằm ở thư mục tạm, không nằm trong repo.
+  - Đăng nhập API → `sync.enable` (lấy dữ liệu sẵn có để không tạo trùng) → tạo dữ liệu → `syncNow`.
+- Dữ liệu đã tạo:
+  - 2 vườn: "Vườn cà phê nhà" (1 ha) và "Rẫy sầu riêng" (0,5 ha).
+  - 5 ô tự thêm:
+    - vườn: Số gốc cây, Giống, Năm trồng
+    - khoản thu chi: Người mua
+    - vật tư: Hạn dùng
+  - 4 khoản hay dùng: Xịt thuốc rầy vườn cà phê 350.000 đ, Tiền điện bơm tưới 450.000 đ, Đổ xăng máy cắt cỏ 120.000 đ, Bán sầu riêng lẻ ở chợ 2.000.000 đ. Trong đó 3 lần đã ghi bằng mẫu.
+  - 4 lần thu hoạch:
+    - cà phê 1.200 kg × 45.000 đ (đã bán, Người mua: Đại lý Tư Hùng) và 800 kg chưa bán
+    - sầu riêng 1.500 kg × 62.000 đ (Người mua: Vựa Bảy Lợi) và 40 trái
+  - 3 người làm: Anh Ba 300.000 đ/ngày, Chị Tư 250.000 đ/ngày, Út Năm 280.000 đ/ngày.
+    - 11 ngày công ở 2 vườn
+    - Anh Ba đã được trả 1 lần (tự ghi khoản Nhân công theo từng vườn); còn lại chưa trả
+  - 7 khoản chi phí mấy tháng gần đây, 1 vật tư (Actara, Hạn dùng 30/06/2027).
+- Trên server: 55 bản ghi (`ledger_version` = 55).
+- Muốn thấy trên app: Sổ thu chi → ⚙️ Cài đặt → Nơi lưu → "☁️ Bật lưu cả trên mạng" → "Dùng tài khoản này". Sau đó bật Chế độ Nâng cao. Chế độ Nâng cao là cài đặt riêng từng máy, không đồng bộ.
+
+---
+
 ## 15/10/2026 (tối): Mục 17 + 19 trong "Việc còn lại"
 
 ### Mục 17: Lịch chọn ngày tiếng Việt cho bản web ✅
