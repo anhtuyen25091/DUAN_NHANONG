@@ -1,6 +1,7 @@
 import { ApiError, formatDate, formatQty, formatVnd, telHref, type Deal, type DealEntry } from '@nhanong/shared'
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
+import { dealWatcher } from '../../dealWatch'
 import { Status } from '../../components/Status'
 import { go, href, useAsync } from '../../hooks'
 import { useLedger } from '../../ledger/useLedger'
@@ -16,10 +17,15 @@ export function DealDetail({ token, uuid }: { token: string; uuid: string }) {
   // Bản mới nhất sau khi mình bấm / tải lại; chưa có thì dùng bản tải lần đầu
   const [latest, setDeal] = useState<Deal | null>(null)
   const deal = latest ?? (state.status === 'ok' ? state.data : null)
-  // Bên kia có thể vừa ghi / xác nhận: tải lại mỗi 30 giây khi đang mở
+  // Bên kia vừa ghi / xác nhận: tải lại ngay khi bộ theo dõi báo đơn này đổi; dự phòng 15 giây 1 lần
   useEffect(() => {
-    const timer = setInterval(() => api.deal(token, uuid).then(setDeal, () => {}), 30_000)
-    return () => clearInterval(timer)
+    const reload = () => api.deal(token, uuid).then(setDeal, () => {})
+    const off = dealWatcher.onDealChanged((changed) => changed === uuid && void reload())
+    const timer = setInterval(reload, 15_000)
+    return () => {
+      off()
+      clearInterval(timer)
+    }
   }, [token, uuid])
 
   if (!deal) return <Status state={state} retry={retry} />
@@ -62,7 +68,7 @@ export function DealDetail({ token, uuid }: { token: string; uuid: string }) {
 
       <section className={`card profit-card ${c.balance > 0 && deal.my_role === 'buyer' ? 'loss' : 'gain'}`}>
         <p className="small muted">Đã 2 bên xác nhận</p>
-        <p className="big">{balanceText(deal, c.balance)}</p>
+        <p className="big">{balanceText(deal, c)}</p>
         <dl className="deal-totals">
           <div>
             <dt>Tiền hàng ({formatQty(c.kg)} {deal.unit})</dt>
@@ -84,14 +90,14 @@ export function DealDetail({ token, uuid }: { token: string; uuid: string }) {
           </div>
         </dl>
         {(deal.summary.awaiting_me > 0 || deal.summary.awaiting_other > 0) && p.balance !== c.balance && (
-          <p className="small muted">Nếu đồng ý các mục đang chờ: {balanceText(deal, p.balance).toLowerCase()}</p>
+          <p className="small muted">Nếu đồng ý các mục đang chờ: {balanceText(deal, p).toLowerCase()}</p>
         )}
       </section>
 
       {deal.summary.awaiting_me > 0 && <div className="notice upgrade">🔔 Có {deal.summary.awaiting_me} mục bên kia vừa ghi, chờ bạn xác nhận (ở dưới).</div>}
 
       {open && (
-        <div className="actions deal-add">
+        <div className="btn-row deal-add">
           {(['cut', 'deposit', 'payment', 'cost'] as const).map((kind) => (
             <a key={kind} className={`button${kind === 'cut' ? ' primary' : ''}`} href={href(`don/${deal.uuid}/muc-moi`, { loai: kind })}>
               ＋ {KIND_LABEL[kind]}
@@ -114,11 +120,11 @@ export function DealDetail({ token, uuid }: { token: string; uuid: string }) {
 
       <section className="card">
         <h2>Đơn</h2>
-        <div className="actions">
+        <div className="btn-row">
           {open ? (
             <>
-              <button type="button" onClick={() => run(() => api.updateDeal(token, deal.uuid, { status: 'done' }), 'Đã kết thúc đơn')}>
-                ✅ Kết thúc đơn
+              <button type="button" onClick={() => run(() => api.updateDeal(token, deal.uuid, { status: 'done' }), `Đã kết thúc đơn, ${counterpartName(deal)} sẽ nhận thông báo`)}>
+                Kết thúc đơn
               </button>
               <button type="button" className="danger-outline" onClick={() => window.confirm('Hủy đơn này?') && run(() => api.updateDeal(token, deal.uuid, { status: 'cancelled' }), 'Đã hủy đơn')}>
                 Hủy đơn
@@ -194,7 +200,7 @@ function EntryCard({
     if (!reason?.trim()) return
     try {
       onDeal(await api.disputeDealEntry(token, e.uuid, reason.trim()))
-      showToast({ message: 'Đã báo sai, chờ bên kia sửa' })
+      showToast({ message: `Đã báo sai, ${counterpartName(deal)} sẽ nhận thông báo để sửa` })
     } catch (err) {
       showToast({ message: err instanceof ApiError ? err.message : (err as Error).message })
     }
@@ -229,15 +235,15 @@ function EntryCard({
       )}
       {e.note && <p className="small muted">{e.note}</p>}
       {e.status === 'disputed' && e.dispute_reason && <p className="small out">⚠️ Lý do báo sai: {e.dispute_reason}</p>}
-      <div className="actions">
+      <div className="btn-row">
         {canRespond && (
           <>
-            <button type="button" className="primary" onClick={() => run(() => api.confirmDealEntry(token, e.uuid), 'Đã xác nhận')}>
-              ✅ Đồng ý
+            <button type="button" className="primary" onClick={() => run(() => api.confirmDealEntry(token, e.uuid), `Đã đồng ý, ${counterpartName(deal)} sẽ nhận thông báo`)}>
+              ✓ Đồng ý
             </button>
             {e.status === 'pending' && (
               <button type="button" className="danger-outline" onClick={dispute}>
-                ⚠️ Báo sai
+                Báo sai
               </button>
             )}
           </>
@@ -248,7 +254,7 @@ function EntryCard({
           </a>
         )}
         {open && e.mine && e.status !== 'confirmed' && (
-          <button type="button" className="linklike" onClick={() => window.confirm('Xóa mục này?') && run(() => api.deleteDealEntry(token, e.uuid), 'Đã xóa')}>
+          <button type="button" className="danger-outline" onClick={() => window.confirm('Xóa mục này?') && run(() => api.deleteDealEntry(token, e.uuid), 'Đã xóa')}>
             Xóa
           </button>
         )}
@@ -370,7 +376,7 @@ function LedgerLinkCard({ deal }: { deal: Deal }) {
             ✅ Đã nối: các đợt cân đã xác nhận tự ghi {seller ? 'tiền vào' : 'tiền ra'}
             {link.garden_id ? ` của ${data.gardens.find((g) => g.id === link.garden_id)?.name ?? 'vườn'}` : ' (chi chung)'}; chi phí riêng ghi tiền ra.
           </p>
-          <div className="actions">
+          <div className="btn-row">
             <button type="button" onClick={async () => showToast({ message: `Đã cập nhật ${await ledger.applyDeal(deal)} khoản` })}>
               🔄 Cập nhật sổ
             </button>

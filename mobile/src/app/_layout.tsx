@@ -1,7 +1,9 @@
 import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { DealNotices } from '../components/DealNotices';
 import { ToastHost } from '../components/ledger';
+import { startDealWatch } from '../lib/dealWatch';
 import { openLedger } from '../lib/ledger';
 import { onNotificationOpened, registerPush, type OpenedData } from '../lib/push';
 import { colors } from '../lib/theme';
@@ -16,6 +18,7 @@ function openFromNotification(data: OpenedData) {
 }
 
 export default function RootLayout() {
+  useEffect(() => startDealWatch(), []);
   useEffect(() => {
     // Token có thể đổi: cập nhật mỗi lần mở app, không hỏi quyền (chỉ hỏi khi người dùng đặt cảnh báo).
     // Máy không hỗ trợ (web, Expo Go trên Android) thì registerPush / onNotificationOpened không làm gì.
@@ -66,6 +69,7 @@ export default function RootLayout() {
         <Stack.Screen name="deals/entry" options={{ title: 'Ghi mục' }} />
       </Stack>
       <ToastHost />
+      <DealNotices />
       <StatusBar style="dark" />
     </>
   );

@@ -48,6 +48,19 @@ class DealEntry extends Model
         return 'uuid';
     }
 
+    /** "Đợt cân 162.500.000 đ (3.500 kg)", "Cọc 150.000.000 đ" để ghi vào thông báo */
+    public function describe(): string
+    {
+        $money = number_format($this->amount, 0, ',', '.').' đ';
+
+        return match ($this->kind) {
+            DealEntryKind::Cut => 'Đợt cân '.$money.' ('.rtrim(rtrim(number_format($this->kg, 3, ',', '.'), '0'), ',').' kg)',
+            DealEntryKind::Deposit => 'Cọc '.$money,
+            DealEntryKind::Payment => 'Trả tiền '.$money,
+            DealEntryKind::Cost => 'Chi phí '.$money,
+        };
+    }
+
     /**
      * @return BelongsTo<Deal, $this>
      */

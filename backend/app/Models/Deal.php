@@ -30,6 +30,7 @@ class Deal extends Model
         return [
             'status' => DealStatus::class,
             'closed_at' => 'datetime',
+            'last_activity_at' => 'datetime',
         ];
     }
 
@@ -79,6 +80,18 @@ class Deal extends Model
             $this->buyer_id => 'buyer',
             default => null,
         };
+    }
+
+    /**
+     * Ghi hoạt động mới nhất (bên kia thấy thông báo khi đang mở app). Mục riêng (chi phí) không ghi.
+     */
+    public function recordActivity(User $by, string $text): void
+    {
+        $this->forceFill([
+            'last_activity' => mb_substr($by->name.' '.$text, 0, 250),
+            'last_activity_by' => $by->id,
+            'last_activity_at' => now(),
+        ])->save();
     }
 
     public function isOpenToJoin(): bool

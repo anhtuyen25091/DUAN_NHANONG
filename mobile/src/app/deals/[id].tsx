@@ -10,6 +10,7 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { confirmAsync } from '../../lib/confirm';
 import { balanceText, counterpartName, KIND_LABEL, STATUS_LABEL } from '../../lib/deals';
+import { dealWatcher } from '../../lib/dealWatch';
 import { useLedger } from '../../lib/ledger';
 import { colors, font } from '../../lib/theme';
 import { showToast } from '../../lib/toast';
@@ -41,13 +42,17 @@ function DealDetail({ token, id }: { token: string; id: string }) {
     [token, id],
   );
 
-  // Mở / quay lại màn này thì tải lại; bên kia có thể vừa ghi / xác nhận: tải lại mỗi 30 giây khi đang xem
+  // Mở / quay lại màn này thì tải lại; bên kia vừa ghi / xác nhận thì tải lại ngay (bộ theo dõi báo), dự phòng 15 giây 1 lần
   useFocusEffect(
     useCallback(() => {
       void load();
-      const timer = setInterval(() => void load(), 30_000);
-      return () => clearInterval(timer);
-    }, [load]),
+      const off = dealWatcher.onDealChanged((changed) => changed === id && void load());
+      const timer = setInterval(() => void load(), 15_000);
+      return () => {
+        off();
+        clearInterval(timer);
+      };
+    }, [load, id]),
   );
 
   const refresh = async () => {
@@ -120,13 +125,13 @@ function DealDetail({ token, id }: { token: string; id: string }) {
 
       <Card style={{ borderLeftWidth: 6, borderLeftColor: owing ? colors.loss : colors.gain }}>
         <Text style={styles.muted}>Đã 2 bên xác nhận</Text>
-        <Text style={{ fontSize: 24, fontWeight: '800', color: owing ? colors.loss : colors.gain, marginVertical: 4 }}>{balanceText(deal, c.balance)}</Text>
+        <Text style={{ fontSize: 24, fontWeight: '800', color: owing ? colors.loss : colors.gain, marginVertical: 4 }}>{balanceText(deal, c)}</Text>
         <Row label={`Tiền hàng (${formatQty(c.kg)} ${deal.unit})`} value={formatVnd(c.delivered)} />
         <Row label="Tiền cọc" value={formatVnd(c.deposit)} />
         <Row label="Đã trừ cọc · cọc còn" value={`${formatVnd(c.deducted)} · ${formatVnd(c.deposit_left)}`} />
         <Row label="Đã trả tiền" value={formatVnd(c.paid)} />
         {(deal.summary.awaiting_me > 0 || deal.summary.awaiting_other > 0) && p.balance !== c.balance && (
-          <Text style={[styles.muted, { marginTop: 8 }]}>Nếu đồng ý các mục đang chờ: {balanceText(deal, p.balance).toLowerCase()}</Text>
+          <Text style={[styles.muted, { marginTop: 8 }]}>Nếu đồng ý các mục đang chờ: {balanceText(deal, p).toLowerCase()}</Text>
         )}
       </Card>
 

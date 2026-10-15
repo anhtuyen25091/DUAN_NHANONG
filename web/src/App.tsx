@@ -1,4 +1,6 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
+import { Notices } from './components/Notices'
+import { startDealWatch, useDealWatch } from './dealWatch'
 import { href, useRoute } from './hooks'
 import { Account } from './pages/Account'
 import { PriceBoard } from './pages/PriceBoard'
@@ -11,6 +13,12 @@ const DealRoutes = lazy(() => import('./pages/deals/DealRoutes'))
 
 export default function App() {
   const { path, query } = useRoute()
+  const { awaiting } = useDealWatch()
+  useEffect(() => startDealWatch(), [])
+  // Số mục chờ xác nhận hiện cả trên tiêu đề tab trình duyệt
+  useEffect(() => {
+    document.title = awaiting > 0 ? `(${awaiting}) Nhà Nông` : 'Nhà Nông'
+  }, [awaiting])
   const section = path[0] === 'diem-ban' ? 'shops' : path[0] === 'so' ? 'ledger' : path[0] === 'don' ? 'deals' : 'prices'
 
   return (
@@ -26,8 +34,8 @@ export default function App() {
           <a href={href('so')} aria-current={section === 'ledger' ? 'page' : undefined}>
             Sổ thu chi
           </a>
-          <a href={href('don')} aria-current={section === 'deals' ? 'page' : undefined}>
-            Đơn
+          <a href={href('don')} aria-current={section === 'deals' ? 'page' : undefined} aria-label={awaiting > 0 ? `Đơn, ${awaiting} mục chờ bạn xác nhận` : undefined}>
+            Đơn{awaiting > 0 && <span className="nav-badge">{awaiting}</span>}
           </a>
           <a href={href('diem-ban')} aria-current={section === 'shops' ? 'page' : undefined}>
             Điểm bán
@@ -58,6 +66,7 @@ export default function App() {
           <PriceBoard query={query} />
         )}
       </main>
+      <Notices />
     </>
   )
 }

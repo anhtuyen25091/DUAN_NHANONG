@@ -1,5 +1,6 @@
 import { router, Tabs } from 'expo-router';
 import { Text } from 'react-native';
+import { useDealWatch } from '../../lib/dealWatch';
 import { colors } from '../../lib/theme';
 
 const icon = (emoji: string) =>
@@ -8,6 +9,7 @@ const icon = (emoji: string) =>
   };
 
 export default function TabsLayout() {
+  const { awaiting } = useDealWatch();
   return (
     <Tabs
       screenOptions={{
@@ -42,7 +44,10 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="deals" options={{ title: '🤝 Đơn mua bán', tabBarLabel: 'Đơn', tabBarIcon: icon('🤝') }} />
+      <Tabs.Screen
+        name="deals"
+        options={{ title: '🤝 Đơn mua bán', tabBarLabel: 'Đơn', tabBarIcon: icon('🤝'), tabBarBadge: awaiting > 0 ? awaiting : undefined }}
+      />
       <Tabs.Screen name="shops" options={{ title: 'Điểm bán · thu mua', tabBarLabel: 'Điểm bán', tabBarIcon: icon('🏪') }} />
       <Tabs.Screen name="alerts" options={{ title: 'Cảnh báo giá', tabBarLabel: 'Cảnh báo', tabBarIcon: icon('🔔') }} />
     </Tabs>

@@ -185,6 +185,30 @@ class DealApiTest extends TestCase
         $this->getJson(route('api.v1.deals.index'))->assertOk()->assertJsonCount(2, 'data')->assertJsonMissingPath('data.0.entries');
     }
 
+    public function test_other_side_sees_latest_activity_and_can_poll_changes_since(): void
+    {
+        $uuid = $this->dealJoined();
+        $this->assertSame(['text' => 'Chú Ba đã tham gia đơn', 'by_me' => false], array_intersect_key($this->as($this->trader)->getJson(route('api.v1.deals.show', $uuid))->json('data.last_activity'), ['text' => 1, 'by_me' => 1]));
+
+        $this->travel(1)->minutes();
+        $since = now()->toIso8601String();
+        $this->travel(5)->seconds();
+        $this->postJson(route('api.v1.deals.entries.store', $uuid), ['kind' => 'cut', 'date' => '2026-08-20', 'lines' => [['grade' => 'Loại A', 'kg' => 1250.5, 'price' => 80000]]])
+            ->assertJsonPath('data.last_activity.by_me', true);
+
+        $changes = $this->as($this->farmer)->getJson(route('api.v1.deals.index', ['since' => $since]))->assertOk();
+        $this->assertSame('Lái Tư ghi Đợt cân 100.040.000 đ (1.250,5 kg), chờ xác nhận', $changes->json('data.0.last_activity.text'));
+        $this->assertFalse($changes->json('data.0.last_activity.by_me'));
+        $this->assertSame(2, $changes->json('data.0.summary.awaiting_me'), 'Cọc + đợt cân chờ nông dân');
+
+        // Chi phí riêng không lộ qua thông báo
+        $this->as($this->trader)->postJson(route('api.v1.deals.entries.store', $uuid), ['kind' => 'cost', 'date' => '2026-08-20', 'amount' => 3_000_000]);
+        $this->assertStringNotContainsString('Chi phí', $this->as($this->farmer)->getJson(route('api.v1.deals.show', $uuid))->json('data.last_activity.text'));
+
+        $this->travel(1)->minutes();
+        $this->getJson(route('api.v1.deals.index', ['since' => now()->toIso8601String()]))->assertJsonCount(0, 'data');
+    }
+
     public function test_finished_deal_is_read_only_until_reopened_and_unjoined_deal_can_be_deleted(): void
     {
         $uuid = $this->dealJoined();

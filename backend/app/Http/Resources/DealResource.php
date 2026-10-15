@@ -63,6 +63,11 @@ class DealResource extends JsonResource
                 'responded_at' => $e->responded_at?->toIso8601String(),
                 'updated_at' => $e->updated_at->toIso8601String(),
             ])),
+            'last_activity' => $this->last_activity === null ? null : [
+                'text' => $this->last_activity,
+                'by_me' => $this->last_activity_by === $viewer->id,
+                'at' => $this->last_activity_at?->toIso8601String(),
+            ],
             'updated_at' => $this->updated_at->toIso8601String(),
         ];
     }

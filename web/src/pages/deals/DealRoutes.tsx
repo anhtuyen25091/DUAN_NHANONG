@@ -48,7 +48,7 @@ function DealList({ token }: { token: string }) {
     <div className="ledger">
       <h1>🤝 Đơn mua bán</h1>
       <p className="small muted">Đơn dùng chung 2 bên: bên mua (thương lái, chi nhánh) và bên bán (nông dân, lái bán lại). Mỗi bên ghi, bên kia xác nhận.</p>
-      <div className="actions">
+      <div className="btn-row">
         <a className="button primary" href={href('don/moi')}>
           ＋ Tạo đơn
         </a>
@@ -57,6 +57,7 @@ function DealList({ token }: { token: string }) {
         </a>
       </div>
       {waiting > 0 && <div className="notice upgrade">🔔 Có {waiting} mục bên kia vừa ghi, chờ bạn xác nhận.</div>}
+      <BrowserNotifyPrompt />
 
       <nav className="segmented" aria-label="Lọc đơn">
         <button type="button" className={tab === 'open' ? 'active' : ''} aria-pressed={tab === 'open'} onClick={() => setTab('open')}>
@@ -86,6 +87,20 @@ function DealList({ token }: { token: string }) {
         ))}
       </div>
     </div>
+  )
+}
+
+/** Mời bật thông báo của trình duyệt để biết khi bên kia ghi / xác nhận lúc đang ở tab khác */
+function BrowserNotifyPrompt() {
+  const [permission, setPermission] = useState(() => ('Notification' in window ? Notification.permission : 'denied'))
+  if (permission !== 'default') return null
+  return (
+    <p className="small">
+      <button type="button" className="linklike" onClick={async () => setPermission(await Notification.requestPermission())}>
+        🔔 Bật thông báo trên máy này
+      </button>{' '}
+      <span className="muted">để biết ngay khi bên kia ghi hoặc xác nhận, kể cả lúc đang mở tab khác.</span>
+    </p>
   )
 }
 

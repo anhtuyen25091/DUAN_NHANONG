@@ -27,7 +27,7 @@ class DealEntryController extends Controller
         $entry->created_by = $request->user()->id;
         $entry->status = $entry->kind->isShared() ? DealEntryStatus::Pending : DealEntryStatus::Private;
         $entry->save();
-        $deal->touch();
+        $entry->kind->isShared() ? $deal->recordActivity($request->user(), 'ghi '.$entry->describe().', chờ xác nhận') : $deal->touch();
 
         return $this->dealResponse($deal, $request, 201);
     }
@@ -38,12 +38,13 @@ class DealEntryController extends Controller
         $this->authorizeOpenDeal($request, $deal);
         $this->authorizeCreator($request, $entry, 'Chỉ người ghi mục này mới sửa được. Thấy sai thì bấm "Báo sai".');
         $entry->fill($request->entryData());
-        if ($entry->kind->isShared() && $entry->isDirty()) {
+        $changed = $entry->isDirty();
+        if ($entry->kind->isShared() && $changed) {
             $entry->status = DealEntryStatus::Pending;
             $entry->forceFill(['responded_by' => null, 'responded_at' => null, 'dispute_reason' => null]);
         }
         $entry->save();
-        $deal->touch();
+        $entry->kind->isShared() && $changed ? $deal->recordActivity($request->user(), 'sửa '.$entry->describe().', chờ xác nhận lại') : $deal->touch();
 
         return $this->dealResponse($deal, $request);
     }
@@ -55,7 +56,7 @@ class DealEntryController extends Controller
         $this->authorizeCreator($request, $entry, 'Chỉ người ghi mục này mới xóa được.');
         abort_if($entry->status === DealEntryStatus::Confirmed, 422, 'Mục đã được bên kia xác nhận, không xóa được. Hãy sửa lại (bên kia sẽ xác nhận lại).');
         $entry->delete();
-        $deal->touch();
+        $entry->kind->isShared() ? $deal->recordActivity($request->user(), 'xóa '.$entry->describe()) : $deal->touch();
 
         return $this->dealResponse($deal, $request);
     }
@@ -80,7 +81,7 @@ class DealEntryController extends Controller
         abort_unless($entry->kind->isShared(), 404);
         $entry->status = $status;
         $entry->forceFill(['responded_by' => $request->user()->id, 'responded_at' => now(), 'dispute_reason' => $reason])->save();
-        $deal->touch();
+        $deal->recordActivity($request->user(), $status === DealEntryStatus::Confirmed ? 'đồng ý '.$entry->describe() : 'báo sai '.$entry->describe().': '.$reason);
 
         return $this->dealResponse($deal, $request);
     }

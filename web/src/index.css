@@ -1372,3 +1372,118 @@ ul.deal-lines {
     gap: 10px;
   }
 }
+
+/* ---- Hàng nút đều nhau (đơn mua bán) ---- */
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.btn-row > button,
+.btn-row > a.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  margin: 0;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.btn-row > button.danger-outline {
+  margin-top: 0;
+  background: var(--surface);
+}
+
+.btn-row > button.primary {
+  min-width: 96px;
+}
+
+/* ---- Thông báo nổi khi bên kia vừa ghi / xác nhận ---- */
+.notices {
+  position: fixed;
+  top: 64px;
+  right: 16px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(100vw - 32px));
+}
+
+.notice-pop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--primary);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  animation: notice-in 0.2s ease-out;
+}
+
+@keyframes notice-in {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+}
+
+.notice-pop-icon {
+  font-size: 1.3rem;
+}
+
+.notice-pop-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.notice-pop-text b {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+a.button.small-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.notice-close {
+  min-height: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 4px;
+}
+
+.nav-badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--loss);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  vertical-align: top;
+}

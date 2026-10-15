@@ -161,6 +161,8 @@ export interface Deal {
   sources?: Array<{ uuid: string; title: string; seller_name: string | null }>;
   /** Có ở API chi tiết, không có ở danh sách */
   entries?: DealEntry[];
+  /** Việc mới nhất trên đơn ("Chú Ba đồng ý Đợt cân …"); by_me = do mình làm */
+  last_activity: { text: string; by_me: boolean; at: string | null } | null;
   updated_at: string;
 }
 
@@ -388,7 +390,8 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
       request<PriceHistory>('GET', `/products/${encodeURIComponent(productCode)}/history`, { query: options, token: token ?? undefined }),
     plans: () => request<PlanList>('GET', '/plans'),
 
-    deals: (token: string) => request<{ data: Deal[] }>('GET', '/deals', { token }).then((r) => r.data),
+    /** since: chỉ lấy đơn thay đổi từ thời điểm đó (hỏi định kỳ để báo bên kia vừa ghi / xác nhận) */
+    deals: (token: string, since?: string) => request<{ data: Deal[] }>('GET', '/deals', { token, query: since ? { since } : {} }).then((r) => r.data),
     deal: (token: string, uuid: string) => request<{ data: Deal }>('GET', `/deals/${uuid}`, { token }).then((r) => r.data),
     createDeal: (token: string, deal: NewDeal) => request<{ data: Deal }>('POST', '/deals', { token, body: deal }).then((r) => r.data),
     updateDeal: (token: string, uuid: string, patch: { title?: string; note?: string | null; counterpart_name?: string | null; status?: Deal['status'] }) =>

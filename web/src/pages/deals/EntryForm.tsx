@@ -53,7 +53,8 @@ function EntryFormInner({ token, deal, kind, entryUuid }: { token: string; deal:
     try {
       if (entry) await api.updateDealEntry(token, entry.uuid, input)
       else await api.addDealEntry(token, deal.uuid, { ...input, kind })
-      showToast({ message: kind === 'cost' ? 'Đã lưu chi phí (chỉ mình thấy)' : 'Đã lưu, chờ bên kia xác nhận' })
+      const other = deal.counterpart?.name ?? 'bên kia'
+      showToast({ message: kind === 'cost' ? 'Đã lưu chi phí (chỉ mình thấy)' : deal.joined ? `Đã gửi cho ${other}, chờ xác nhận` : 'Đã lưu. Bên kia chưa tham gia đơn: gửi mã để họ xác nhận.' })
       go(back)
     } catch (err) {
       setError((err as Error).message)
@@ -109,7 +110,7 @@ function EntryFormInner({ token, deal, kind, entryUuid }: { token: string; deal:
                 )}
               </div>
             ))}
-            <div className="actions">
+            <div className="btn-row">
               {CUT_GRADES.filter((g) => !lines.some((l) => l.grade === g)).map((g) => (
                 <button key={g} type="button" onClick={() => setLines([...lines, { grade: g, kg: '', price: 0 }])}>
                   ＋ {g}
@@ -126,7 +127,7 @@ function EntryFormInner({ token, deal, kind, entryUuid }: { token: string; deal:
           {depositLeft > 0 && (
             <>
               <MoneyField label={`Trừ cọc (cọc còn ${formatVnd(depositLeft)})`} value={deduct} onChange={(v) => setDeduct(Math.min(v, depositLeft, value))} />
-              <div className="actions">
+              <div className="btn-row">
                 <button type="button" onClick={() => setDeduct(Math.min(depositLeft, value))}>
                   Trừ {formatVnd(Math.min(depositLeft, value))}
                 </button>
@@ -137,7 +138,7 @@ function EntryFormInner({ token, deal, kind, entryUuid }: { token: string; deal:
             </>
           )}
           <MoneyField label="Tiền trả ngay lúc cân" value={paidNow} onChange={(v) => setPaid(Math.min(v, Math.max(0, value - deduct)))} />
-          <div className="actions">
+          <div className="btn-row">
             <button type="button" onClick={() => setPaid(Math.max(0, value - deduct))}>
               Trả đủ {formatVnd(Math.max(0, value - deduct))}
             </button>

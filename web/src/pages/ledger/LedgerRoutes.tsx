@@ -2,7 +2,6 @@ import type { DebtKind } from '@nhanong/shared'
 import { useEffect } from 'react'
 import { refreshLinkedDeals } from '../../ledger/deals'
 import { useLedger } from '../../ledger/useLedger'
-import { hideToast, useToast } from '../../ledger/toast'
 import { AddEntry } from './AddEntry'
 import { ChooseMode } from './ChooseMode'
 import { ContractDetail, ContractForm, ContractList, CutForm } from './Contracts'
@@ -84,28 +83,6 @@ export default function LedgerRoutes({ path, query }: { path: string[]; query: U
       ) : (
         <LedgerHome ledger={ledger} data={data} />
       )}
-      <ToastBar />
     </>
-  )
-}
-
-function ToastBar() {
-  const toast = useToast()
-  if (!toast) return null
-  return (
-    <div className="toast" role="status">
-      <span>{toast.message}</span>
-      {toast.undo && (
-        <button
-          type="button"
-          onClick={() => {
-            toast.undo!()
-            hideToast()
-          }}
-        >
-          Hoàn tác
-        </button>
-      )}
-    </div>
   )
 }

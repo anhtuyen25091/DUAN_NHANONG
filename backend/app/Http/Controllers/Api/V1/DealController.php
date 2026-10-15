@@ -11,6 +11,7 @@ use App\Http\Resources\DealResource;
 use App\Models\Deal;
 use App\Models\Product;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -25,9 +26,19 @@ class DealController extends Controller
 {
     private const WITH = ['seller', 'buyer', 'product', 'entries.creator', 'sources.entries', 'sources.seller'];
 
+    /**
+     * ?since=ISO: chỉ các đơn thay đổi sau thời điểm đó (app hỏi vài giây 1 lần để báo bên kia vừa ghi / xác nhận).
+     */
     public function index(Request $request): JsonResponse
     {
-        $deals = Deal::query()->forUser($request->user())->with(self::WITH)->latest('updated_at')->limit(200)->get();
+        $since = $request->validate(['since' => ['nullable', 'date']])['since'] ?? null;
+        $deals = Deal::query()
+            ->forUser($request->user())
+            ->when($since, fn ($query) => $query->where('updated_at', '>=', CarbonImmutable::parse($since)->setTimezone(config('app.timezone'))))
+            ->with(self::WITH)
+            ->latest('updated_at')
+            ->limit(200)
+            ->get();
 
         return response()->json(['data' => $deals->map(function (Deal $deal) use ($request): array {
             $resource = new DealResource($deal);
@@ -99,6 +110,13 @@ class DealController extends Controller
             $deal->closed_at = $deal->status === DealStatus::Open ? null : now();
         }
         $deal->save();
+        if (isset($data['status'])) {
+            $deal->recordActivity($request->user(), match ($deal->status) {
+                DealStatus::Done => 'đã kết thúc đơn',
+                DealStatus::Cancelled => 'đã hủy đơn',
+                DealStatus::Open => 'đã mở lại đơn',
+            });
+        }
 
         return response()->json(['data' => $this->present($deal, $request)]);
     }
@@ -139,6 +157,7 @@ class DealController extends Controller
             }
             $deal->{$deal->seller_id === null ? 'seller_id' : 'buyer_id'} = $user->id;
             $deal->save();
+            $deal->recordActivity($user, 'đã tham gia đơn');
 
             return $deal;
         });

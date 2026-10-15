@@ -1,4 +1,4 @@
-import { formatVnd, type Deal, type DealEntry } from '@nhanong/shared';
+import { formatVnd, type Deal, type DealEntry, type DealTotals } from '@nhanong/shared';
 import { api } from './api';
 import { getAuth } from './auth';
 import { openLedger } from './ledger';
@@ -12,8 +12,10 @@ export function counterpartName(deal: Deal): string {
 }
 
 /** "Mình còn phải trả 24.250.000 đ" / "Bên mua còn nợ mình …" */
-export function balanceText(deal: Deal, balance: number): string {
-  if (balance === 0) return deal.summary.confirmed.delivered === 0 && deal.summary.with_pending.delivered === 0 ? 'Chưa có đợt cân nào' : 'Đã thanh toán đủ';
+/** totals: số liệu đã xác nhận, hoặc gồm cả các mục đang chờ */
+export function balanceText(deal: Deal, totals: DealTotals): string {
+  const balance = totals.balance;
+  if (balance === 0) return totals.delivered === 0 ? 'Chưa có đợt cân nào được xác nhận' : 'Đã thanh toán đủ';
   const buyerOwes = balance > 0;
   const iAmBuyer = deal.my_role === 'buyer';
   const amount = formatVnd(Math.abs(balance));
