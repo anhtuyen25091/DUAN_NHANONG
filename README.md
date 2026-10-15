@@ -127,6 +127,35 @@ php artisan shops:import-csv ds-dai-ly.csv --source="Sở NN&MT Đắk Lắk" --
 - Bản web là PWA: cài được ra màn hình chính và dùng được khi mất mạng (`web/public/sw.js`, chỉ bật ở bản build).
   - Thử chế độ này bằng: `npm run build -w web && npx vite preview` trong `web/`.
 
+## Phân quyền xem lịch sử giá
+
+- Khách xem 10 ngày gần nhất, tài khoản đăng ký (số điện thoại) xem 30 ngày, tài khoản có gói xem toàn bộ (tới 5 năm). Cấu hình: `backend/config/nhanong.php`.
+- Server cắt theo mức tài khoản, tính từ hôm nay; khoảng > 120 ngày gộp theo tuần, > 2 năm gộp theo tháng.
+- Gói tháng / năm và giá: `/admin` → Gói xem giá. Kích hoạt / gia hạn / hủy gói cho người dùng: `/admin` → Tài khoản (chưa có thanh toán trong app).
+- API: `GET /api/v1/products/{code}/history?days=` (gửi token nếu đã đăng nhập), `GET /api/v1/plans`.
+
+## Đơn mua bán chung 2 bên
+
+- Dành cho thương lái / chi nhánh thu mua / nông dân. Người tạo chọn mình là bên mua hay bên bán; bên kia tham gia bằng **mã 6 ký tự**.
+- Mục của đơn: cọc, đợt cân (nhiều loại hàng × kg × giá, trừ cọc, trả ngay), trả tiền, chi phí riêng (chỉ người ghi thấy).
+- Cả 2 bên ghi được; mục chờ bên kia **Đồng ý / Báo sai** (kèm lý do); sửa mục đã xác nhận thì phải xác nhận lại.
+- Thương lái gộp các đơn mua vào đơn bán để tính **lời cả lô** và hao hụt kg.
+- Nối đơn với Sổ thu chi: đợt cân đã xác nhận tự thành tiền vào / tiền ra của vườn đã chọn (đổi vườn được).
+- Thông báo khi bên kia ghi / xác nhận: web / app hỏi server 8 giây/lần (`DealWatcher` trong `packages/shared`).
+- Web `#/don`, app tab "🤝 Đơn". API: `/api/v1/deals`, `/deals/join`, `/deals/{uuid}/entries`, `/deal-entries/{uuid}/confirm|dispute`, `/deals/{uuid}/sources`.
+
+## Dữ liệu giá cũ, xuất / nạp dữ liệu giá
+
+```bash
+php artisan crawl:backfill baoquocte-ca-phe baoquocte-ho-tieu --from=2021-11   # cà phê, tiêu
+php artisan crawl:backfill congthuong-lua-gao --from=2021-10                   # lúa gạo An Giang
+php artisan crawl:backfill agro-gov --from=2021-10                             # agro.gov.vn: lúa, phân bón An Giang
+php artisan crawl:backfill thcl-sau-rieng --from=2024-07                       # sầu riêng
+scripts/export-prices.sh                    # xuất danh mục + nguồn + giá → exports/*.sql.gz
+gunzip -c exports/nhanong-gia-….sql.gz | mysql --default-character-set=utf8mb4 -u nhanong -p nhanong
+```
+Chạy lại được: bài / tháng đã lấy thì bỏ qua.
+
 ## Mobile khi dev
 
 App tự gọi backend theo IP của máy đang chạy Metro, cổng 8000. Vì vậy cần chạy Laravel cho điện thoại cùng mạng truy cập được:

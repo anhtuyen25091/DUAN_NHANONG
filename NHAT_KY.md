@@ -13,69 +13,75 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ## Link xem thử khi chạy dưới máy
 
-Các link chỉ mở được khi các server đang chạy. Cách bật server: xem mục "Cách chạy lại" bên dưới.
+Các link chỉ mở được khi các server đang chạy (xem "Cách chạy lại" bên dưới). Máy dev hiện tại (máy 2, từ 15/10/2026) chạy web ở cổng **5180**, vì cổng 5173 đang bị dự án khác dùng.
 
 **Trên máy tính**
 
 | Chức năng | Link |
 |---|---|
-| Bảng giá nông sản, phân bón, thuốc BVTV | http://localhost:5173/ |
-| Biểu đồ giá một mặt hàng (ví dụ cà phê) | http://localhost:5173/#/san-pham/ca-phe-robusta |
-| Danh sách điểm bán / thu mua | http://localhost:5173/#/diem-ban |
-| Form thêm điểm bán mới | http://localhost:5173/#/diem-ban/de-xuat |
-| Sổ thu chi (web) | http://localhost:5173/#/so |
-| Kho vật tư / Công nợ / Bán cho lái (web, cần bật Chế độ Nâng cao) | http://localhost:5173/#/so/kho · http://localhost:5173/#/so/no · http://localhost:5173/#/so/ban |
-| Kho vật tư / Công nợ (app) | http://localhost:8081/ledger/supplies · http://localhost:8081/ledger/debts |
-| Đăng nhập để lưu cả trên mạng (web) | http://localhost:5173/#/so/dang-nhap |
-| Đăng nhập để lưu cả trên mạng (app) | http://localhost:8081/ledger/sign-in |
-| Sổ thu chi (app, tab 📒) | http://localhost:8081/ledger |
-| App điện thoại xem trên trình duyệt (tab Bảng giá, Điểm bán, Cảnh báo) | http://localhost:8081/ |
-| Trang quản trị | http://localhost:8000/admin |
+| Bảng giá nông sản, phân bón, thuốc BVTV | http://localhost:5180/ |
+| Biểu đồ giá một mặt hàng (khóa 🔒 theo mức tài khoản) | http://localhost:5180/#/san-pham/ca-phe-robusta |
+| Tài khoản: đăng nhập / đăng ký / gói xem giá | http://localhost:5180/#/tai-khoan |
+| Đơn mua bán chung 2 bên | http://localhost:5180/#/don |
+| Sổ thu chi | http://localhost:5180/#/so |
+| Kho vật tư / Công nợ & tiền vay / Bán cho lái (bật Chế độ Nâng cao) | http://localhost:5180/#/so/kho · http://localhost:5180/#/so/no · http://localhost:5180/#/so/ban |
+| Điểm bán / thu mua | http://localhost:5180/#/diem-ban |
+| Trang quản trị (giá, nguồn, tài khoản + kích hoạt gói, gói xem giá) | http://localhost:8000/admin |
 | Kiểm tra API còn chạy không | http://localhost:8000/api/v1/health |
 
-**Trên điện thoại** (dùng chung wifi với máy tính; IP máy lúc ghi là `192.168.1.10`, IP có thể đổi)
+**Trên điện thoại** (cùng Wi-Fi GODY.VN với máy tính; IP máy lúc ghi là `192.168.1.13`, có thể đổi)
 
 | Chức năng | Link |
 |---|---|
-| Web | http://192.168.1.10:5173 |
-| App (bản chạy trên trình duyệt) | http://192.168.1.10:8081 |
+| Web | http://192.168.1.13:5180 |
+| App trong Expo Go (cần Expo Go cho **SDK 57**) | `exp://192.168.1.13:8081` |
 
-**Tài khoản quản trị (chỉ dùng trên máy dev)**
-- Email: `admin@nhanong.local`
-- Mật khẩu: không ghi vào file này, vì file có thể được commit lên git. Quên mật khẩu thì tạo tài khoản mới rồi cấp quyền:
+**Tài khoản thử trên máy dev** (mật khẩu không ghi vào file này vì file được commit; đặt lại bằng lệnh ở dưới)
+
+| Đăng nhập | Tên | Dùng để thử |
+|---|---|---|
+| 0900000001 | Chú Ba (nông dân) | tài khoản thường (xem giá 30 ngày), nhập mã tham gia đơn, nối sổ |
+| 0900000002 | Lái Tư (thương lái) | có gói 1 năm, tạo đơn mua / bán, gộp lô |
+| 0900000003 | Chi nhánh Tân Phú | có gói, tham gia đơn bán của lái |
+| admin@nhanong.local (email) | Quản trị | vào /admin |
 
 ```bash
-cd backend
-php artisan make:filament-user
-php artisan admin:grant email@cua-ban.vn
+# Đặt lại mật khẩu 1 tài khoản (máy dev)
+cd backend && php artisan tinker --execute 'App\Models\User::where("phone","0900000001")->first()->update(["password" => "mat-khau-moi"]);'
+# Tạo admin mới
+php artisan make:filament-user && php artisan admin:grant email@cua-ban.vn
 ```
 
-**Dữ liệu có sẵn lúc ghi (14/10/2026)**
-- 65 giá lấy thật từ báo: cà phê, hồ tiêu, lúa gạo, phân bón.
-- 33 điểm bán lấy từ OpenStreetMap.
-
 **Cần biết khi xem thử**
-- Bản app chạy trên trình duyệt chỉ để xem giao diện. Nút "Gần tôi" và thông báo đẩy phải thử trên điện thoại thật.
-- Nhiều điểm bán từ OpenStreetMap không ghi tỉnh, nên lọc theo tỉnh hiện chỉ ra vài điểm.
-- Sửa code app xong phải khởi động lại Expo mới thấy thay đổi, vì Expo đang chạy với `CI=1` (chế độ tự nạp lại code bị crash).
+- Bản app chạy trên trình duyệt chỉ để xem giao diện. Nút "Gần tôi", thông báo nhắc hạn và thông báo đẩy phải thử trên điện thoại thật.
+- Metro / Vite trên ổ `/Volumes/MacOS` không tự nhận file đã sửa (máy chưa có watchman): sửa code xong phải khởi động lại. Metro thì thêm `--clear`, và xem log "Android Bundled … (≈1700 modules)"; nếu chỉ khoảng 1360 module là thiếu màn hình, phải chạy lại.
+- Thông báo trong đơn mua bán chỉ đến khi web/app đang mở (hỏi server 8 giây/lần).
 
-**Cách chạy lại**
+**Cách chạy lại (máy dev hiện tại)**
 
 ```bash
-# 1. Mở Docker Desktop, rồi bật MySQL + Redis
-docker compose up -d --wait
+# 1. MySQL 8 + Redis: máy này dùng DBngin (cổng 3306 / 6379), không cần Docker.
+#    Máy khác thì dùng: docker compose up -d --wait
+#    DB: nhanong, user nhanong / secret (giống backend/.env.example)
 
 # 2. Backend (cổng 8000)
 cd backend && php artisan serve --host=0.0.0.0 --port=8000
 
-# 3. Web (cổng 5173), mở terminal khác
-cd web && npx vite --host 0.0.0.0 --port 5173
+# 3. Web (cổng 5180)
+cd web && npx vite --host 0.0.0.0 --port 5180 --strictPort
 
-# 4. App xem trên trình duyệt (cổng 8081), mở terminal khác
-cd mobile && CI=1 npx expo start --web --port 8081
+# 4. App cho điện thoại (Expo Go), ép dùng IP Wi-Fi vì máy có 2 mạng
+cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.13 npx expo start --go --lan --port 8081 --clear
+#    Xem app trên trình duyệt: cd mobile && CI=1 npx expo start --web --port 8082
 
-# Lấy giá mới, nhập thêm điểm bán (khi cần)
-cd backend && php artisan crawl:run && php artisan shops:import-osm
+# Lấy giá hôm nay / lấy dữ liệu cũ (chạy lại được, bỏ qua bài đã lấy)
+cd backend && php artisan crawl:run
+php artisan crawl:backfill baoquocte-ca-phe baoquocte-ho-tieu --from=2021-11
+php artisan crawl:backfill congthuong-lua-gao --from=2021-10
+
+# Xuất dữ liệu giá sang máy khác / nạp vào máy khác (máy nhận đã chạy php artisan migrate)
+scripts/export-prices.sh                      # → exports/nhanong-gia-YYYYMMDD-HHMM.sql.gz
+gunzip -c exports/nhanong-gia-….sql.gz | mysql --default-character-set=utf8mb4 -h 127.0.0.1 -u nhanong -p nhanong
 ```
 
 ---
@@ -91,7 +97,71 @@ cd backend && php artisan crawl:run && php artisan shops:import-osm
 | 3. Sổ thu chi Cơ bản (lưu trên máy) | Vườn, Tiền vào/ra, tổng kết, xuất/nhập file | ✅ Xong (web + app + PWA). Chưa thử với nông dân thật |
 | 4. Đồng bộ | Lưu trên máy + server, API sync, giao diện web/app | ✅ Xong. Chưa thử trên điện thoại thật; chưa có quên mật khẩu (cần OTP SMS) |
 | 4b. Sổ thu chi Nâng cao | Mùa vụ, kho vật tư, công nợ | ✅ Xong (web + app). Chưa thử trên điện thoại thật |
+| 1b. Dữ liệu giá cũ | Lấy lại giá 2021 → nay từ báo / cơ sở dữ liệu nhà nước | 🔄 Cà phê, tiêu, lúa gạo đang chạy; phân bón An Giang, sầu riêng (từ 10/2024) xong |
+| 7. Phân quyền xem giá | Khách 10 ngày, đăng ký 30 ngày, có gói xem toàn bộ; gói tháng / năm | ✅ Xong. Thanh toán trong app chưa làm (admin kích hoạt tay) |
+| 8. Đơn mua bán chung | Thương lái / chi nhánh / nông dân: mã tham gia, xác nhận 2 bên, lời cả lô, nối sổ, thông báo | ✅ Xong (web + app). Chưa có thông báo đẩy khi app đóng |
 | 6. Phát hành | EAS build, CH Play / App Store, VPS | ⏳ Chưa làm |
+
+---
+
+## 15/10/2026: Tổng kết cả ngày
+
+Máy dev mới (clone từ GitHub, MySQL/Redis của DBngin, web cổng 5180, app qua Expo Go cùng Wi-Fi). Mỗi phần làm xong đều có test, thử tự động trên trình duyệt (web + bản web của app), rồi commit và push.
+
+**Đã làm trong ngày** (chi tiết ở các mục bên dưới)
+1. Dựng lại môi trường trên máy mới; đồng bộ sổ thu chi web/app (giai đoạn 4).
+2. Sổ thu chi Nâng cao: mùa vụ, kho vật tư, công nợ (giai đoạn 4b).
+3. Chạy app trên điện thoại bằng Expo Go: sửa lỗi `expo-notifications` làm sập app trên Expo Go Android.
+4. Chọn ngày bằng lịch tiếng Việt trên app.
+5. Bán cho lái (sầu riêng: cọc + cắt nhiều đợt nhiều loại hàng) và nút Hoàn tất + bảng quyết toán.
+6. Tiền vay: bên cho vay (danh sách ngân hàng), 3 cách trả, lịch trả nợ, tổng lãi đến khi tất toán, nhắc hạn (thẻ trong app + thông báo trên máy).
+7. Phân quyền xem lịch sử giá + trang Tài khoản + quản lý gói trong /admin.
+8. Lấy dữ liệu giá cũ 5 năm (`crawl:backfill`) từ 4 nguồn; sửa nhiều lỗi đọc bảng giá; sửa giá bị kẹt "cần duyệt".
+9. Đơn mua bán chung 2 bên (thương lái / chi nhánh / nông dân), lời cả lô, tự ghi vào sổ.
+10. Thông báo khi bên kia ghi / xác nhận đơn, nút gọn đều; nông dân chọn / đổi vườn nhận tiền của đơn.
+11. Script xuất dữ liệu giá `scripts/export-prices.sh`.
+
+**Kiểm tra cuối ngày:** backend 115 test, shared 67 test, build + lint web, typecheck mobile đều qua.
+
+### Dữ liệu giá trong DB dev (lúc 15:55, việc lấy dữ liệu cũ còn đang chạy)
+
+| Mặt hàng | Từ | Số ngày có giá | Nguồn |
+|---|---|---|---|
+| Cà phê Robusta (Đắk Lắk, Lâm Đồng, Gia Lai, Đắk Nông) | 11/2021 | 955 (đang chạy, tới 07/2024) | baoquocte.vn + vietbao.vn |
+| Hồ tiêu (6 tỉnh) | 11/2021 | 982 (đang chạy) | baoquocte.vn + vietbao.vn |
+| Lúa IR 50404 / OM 5451 / OM 18 / Đài thơm 8, gạo IR 504 (An Giang) | 10/2021 | 380–716 (đang chạy, tới 01/2023) | agro.gov.vn + congthuong.vn |
+| Urê Phú Mỹ, NPK 20-20-15 Bình Điền (bán lẻ An Giang, đ/bao = đ/kg × 50) | 10/2021 | khoảng 500 (tới 06/2025) | agro.gov.vn |
+| Sầu riêng Ri6 / Thái loại A (ĐBSCL, Đông Nam Bộ, Tây Nguyên, vài tỉnh) | 10/2024 | khoảng 730 | thuonghieucongluan.com.vn (chạy hằng ngày) |
+| Phân bón sỉ Vinacam | 10/2026 | 1 | vinacam.com.vn |
+
+- Tổng khoảng 19.000 giá. 137 giá nhảy mạnh đang chờ admin duyệt (/admin → Giá → "Cần duyệt").
+- Không có nguồn miễn phí đủ 5 năm cho:
+  - sầu riêng trước 10/2024 (7–9/2024 bảng giá là ảnh);
+  - phân bón theo vùng / Kali;
+  - thuốc BVTV.
+- File xuất dữ liệu giá: `exports/nhanong-gia-20261015-1555.sql.gz`. Không đưa lên git (thư mục `exports/` nằm trong `.gitignore`). Đã thử nạp vào DB trống: đủ 19.081 giá, 41 mặt hàng, 10 nguồn, tiếng Việt đúng.
+- Khi việc lấy dữ liệu cũ chạy xong cần:
+  1. xét lại giá "cần duyệt" (việc lấy dữ liệu khởi động trước bản sửa so giá);
+  2. xuất lại file bằng `scripts/export-prices.sh`.
+
+### Đơn mua bán: thông báo, nút, chọn vườn (bổ sung chiều 15/10)
+- Server ghi "hoạt động mới nhất" của đơn ("Chú Ba đồng ý Đợt cân …"). `GET /deals?since=` chỉ trả đơn mới đổi.
+- `DealWatcher` (dùng chung web + app) hỏi server 8 giây/lần. Bên nhận thấy:
+  - thông báo nổi / băng thông báo có nút Xem;
+  - số đỏ trên mục / tab "Đơn" (web còn hiện ở tiêu đề tab);
+  - trang đơn đang mở tự cập nhật.
+
+  Bên gửi thấy "Đã gửi cho …, chờ xác nhận". Thử thật: thông báo đến sau khoảng 6–7 giây.
+- Lỗi tìm thấy: thanh thông báo "Đã lưu…" trên web chỉ được vẽ ở trang Sổ thu chi, nên trang Đơn không bao giờ hiện thông báo. Đã đưa ra dùng chung.
+- Nút Đồng ý / Báo sai / Kết thúc / Hủy cùng cỡ. Đơn chưa có đợt cân xác nhận ghi "Chưa có đợt cân nào được xác nhận" (trước ghi nhầm "Đã thanh toán đủ").
+- Phần Sổ thu chi trong đơn: chọn / đổi vườn (hoặc Chi chung) và hạng mục bất cứ lúc nào, các khoản đã ghi chuyển theo; nút "＋ Thêm vườn" rồi quay lại đơn. Trong sổ, bấm khoản tự ghi từ đơn thì mở đơn.
+- Chưa có: thông báo đẩy khi app đóng (cần bản build riêng + server gửi), WebSocket (cập nhật tức thì).
+
+### ⏭️ Việc tiếp theo (đề xuất)
+- Màn hình tổng hợp cho thương lái (lời các lô theo tháng / vụ, tổng nợ nông dân, tổng chi nhánh nợ mình), phiếu cân / biên nhận gửi bên kia.
+- Thông báo đẩy từ server cho đơn mua bán (cần development build: `eas build --profile development`).
+- Thanh toán gói xem giá (VietQR + webhook ngân hàng, hoặc mã kích hoạt).
+- Giai đoạn 6: phát hành (EAS build, CH Play / App Store, VPS cho backend).
 
 ---
 
