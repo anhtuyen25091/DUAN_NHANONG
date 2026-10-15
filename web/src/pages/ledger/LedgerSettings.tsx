@@ -56,6 +56,17 @@ export function LedgerSettings({ ledger, data }: { ledger: Ledger; data: LedgerS
       <StoragePlace data={data} />
 
       <section className="card">
+        <h2>Chế độ Nâng cao</h2>
+        <label className="toggle">
+          <input type="checkbox" checked={!!data.meta.advanced} onChange={(e) => ledger.setMeta({ advanced: e.target.checked })} />
+          <span>
+            <b>Bật mùa vụ, kho vật tư, công nợ</b>
+            <span className="small muted">Chia lời/lỗ theo vụ; mua phân thuốc về kho rồi ghi dùng cho vườn nào; ghi mua thiếu, bán chịu. Tắt đi thì dữ liệu vẫn giữ.</span>
+          </span>
+        </label>
+      </section>
+
+      <section className="card">
         <h2>Sao lưu</h2>
         <p className="small muted">Tải sổ ra 1 file để cất giữ. Đổi máy hoặc xóa trình duyệt thì nhập lại file này.</p>
         <div className="actions">

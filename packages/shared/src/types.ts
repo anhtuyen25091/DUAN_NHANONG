@@ -20,11 +20,15 @@ export interface Garden extends SyncRecord {
   note: string | null;
 }
 
+/**
+ * Mùa vụ của 1 vườn. Khoản thu chi thuộc vụ theo ngày + vườn (tính lúc xem, không lưu season_id),
+ * nên sửa ngày bắt đầu/kết thúc vụ thì số liệu tự tính lại.
+ */
 export interface Season extends SyncRecord {
   garden_id: string;
   name: string;
   started_on: string; // YYYY-MM-DD
-  ended_on: string | null;
+  ended_on: string | null; // null = đang làm
 }
 
 export type EntryType = 'income' | 'expense';
@@ -42,20 +46,26 @@ export interface Transaction extends SyncRecord {
   amount: number; // VND
   date: string; // YYYY-MM-DD
   garden_id: string | null; // null = chi chung
-  season_id: string | null;
+  season_id: string | null; // chưa dùng: vụ tính theo ngày + vườn (xem Season)
   category_id: string;
   supply_id: string | null; // khoản chi sinh ra khi mua vật tư
   note: string | null;
 }
 
+/**
+ * Vật tư mua về kho. Lúc mua tự ghi 1 khoản tiền ra "chi chung" (transactions.supply_id = id vật tư);
+ * mỗi lần dùng cho vườn nào thì phần tiền tương ứng tính vào vườn đó (xem allocatedEntries).
+ */
 export interface Supply extends SyncRecord {
   name: string;
+  category_id: string; // hạng mục chi: Phân bón, Thuốc…
   product_id: number | null; // liên kết danh mục giá trên server (tùy chọn)
-  unit: string;
+  unit: string; // bao, chai, kg…
   quantity: number;
-  unit_price: number;
+  unit_price: number; // đồng / 1 đơn vị (có thể lẻ khi nhập thành tiền, ví dụ 1 triệu / 3 chai)
   bought_on: string;
   shop_name: string | null;
+  note: string | null;
 }
 
 export interface SupplyUsage extends SyncRecord {
@@ -63,6 +73,34 @@ export interface SupplyUsage extends SyncRecord {
   garden_id: string;
   quantity: number;
   used_on: string;
+  note: string | null;
+}
+
+/** payable: mình nợ người ta (mua thiếu phân, thuốc…); receivable: người ta nợ mình (bán chịu) */
+export type DebtKind = 'payable' | 'receivable';
+
+/**
+ * Khoản nợ. Tiền đã tính vào lời/lỗ lúc mua/bán (khoản thu chi transaction_id, nếu có);
+ * trả nợ chỉ làm giảm số còn nợ, không tính lại vào lời/lỗ.
+ */
+export interface Debt extends SyncRecord {
+  kind: DebtKind;
+  party: string; // tên đại lý / người mua
+  phone: string | null;
+  amount: number;
+  date: string;
+  due_on: string | null;
+  garden_id: string | null;
+  transaction_id: string | null;
+  supply_id: string | null; // nợ sinh ra khi mua vật tư thiếu
+  note: string | null;
+}
+
+export interface DebtPayment extends SyncRecord {
+  debt_id: string;
+  amount: number;
+  date: string;
+  note: string | null;
 }
 
 export type CustomFieldTarget = 'garden' | 'transaction' | 'supply';

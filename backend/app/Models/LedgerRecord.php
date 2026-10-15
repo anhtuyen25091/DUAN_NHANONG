@@ -15,7 +15,8 @@ class LedgerRecord extends Model
      */
     public const TABLES = [
         'gardens', 'categories', 'transactions',
-        'seasons', 'supplies', 'supply_usages', 'custom_fields', 'templates', 'debts', 'harvests', 'workers', 'work_logs',
+        'seasons', 'supplies', 'supply_usages', 'debts', 'debt_payments',
+        'custom_fields', 'templates', 'harvests', 'workers', 'work_logs',
     ];
 
     protected function casts(): array

@@ -882,3 +882,140 @@ button.danger-outline {
 .switch-mode button.danger-outline {
   margin-top: 0;
 }
+
+/* ---- Sổ thu chi Nâng cao: mùa vụ, kho vật tư, công nợ ---- */
+.segmented.wrap {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.ledger .big {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin: 2px 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger section.card > p {
+  margin-top: 0;
+}
+
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.card.shortcut {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (max-width: 360px) {
+  .shortcut-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.split-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.split-2 p {
+  margin: 0;
+}
+
+.split-2 .big {
+  font-size: 1.25rem;
+}
+
+.row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.row-2 input {
+  width: 100%;
+  min-width: 0;
+}
+
+.with-suffix {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.with-suffix input {
+  flex: 1;
+  min-width: 0;
+}
+
+.stock-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  overflow: hidden;
+}
+
+.stock-bar span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+
+.garden-list.faded {
+  opacity: 0.6;
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.tag.overdue {
+  background: var(--loss-soft);
+  color: var(--loss);
+}
+
+label.toggle {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+label.toggle input {
+  min-height: 0;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  flex: none;
+}
+
+label.toggle > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form.card {
+  margin-top: 12px;
+}
+
+a.entry.entry-main {
+  color: inherit;
+  text-decoration: none;
+}

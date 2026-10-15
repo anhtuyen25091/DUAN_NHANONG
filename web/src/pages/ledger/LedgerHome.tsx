@@ -1,4 +1,4 @@
-import { filterEntries, formatVnd, totals, type Ledger, type LedgerSnapshot } from '@nhanong/shared'
+import { allocatedEntries, debtStatus, debtSummary, filterEntries, formatVnd, supplyStock, today, totals, type Ledger, type LedgerSnapshot } from '@nhanong/shared'
 import { useState } from 'react'
 import { href } from '../../hooks'
 import { PERIOD_LABELS, periodRange, type Period } from '../../ledger/period'
@@ -8,10 +8,12 @@ import { SyncBadge } from './SyncBadge'
 export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
   const [period, setPeriod] = useState<Period>('year')
   const range = periodRange(period)
-  const inPeriod = filterEntries(data.transactions, range)
+  // Vật tư lấy từ kho tính vào vườn đã dùng (tổng cả sổ không đổi)
+  const inPeriod = filterEntries(allocatedEntries(data), range)
   const all = totals(inPeriod)
   const shared = totals(filterEntries(inPeriod, { gardenId: null }))
-  const hasShared = inPeriod.some((t) => t.garden_id === null)
+  const hasShared = filterEntries(data.transactions, range).some((t) => t.garden_id === null)
+  const stockValue = supplyStock(data).reduce((sum, s) => sum + s.leftValue, 0)
 
   return (
     <div className="ledger">
@@ -32,6 +34,7 @@ export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnaps
       </nav>
 
       <ProfitCard label={`Tất cả các vườn · ${PERIOD_LABELS[period].toLowerCase()}`} {...all} />
+      {data.meta.advanced && <AdvancedShortcuts data={data} />}
 
       <h2 className="section">Vườn của tôi</h2>
       {data.gardens.length === 0 && (
@@ -65,7 +68,10 @@ export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnaps
         })}
         {hasShared && (
           <a className="card garden-row" href={href('so/vuon/chung')}>
-            <span className="garden-name">📦 Chi chung (không thuộc vườn nào)</span>
+            <span className="garden-name">
+              📦 Chi chung (không thuộc vườn nào)
+              {stockValue > 0 && <span className="small muted"> · gồm {formatVnd(stockValue)} vật tư còn trong kho</span>}
+            </span>
             <span className={`profit ${shared.profit >= 0 ? 'gain' : 'loss'}`}>{formatVnd(shared.profit)}</span>
           </a>
         )}
@@ -81,6 +87,35 @@ export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnaps
 
       <a className="fab" href={href('so/ghi')}>
         ＋ Ghi tiền
+      </a>
+    </div>
+  )
+}
+
+/** Chế độ Nâng cao: lối tắt vào Kho vật tư và Công nợ, kèm con số chính */
+function AdvancedShortcuts({ data }: { data: LedgerSnapshot }) {
+  const stock = supplyStock(data)
+  const inStock = stock.filter((s) => s.left > 1e-9)
+  const debts = debtSummary(debtStatus(data, today()))
+  return (
+    <div className="shortcut-grid">
+      <a className="card shortcut" href={href('so/kho')}>
+        <b>📦 Kho vật tư</b>
+        <span className="small muted">{inStock.length ? `${inStock.length} loại · còn ${formatVnd(inStock.reduce((s, x) => s + x.leftValue, 0))}` : 'Chưa có gì trong kho'}</span>
+      </a>
+      <a className="card shortcut" href={href('so/no')}>
+        <b>🧾 Công nợ</b>
+        <span className="small muted">
+          {debts.payable || debts.receivable ? (
+            <>
+              {debts.payable > 0 && <span className="out">Nợ {formatVnd(debts.payable)}</span>}
+              {debts.payable > 0 && debts.receivable > 0 && ' · '}
+              {debts.receivable > 0 && <span className="in">Được nợ {formatVnd(debts.receivable)}</span>}
+            </>
+          ) : (
+            'Không còn nợ'
+          )}
+        </span>
       </a>
     </div>
   )

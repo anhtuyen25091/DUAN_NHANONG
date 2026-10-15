@@ -10,9 +10,15 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
   const gardens = new Map(data.gardens.map((g) => [g.id, g]))
   const now = today()
 
+  // Khoản sinh ra khi mua vật tư / ghi nợ: mở vật tư / khoản nợ để sửa, để 2 bên không lệch nhau
+  const debtOf = new Map(data.debts.filter((d) => d.transaction_id).map((d) => [d.transaction_id!, d.id]))
+  const entryHref = (t: Transaction) =>
+    t.supply_id ? href(`so/kho/${t.supply_id}`) : debtOf.has(t.id) ? href(`so/no/${debtOf.get(t.id)}`) : href('so/ghi', { sua: t.id })
+
   const remove = async (entry: Transaction) => {
+    const linked = entry.supply_id ? ' (xóa cả vật tư trong kho)' : debtOf.has(entry.id) ? ' (xóa cả khoản nợ)' : ''
     const undo = await ledger.removeEntry(entry.id)
-    showToast({ message: `Đã xóa ${formatVnd(entry.amount)}`, undo })
+    showToast({ message: `Đã xóa ${formatVnd(entry.amount)}${linked}`, undo })
   }
 
   return (
@@ -24,7 +30,7 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
             const cat = categories.get(t.category_id)
             return (
               <div key={t.id} className="entry">
-                <a className="entry-main" href={href('so/ghi', { sua: t.id })}>
+                <a className="entry-main" href={entryHref(t)}>
                   <span className="entry-icon" aria-hidden>
                     {cat?.icon ?? '📦'}
                   </span>

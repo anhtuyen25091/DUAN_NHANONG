@@ -108,6 +108,20 @@ class LedgerSyncApiTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors('records.0.data.updated_at');
     }
 
+    public function test_syncs_advanced_mode_tables(): void
+    {
+        $user = User::factory()->create();
+        $at = '2026-10-14T08:00:00.000Z';
+        $tables = ['seasons', 'supplies', 'supply_usages', 'debts', 'debt_payments'];
+
+        $this->actingAs($user)->postJson(route('api.v1.sync.push'), [
+            'records' => array_map(fn (string $tbl) => ['tbl' => $tbl, 'data' => $this->record([], $at)], $tables),
+        ])->assertOk()->assertJsonPath('accepted', 5);
+
+        $pulled = $this->getJson(route('api.v1.sync.pull'))->assertOk()->json('records');
+        $this->assertEqualsCanonicalizing($tables, array_keys($pulled));
+    }
+
     public function test_pull_pages_through_large_ledgers(): void
     {
         $user = User::factory()->create();
