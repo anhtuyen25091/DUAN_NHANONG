@@ -42,4 +42,14 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    /**
+     * Tài khoản có gói xem toàn bộ lịch sử giá (còn hạn 1 tháng).
+     */
+    public function premium(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'premium_until' => now()->addMonth(),
+        ]);
+    }
 }

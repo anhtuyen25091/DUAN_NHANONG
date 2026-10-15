@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\PriceAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -71,10 +72,16 @@ class AuthController extends Controller
     }
 
     /**
-     * @return array{id: int, name: string, phone: ?string}
+     * @return array{id: int, name: string, phone: ?string, tier: string, premium_until: ?string}
      */
     private static function userData(User $user): array
     {
-        return ['id' => $user->id, 'name' => $user->name, 'phone' => $user->phone];
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'phone' => $user->phone,
+            'tier' => PriceAccess::tier($user),
+            'premium_until' => $user->premium_until?->toDateString(),
+        ];
     }
 }

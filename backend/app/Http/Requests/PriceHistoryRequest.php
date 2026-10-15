@@ -19,7 +19,8 @@ class PriceHistoryRequest extends FormRequest
     {
         return [
             'region' => ['nullable', 'string', 'exists:regions,code'],
-            'days' => ['nullable', 'integer', 'in:7,30,90,365'],
+            // Số ngày muốn xem; server tự cắt theo mức tài khoản (PriceAccess)
+            'days' => ['nullable', 'integer', 'min:1', 'max:'.config('nhanong.price_history.max_days')],
             'to' => ['nullable', 'date_format:Y-m-d'],
         ];
     }

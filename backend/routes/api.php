@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CatalogController;
 use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\LedgerSyncController;
+use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\PriceAlertController;
 use App\Http\Controllers\Api\V1\PriceController;
 use App\Http\Controllers\Api\V1\ShopController;
@@ -19,6 +20,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/products/{product:code}/history', [PriceController::class, 'history'])->name('prices.history');
     Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
     Route::get('/provinces', [ShopController::class, 'provinces'])->name('provinces');
+    Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
 
     // Không cần đăng nhập: nhận diện máy qua header X-Device-Id
     Route::middleware([ResolveDevice::class, 'throttle:60,1'])->group(function () {

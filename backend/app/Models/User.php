@@ -36,6 +36,7 @@ class User extends Authenticatable implements FilamentUser
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'ledger_version' => 'integer',
+            'premium_until' => 'datetime',
         ];
     }
 
@@ -58,6 +59,21 @@ class User extends Authenticatable implements FilamentUser
         }
 
         return preg_match('/^0[1-9]\d{8}$/', $digits) ? $digits : null;
+    }
+
+    /** Gói xem toàn bộ lịch sử giá còn hạn */
+    public function hasPremium(): bool
+    {
+        return $this->premium_until !== null && $this->premium_until->isFuture();
+    }
+
+    /**
+     * Kích hoạt / gia hạn gói: cộng thêm số tháng vào hạn hiện tại (hoặc từ hôm nay nếu đã hết hạn).
+     */
+    public function extendPremium(int $months): void
+    {
+        $start = $this->hasPremium() ? $this->premium_until : now();
+        $this->forceFill(['premium_until' => $start->copy()->addMonthsNoOverflow($months)->endOfDay()])->save();
     }
 
     public function canAccessPanel(Panel $panel): bool

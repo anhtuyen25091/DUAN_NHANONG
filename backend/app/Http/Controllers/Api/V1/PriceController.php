@@ -10,6 +10,7 @@ use App\Http\Resources\RegionResource;
 use App\Models\Product;
 use App\Models\Region;
 use App\Queries\PriceBoard;
+use App\Support\PriceAccess;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 
@@ -35,22 +36,44 @@ class PriceController extends Controller
     }
 
     /**
-     * Chuỗi giá theo ngày của 1 mặt hàng để vẽ biểu đồ.
+     * Chuỗi giá của 1 mặt hàng để vẽ biểu đồ.
+     * Khách xem 10 ngày gần nhất, tài khoản đăng ký 30 ngày, tài khoản có gói xem toàn bộ (config/nhanong.php).
+     * Giới hạn tính từ hôm nay nên đổi tham số `to` về quá khứ cũng không xem được dữ liệu cũ.
+     * Khoảng dài thì gộp điểm theo tuần (> 120 ngày) hoặc tháng (> 2 năm) cho biểu đồ nhẹ.
      */
     public function history(PriceHistoryRequest $request, Product $product): JsonResponse
     {
-        $to = CarbonImmutable::parse($request->validated('to') ?? 'today');
+        $today = CarbonImmutable::today();
+        $to = CarbonImmutable::parse($request->validated('to') ?? 'today')->min($today);
         $days = (int) ($request->validated('days') ?? 30);
+        $from = $to->subDays($days - 1);
         $region = $request->validated('region')
             ? Region::query()->where('code', $request->validated('region'))->firstOrFail()
             : null;
 
+        $tier = PriceAccess::tier($request->user('sanctum'));
+        $earliest = PriceAccess::earliestDate($tier);
+        $limited = $earliest !== null && $from->lessThan($earliest);
+        if ($limited) {
+            $from = $earliest;
+        }
+
+        $span = $from->diffInDays($to) + 1;
+        $interval = $span > 730 ? 'month' : ($span > 120 ? 'week' : 'day');
+
         return response()->json([
             'product' => new ProductResource($product->load('category')),
             'region' => $region ? new RegionResource($region) : null,
-            'from' => $to->subDays($days - 1)->toDateString(),
+            'from' => $from->toDateString(),
             'to' => $to->toDateString(),
-            'points' => $this->board->history($product->id, $region?->id, $to->subDays($days - 1), $to),
+            'interval' => $interval,
+            'points' => $from->greaterThan($to) ? [] : $this->board->history($product->id, $region?->id, $from, $to, $interval),
+            'access' => [
+                'tier' => $tier,
+                'max_days' => PriceAccess::maxDays($tier),
+                'limited' => $limited,
+                'first_date' => $this->board->firstDate($product->id, $region?->id),
+            ],
         ]);
     }
 }

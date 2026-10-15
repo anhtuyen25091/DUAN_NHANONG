@@ -6,8 +6,17 @@ const W = 360
 const H = 200
 const PAD = { top: 10, right: 10, bottom: 22, left: 54 }
 
-/** Biểu đồ đường giá trung bình + dải thấp–cao. Chạm/rê chuột để xem giá từng ngày. */
-export function PriceChart({ points, unit }: { points: HistoryPoint[]; unit: string }) {
+/** Nhãn 1 điểm: ngày, "tuần từ 13/10/2025" hoặc "tháng 10/2025" */
+function pointLabel(date: string, interval: Interval): string {
+  if (interval === 'month') return `tháng ${Number(date.slice(5, 7))}/${date.slice(0, 4)}`
+  if (interval === 'week') return `tuần từ ${formatDate(date)}`
+  return formatDate(date)
+}
+
+type Interval = 'day' | 'week' | 'month'
+
+/** Biểu đồ đường giá trung bình + dải thấp–cao. Chạm/rê chuột để xem giá từng ngày (từng tuần / tháng khi xem khoảng dài). */
+export function PriceChart({ points, unit, interval = 'day' }: { points: HistoryPoint[]; unit: string; interval?: Interval }) {
   const [active, setActive] = useState<number | null>(null)
 
   if (points.length === 0) return <p className="muted center">Chưa có dữ liệu trong khoảng này.</p>
@@ -55,7 +64,7 @@ export function PriceChart({ points, unit }: { points: HistoryPoint[]; unit: str
       <div className="chart-readout" aria-live="polite">
         {current ? (
           <>
-            <strong>{formatDate(current.date)}</strong>: {formatNumber(current.avg)} đ/{unit}
+            <strong>{pointLabel(current.date, interval)}</strong>: {formatNumber(current.avg)} đ/{unit}
             {current.min !== current.max && (
               <span className="muted">
                 {' '}
@@ -93,7 +102,7 @@ export function PriceChart({ points, unit }: { points: HistoryPoint[]; unit: str
                 className="axis"
                 textAnchor={i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'}
               >
-                {formatDate(p.date, true)}
+                {interval === 'day' ? formatDate(p.date, true) : `${p.date.slice(5, 7)}/${p.date.slice(2, 4)}`}
               </text>
             ),
         )}

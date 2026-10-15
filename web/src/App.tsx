@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { href, useRoute } from './hooks'
+import { Account } from './pages/Account'
 import { PriceBoard } from './pages/PriceBoard'
 import { ProductDetail } from './pages/ProductDetail'
 import { ShopList } from './pages/ShopList'
@@ -27,6 +28,9 @@ export default function App() {
           <a href={href('diem-ban')} aria-current={section === 'shops' ? 'page' : undefined}>
             Điểm bán
           </a>
+          <a href={href('tai-khoan')} aria-current={path[0] === 'tai-khoan' ? 'page' : undefined} aria-label="Tài khoản">
+            👤
+          </a>
         </nav>
       </header>
       <main>
@@ -36,6 +40,8 @@ export default function App() {
           <Suspense fallback={<p className="muted center">Đang mở sổ…</p>}>
             <LedgerRoutes path={path} query={query} />
           </Suspense>
+        ) : path[0] === 'tai-khoan' ? (
+          <Account query={query} />
         ) : path[0] === 'diem-ban' && path[1] === 'de-xuat' ? (
           <ShopSubmit query={query} />
         ) : path[0] === 'diem-ban' ? (

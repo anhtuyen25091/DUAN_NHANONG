@@ -55,12 +55,39 @@ export interface HistoryPoint {
   avg: number;
 }
 
+/** Mức xem lịch sử giá: khách (chưa đăng nhập), đã đăng ký, có gói trả phí */
+export type AccessTier = 'guest' | 'member' | 'premium';
+
 export interface PriceHistory {
   product: Product;
   region: Region | null;
   from: string;
   to: string;
+  /** Mỗi điểm là 1 ngày, 1 tuần (ngày Thứ 2) hoặc 1 tháng (ngày 1) */
+  interval: 'day' | 'week' | 'month';
   points: HistoryPoint[];
+  access: {
+    tier: AccessTier;
+    /** Xem được bao nhiêu ngày gần nhất; null = toàn bộ */
+    max_days: number | null;
+    /** Khoảng xin xem bị cắt bớt vì mức tài khoản */
+    limited: boolean;
+    /** Có dữ liệu từ ngày nào */
+    first_date: string | null;
+  };
+}
+
+export interface Plan {
+  code: string;
+  name: string;
+  months: number;
+  price: number;
+  description: string | null;
+}
+
+export interface PlanList {
+  data: Plan[];
+  limits: { guest_days: number; member_days: number };
 }
 
 export type AlertCondition = 'change' | 'above' | 'below';
@@ -163,6 +190,9 @@ export interface AccountUser {
   id: number;
   name: string;
   phone: string | null;
+  tier?: AccessTier;
+  /** Hạn gói xem toàn bộ lịch sử giá (YYYY-MM-DD) */
+  premium_until?: string | null;
 }
 
 export interface AuthResult {
@@ -245,8 +275,10 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
     categories: () => request<{ data: Category[] }>('GET', '/categories').then((r) => r.data),
     regions: () => request<{ data: Region[] }>('GET', '/regions').then((r) => r.data),
     prices: (filters: PriceFilters = {}) => request<{ data: PriceRow[]; date: string }>('GET', '/prices', { query: filters }),
-    history: (productCode: string, options: { region?: string | null; days?: number; to?: string } = {}) =>
-      request<PriceHistory>('GET', `/products/${encodeURIComponent(productCode)}/history`, { query: options }),
+    /** token: đăng nhập thì xem được lâu hơn (30 ngày / toàn bộ nếu có gói) */
+    history: (productCode: string, { token, ...options }: { region?: string | null; days?: number; to?: string; token?: string | null } = {}) =>
+      request<PriceHistory>('GET', `/products/${encodeURIComponent(productCode)}/history`, { query: options, token: token ?? undefined }),
+    plans: () => request<PlanList>('GET', '/plans'),
 
     updateDevice: (pushToken: string | null, platform?: 'android' | 'ios' | 'web') =>
       request<{ data: { uuid: string; push_enabled: boolean } }>('PUT', '/device', {

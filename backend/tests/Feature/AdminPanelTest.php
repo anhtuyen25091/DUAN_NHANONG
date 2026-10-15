@@ -2,9 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\Users\Pages\ManageUsers;
+use App\Models\Plan;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
+use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -27,6 +31,8 @@ class AdminPanelTest extends TestCase
             'tên chưa nhận diện' => ['/admin/unmatched-names'],
             'điểm bán' => ['/admin/shops'],
             'đề xuất điểm bán' => ['/admin/shop-submissions'],
+            'tài khoản' => ['/admin/users'],
+            'gói xem giá' => ['/admin/plans'],
         ];
     }
 
@@ -38,6 +44,23 @@ class AdminPanelTest extends TestCase
         $admin->forceFill(['is_admin' => true])->save();
 
         $this->actingAs($admin)->get($url)->assertOk();
+    }
+
+    public function test_admin_activates_plan_for_user(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $admin = User::factory()->create();
+        $admin->forceFill(['is_admin' => true])->save();
+        $farmer = User::factory()->create(['phone' => '0912345678']);
+        $yearly = Plan::query()->where('code', 'nam')->firstOrFail();
+
+        $this->actingAs($admin);
+        Livewire::test(ManageUsers::class)
+            ->callAction(TestAction::make('activatePlan')->table($farmer), data: ['plan_id' => $yearly->id])
+            ->assertHasNoFormErrors();
+
+        $this->assertTrue($farmer->refresh()->hasPremium());
+        $this->assertSame(now()->addYear()->toDateString(), $farmer->premium_until->toDateString());
     }
 
     public function test_regular_user_cannot_open_admin(): void

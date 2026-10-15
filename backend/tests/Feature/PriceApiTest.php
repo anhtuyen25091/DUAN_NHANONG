@@ -84,6 +84,8 @@ class PriceApiTest extends TestCase
 
     public function test_history_returns_daily_points_for_chart(): void
     {
+        // Khách chỉ xem được 10 ngày gần nhất tính từ hôm nay
+        $this->travelTo(now()->setDate(2026, 10, 14));
         $this->price('2026-10-01', 130000);
         $this->price('2026-10-13', 138000);
         $this->price('2026-10-14', 139000);

@@ -75,8 +75,17 @@ class PriceBoard
      *
      * @return list<array{date: string, min: int, max: int, avg: int}>
      */
-    public function history(int $productId, ?int $regionId, CarbonImmutable $from, CarbonImmutable $to): array
+    /**
+     * @param  'day'|'week'|'month'  $interval  gộp điểm: theo ngày, tuần (ngày Thứ 2) hoặc tháng (ngày 1)
+     */
+    public function history(int $productId, ?int $regionId, CarbonImmutable $from, CarbonImmutable $to, string $interval = 'day'): array
     {
+        $bucket = fn (string $date): string => match ($interval) {
+            'week' => CarbonImmutable::parse($date)->startOfWeek()->toDateString(),
+            'month' => substr($date, 0, 7).'-01',
+            default => substr($date, 0, 10),
+        };
+
         return Price::query()
             ->published()
             ->where('product_id', $productId)
@@ -84,10 +93,22 @@ class PriceBoard
             ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
             ->orderBy('date')
             ->get(['date', 'price_min', 'price_max', 'price_avg'])
-            ->groupBy('date')
+            ->groupBy(fn (Price $price): string => $bucket((string) $price->date))
             ->map(fn (Collection $prices, string $date): array => ['date' => $date, ...$this->combine($prices)])
             ->values()
             ->all();
+    }
+
+    /** Ngày có giá sớm nhất của mặt hàng (để biết dữ liệu có từ khi nào) */
+    public function firstDate(int $productId, ?int $regionId): ?string
+    {
+        $date = Price::query()
+            ->published()
+            ->where('product_id', $productId)
+            ->when($regionId, fn (Builder $query, int $id) => $query->where('region_id', $id))
+            ->min('date');
+
+        return $date ? substr((string) $date, 0, 10) : null;
     }
 
     /**

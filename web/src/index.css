@@ -1230,3 +1230,35 @@ table.schedule tr.next {
   padding: 0;
   margin: 12px 0;
 }
+
+/* ---- Tài khoản / gói xem lịch sử giá ---- */
+.notice.upgrade {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  background: var(--primary-soft);
+}
+
+.notice.upgrade p {
+  margin: 0;
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.card.plan {
+  margin: 0;
+  text-align: center;
+}
+
+.card.plan h3 {
+  margin: 0;
+}
+
+.card.tiers p {
+  margin: 4px 0;
+}

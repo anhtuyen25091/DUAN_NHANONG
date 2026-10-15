@@ -1,6 +1,7 @@
 import { ApiError, type LedgerSnapshot } from '@nhanong/shared'
 import { useState, type FormEvent } from 'react'
 import { api } from '../../api'
+import { setAuth, useAuth } from '../../auth'
 import { go, href } from '../../hooks'
 import { deviceName, getSync } from '../../ledger/sync'
 import { showToast } from '../../ledger/toast'
@@ -10,6 +11,7 @@ type Tab = 'register' | 'login'
 /** Đăng nhập / tạo tài khoản bằng số điện thoại để bật "lưu cả trên mạng" */
 export function SignIn({ data }: { data: LedgerSnapshot }) {
   const account = data.meta.account
+  const signedIn = useAuth()
   // Phiên hết hạn thì đăng nhập lại, số điện thoại điền sẵn
   const [tab, setTab] = useState<Tab>(account ? 'login' : 'register')
   const [form, setForm] = useState({ name: '', phone: account?.phone ?? '', password: '' })
@@ -30,6 +32,8 @@ export function SignIn({ data }: { data: LedgerSnapshot }) {
       const input = { phone: form.phone.trim(), password: form.password, device_name: deviceName() }
       const { token, user } = tab === 'register' ? await api.register({ ...input, name: form.name.trim() }) : await api.login(input)
       await getSync().enable(token, user)
+      // Dùng luôn tài khoản này để xem lịch sử giá dài hơn
+      setAuth({ token, user, shared: true })
       showToast({ message: `Đã bật lưu cả trên mạng cho tài khoản ${user.phone ?? user.name}.` })
       go('so')
     } catch (error) {
@@ -55,6 +59,25 @@ export function SignIn({ data }: { data: LedgerSnapshot }) {
         {hasData && ' Sổ đang có trên máy này sẽ được gửi lên tài khoản.'}
       </p>
 
+      {signedIn && !account && (
+        <div className="notice">
+          <p>
+            Bạn đang đăng nhập tài khoản <b>{signedIn.user.phone ?? signedIn.user.name}</b>.
+          </p>
+          <button
+            type="button"
+            className="primary"
+            onClick={async () => {
+              await getSync().enable(signedIn.token, signedIn.user)
+              setAuth({ ...signedIn, shared: true })
+              showToast({ message: `Đã bật lưu cả trên mạng cho tài khoản ${signedIn.user.phone ?? signedIn.user.name}.` })
+              go('so')
+            }}
+          >
+            Dùng tài khoản này
+          </button>
+        </div>
+      )}
       <nav className="segmented" aria-label="Loại tài khoản">
         <button type="button" className={tab === 'register' ? 'active' : ''} aria-pressed={tab === 'register'} onClick={() => setTab('register')}>
           Tạo tài khoản mới
