@@ -69,6 +69,13 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 - Controller dùng `$request->user()->buyer` thì có thể nhận kết quả "chưa có hồ sơ" đã nạp sẵn. Đã đổi sang truy vấn thẳng (`myBuyer`).
 - Cột `prices.date` là chuỗi, gọi `toDateString()` bị lỗi 500. Đã đọc lại bằng `CarbonImmutable::parse`.
 
+### Bước B: Phần dùng chung (`packages/shared/src/local.ts`) ✅
+- Kiểu dữ liệu: `BuyerProfile`, `BuyerReport`, `LocalPriceProduct` / `LocalPriceEntry`, `MyLocation`; các nhãn `BUYER_KIND_LABELS`, `BUYER_STATUS_LABELS`; `RADIUS_OPTIONS` (10 / 20 / 30 / 50 km).
+- `PROVINCE_CENTERS` (giống backend), `provinceLocation` (khu vực = trung tâm tỉnh), `nearestProvince` (đoán tỉnh từ GPS), `describeLocation`.
+- `compareToReference`: so với giá chung. Nông sản giá cao hơn thì tốt cho người bán; phân / thuốc giá thấp hơn thì tốt cho người mua.
+- API client: `localPrices`, `flagLocalPrice`, `saveMyLocation`, `myBuyer`, `saveBuyer`, `myBuyerPrices`, `postBuyerPrice`, `deleteBuyerPrice`. `AccountUser` có thêm `location`, `buyer_status`.
+- **Kiểm tra:** 92 test shared qua (thêm 3 test); typecheck shared, web, mobile sạch.
+
 ---
 
 ## 15/10/2026 (tối): Dữ liệu demo cho tài khoản 0900000003

@@ -1,6 +1,7 @@
 /**
  * Kiểu dữ liệu và client gọi API /api/v1 của backend, dùng chung cho web và mobile.
  */
+import type { BuyerProfile, BuyerProfileInput, BuyerReport, BuyerStatus, LocalPriceFilters, LocalPrices, MyLocation } from './local';
 
 export type CategoryType = 'nong_san' | 'phan_bon' | 'thuoc_bvtv';
 
@@ -303,6 +304,10 @@ export interface AccountUser {
   tier?: AccessTier;
   /** Hạn gói xem toàn bộ lịch sử giá (YYYY-MM-DD) */
   premium_until?: string | null;
+  /** Khu vực của tôi đã lưu vào tài khoản */
+  location?: MyLocation | null;
+  /** Trạng thái hồ sơ điểm mua (nếu có) */
+  buyer_status?: BuyerStatus | null;
 }
 
 export interface AuthResult {
@@ -429,6 +434,20 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
       request<{ accepted: number; version: number }>('POST', '/sync/push', { token, body: { records } }),
     syncPull: (token: string, since: number) => request<SyncPullResult>('GET', '/sync/pull', { token, query: { since } }),
     deleteServerLedger: (token: string) => request<void>('DELETE', '/ledger', { token }),
+
+    // ---- Giá theo khu vực (điểm mua đóng góp) ----
+    localPrices: (filters: LocalPriceFilters) => request<LocalPrices>('GET', '/local-prices', { query: filters }),
+    flagLocalPrice: (id: number, reason?: string) =>
+      request<{ message: string }>('POST', `/local-prices/${id}/flag`, { body: { reason: reason ?? null }, device: true }).then((r) => r.message),
+    saveMyLocation: (token: string, location: Pick<MyLocation, 'province' | 'label' | 'radius'> & { lat?: number | null; lng?: number | null }) =>
+      request<{ data: MyLocation }>('PUT', '/me/location', { token, body: location }).then((r) => r.data),
+    myBuyer: (token: string) => request<{ data: BuyerProfile | null }>('GET', '/me/buyer', { token }).then((r) => r.data),
+    saveBuyer: (token: string, profile: BuyerProfileInput) =>
+      request<{ data: BuyerProfile; message?: string }>('PUT', '/me/buyer', { token, body: profile }),
+    myBuyerPrices: (token: string) => request<{ data: BuyerReport[] }>('GET', '/me/buyer/prices', { token }).then((r) => r.data),
+    postBuyerPrice: (token: string, input: { product: string; price: number; date?: string; note?: string | null }) =>
+      request<{ data: BuyerReport; message: string }>('POST', '/me/buyer/prices', { token, body: input }),
+    deleteBuyerPrice: (token: string, id: number) => request<void>('DELETE', `/me/buyer/prices/${id}`, { token }),
 
     shops: (filters: ShopFilters = {}) => request<ShopPage>('GET', '/shops', { query: filters }),
     provinces: () => request<{ data: Province[] }>('GET', '/provinces').then((r) => r.data),

@@ -4,6 +4,7 @@ export * from './dealWatch';
 export * from './extras';
 export * from './format';
 export * from './ledger';
+export * from './local';
 export * from './money';
 export * from './sync';
 export * from './types';
