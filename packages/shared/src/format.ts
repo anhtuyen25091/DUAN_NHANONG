@@ -34,6 +34,13 @@ export function formatDate(date: string, short = false): string {
   return short ? `${d}/${m}` : `${d}/${m}/${y}`;
 }
 
+/** Thời điểm ISO -> "15/10/2026 10:23" theo giờ máy (tự định dạng: Hermes trên Android không chắc có locale vi-VN) */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 
 /** "2026-10-15" -> "Thứ Năm, 15/10/2026" (thứ tính theo lịch, không phụ thuộc múi giờ) */

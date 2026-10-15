@@ -1,4 +1,4 @@
-import { formatNumber, type PriceAlert } from '@nhanong/shared';
+import { formatDateTime, formatNumber, type PriceAlert } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
@@ -66,7 +66,7 @@ export default function AlertsScreen() {
               {item.region?.name ?? 'Trung bình các vùng'} · {describe(item)}
             </Text>
             {item.last_notified_at && (
-              <Text style={styles.muted}>Lần báo gần nhất: {new Date(item.last_notified_at).toLocaleString('vi-VN')}</Text>
+              <Text style={styles.muted}>Lần báo gần nhất: {formatDateTime(item.last_notified_at)}</Text>
             )}
           </Pressable>
           <View style={{ marginTop: 10, alignSelf: 'flex-start' }}>

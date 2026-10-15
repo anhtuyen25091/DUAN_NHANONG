@@ -2,6 +2,7 @@ import { LEDGER_TABLES, Ledger, type LedgerMeta, type LedgerRecords, type Ledger
 import { openDatabaseAsync } from 'expo-sqlite';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
+import { startDueReminders } from './reminders';
 import { startSync } from './sync';
 
 /**
@@ -77,6 +78,8 @@ export function openLedger(): Promise<Ledger> {
     .then((ledger) => {
       // Chỉ chạy khi người dùng bật "lưu cả trên mạng"
       startSync(ledger);
+      // Thông báo nhắc hạn trả nợ (chỉ khi người dùng đã bật trong Cài đặt sổ)
+      startDueReminders(ledger);
       return ledger;
     });
   return opening;

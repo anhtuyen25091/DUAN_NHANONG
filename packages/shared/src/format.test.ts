@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PriceRow } from './api';
-import { directionsUrl, foldVietnamese, formatChange, formatDate, formatDateLong, formatDistance, formatPriceRange, groupByProduct, matchesSearch, telHref, trendOf } from './format';
+import { directionsUrl, foldVietnamese, formatChange, formatDate, formatDateLong, formatDateTime, formatDistance, formatPriceRange, groupByProduct, matchesSearch, telHref, trendOf } from './format';
 
 const row = (code: string, region: string, extra: Partial<PriceRow> = {}): PriceRow => ({
   product: { id: 1, code, name: code === 'ho-tieu' ? 'Hồ tiêu' : 'Cà phê', unit: 'kg' },
@@ -81,5 +81,12 @@ describe('formatDateLong', () => {
     expect(formatDateLong('2026-10-15')).toBe('Thứ Năm, 15/10/2026');
     expect(formatDateLong('2026-10-18')).toBe('Chủ Nhật, 18/10/2026');
     expect(formatDateLong('2024-02-29')).toBe('Thứ Năm, 29/02/2024');
+  });
+});
+
+describe('formatDateTime', () => {
+  it('ngày/tháng/năm giờ:phút theo giờ máy', () => {
+    const d = new Date(2026, 9, 5, 7, 3);
+    expect(formatDateTime(d.toISOString())).toBe('05/10/2026 07:03');
   });
 });

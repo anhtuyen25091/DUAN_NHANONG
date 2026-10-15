@@ -3,7 +3,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { api } from './api';
 
-type NotificationsModule = typeof import('expo-notifications');
+export type NotificationsModule = typeof import('expo-notifications');
 
 export const ALERT_CHANNEL = 'price-alerts';
 
@@ -12,7 +12,7 @@ export const ALERT_CHANNEL = 'price-alerts';
  * Từ SDK 53, chỉ cần nạp expo-notifications trong Expo Go trên Android là báo lỗi và làm sập màn hình,
  * nên phải kiểm tra trước rồi mới nạp thư viện.
  */
-const unsupported: string | null =
+export const notificationsUnsupported: string | null =
   Platform.OS === 'web'
     ? 'Trình duyệt không hỗ trợ thông báo của app.'
     : Platform.OS === 'android' && Constants.executionEnvironment === ExecutionEnvironment.StoreClient
@@ -21,9 +21,9 @@ const unsupported: string | null =
 
 let loaded: NotificationsModule | null = null;
 
-/** Nạp expo-notifications khi cần (null nếu máy không hỗ trợ) */
-function notifications(): NotificationsModule | null {
-  if (unsupported) return null;
+/** Nạp expo-notifications khi cần (null nếu máy không hỗ trợ). Không import thư viện này ở đầu file nào khác. */
+export function notifications(): NotificationsModule | null {
+  if (notificationsUnsupported) return null;
   if (!loaded) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     loaded = require('expo-notifications') as NotificationsModule;
@@ -39,7 +39,7 @@ function notifications(): NotificationsModule | null {
   return loaded;
 }
 
-type OpenedData = { product?: string; region?: string | null } | undefined;
+export type OpenedData = { product?: string; region?: string | null; debtId?: string } | undefined;
 
 /** Bấm vào thông báo (kể cả thông báo đã mở app từ trước): gọi onOpen với data; trả về hàm hủy */
 export function onNotificationOpened(onOpen: (data: OpenedData) => void): () => void {
@@ -61,7 +61,7 @@ export type PushResult = { ok: true } | { ok: false; reason: string };
  */
 export async function registerPush(askPermission: boolean): Promise<PushResult> {
   const Notifications = notifications();
-  if (!Notifications) return { ok: false, reason: unsupported! };
+  if (!Notifications) return { ok: false, reason: notificationsUnsupported! };
 
   if (Platform.OS === 'android') {
     // Backend gửi với channelId "price-alerts"

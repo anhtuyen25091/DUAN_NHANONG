@@ -2,11 +2,15 @@ import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ToastHost } from '../components/ledger';
-import { onNotificationOpened, registerPush } from '../lib/push';
+import { openLedger } from '../lib/ledger';
+import { onNotificationOpened, registerPush, type OpenedData } from '../lib/push';
 import { colors } from '../lib/theme';
 
-function openFromNotification(data: { product?: string; region?: string | null } | undefined) {
-  if (data?.product) {
+function openFromNotification(data: OpenedData) {
+  // Thông báo nhắc hạn trả nợ: mở khoản nợ
+  if (data?.debtId) {
+    router.push({ pathname: '/ledger/debts/[id]', params: { id: data.debtId } });
+  } else if (data?.product) {
     router.push({ pathname: '/product/[code]', params: { code: data.product, region: data.region ?? '' } });
   }
 }
@@ -17,7 +21,10 @@ export default function RootLayout() {
     // Máy không hỗ trợ (web, Expo Go trên Android) thì registerPush / onNotificationOpened không làm gì.
     registerPush(false).catch(() => {});
 
-    // Bấm vào thông báo: mở trang mặt hàng
+    // Mở sổ ngay khi mở app để đặt lại thông báo nhắc hạn trả nợ (nếu đã bật)
+    openLedger().catch(() => {});
+
+    // Bấm vào thông báo: mở trang mặt hàng / khoản nợ
     return onNotificationOpened(openFromNotification);
   }, []);
 

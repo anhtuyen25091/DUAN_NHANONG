@@ -108,6 +108,12 @@ php artisan shops:import-csv ds-dai-ly.csv --source="Sở NN&MT Đắk Lắk" --
     - tiền gốc không tính vào lời/lỗ
     - mỗi lần trả ghi gốc + lãi; tiền lãi là tiền ra, hạng mục "🏦 Lãi vay"
     - có lãi suất %/năm để ước tính lãi mỗi tháng
+  - **Lịch trả nợ vay:**
+    - bên cho vay: chọn trong danh sách ngân hàng, hoặc quỹ tín dụng / cá nhân / doanh nghiệp
+    - lãi suất %/năm hoặc %/tháng
+    - 3 cách trả: lãi hằng tháng gốc cuối kỳ / trả góp gốc đều / trả 1 lần
+    - hiện lịch từng kỳ và **tổng lãi đến khi tất toán**
+    - thẻ "🔔 Sắp đến hạn" trên trang sổ; app có thông báo nhắc (bật trong Cài đặt sổ, cần bản build riêng trên Android)
   - **Nợ gom theo người:** cửa hàng mua thiếu nhiều lần hiện 1 dòng; "Trả gộp" trừ vào lần nợ cũ nhất trước.
   - **Thẻ "Tình hình tài chính"** trên trang sổ: tiền vay còn phải trả, nợ cửa hàng, người ta còn nợ mình, cọc lái chưa trừ.
   - Phần lõi: `packages/shared/src/ledger.ts` (thao tác) và `packages/shared/src/advanced.ts` (tính toán).

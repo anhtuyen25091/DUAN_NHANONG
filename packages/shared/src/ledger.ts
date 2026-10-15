@@ -1246,13 +1246,15 @@ export function pressAmountKey(amount: number, key: AmountKey): number {
 function loanTerms(input: Partial<NewDebt>, date: string): Pick<Debt, 'interest_rate' | 'rate_unit' | 'lender_type' | 'loan_plan' | 'term_months' | 'pay_day'> & { due_on?: string | null } {
   const term = input.term_months && input.term_months > 0 ? Math.round(input.term_months) : null;
   const plan = term ? (input.loan_plan ?? 'monthly_interest') : null;
+  const payDay = plan && plan !== 'lump_sum' ? Math.min(31, Math.max(1, Math.round(input.pay_day ?? Number(date.slice(8, 10))))) : null;
   return {
     interest_rate: input.interest_rate || null,
     rate_unit: input.rate_unit ?? 'year',
     lender_type: input.lender_type ?? null,
     loan_plan: plan,
     term_months: term,
-    pay_day: plan && plan !== 'lump_sum' ? Math.min(31, Math.max(1, Math.round(input.pay_day ?? Number(date.slice(8, 10))))) : null,
-    ...(term ? { due_on: addMonths(date, term) } : {}),
+    pay_day: payDay,
+    // Hạn trả hết nợ = ngày của kỳ cuối (theo ngày trả hằng tháng nếu có)
+    ...(term ? { due_on: addMonths(date, term, payDay ?? undefined) } : {}),
   };
 }

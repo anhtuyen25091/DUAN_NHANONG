@@ -1,10 +1,12 @@
-import { formatVnd, monthlyInterest, today, type DebtKind, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
+import { formatVnd, today, type DebtKind, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { CategoryPicker, checkDate, CheckRow, DateField, ErrorNote, GardenPicker, MoneyField, TextField } from '../../../components/fields';
+import { LenderFields, LoanFields } from '../../../components/loan';
 import { Button, Chip, styles } from '../../../components/ui';
 import { useLedger } from '../../../lib/ledger';
+import { loanDraft, loanTermsOf } from '../../../lib/loanDraft';
 import { colors, font } from '../../../lib/theme';
 import { showToast } from '../../../lib/toast';
 
@@ -29,9 +31,10 @@ function DebtForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
   const [gardenId, setGardenId] = useState<string | null>(debt ? debt.garden_id : null);
   const [note, setNote] = useState(debt?.note ?? '');
   const [recordEntry, setRecordEntry] = useState(true);
-  const [rate, setRate] = useState(debt?.interest_rate ? String(debt.interest_rate).replace('.', ',') : '');
+  const [terms, setTerms] = useState(() => loanDraft(debt));
   const loan = kind === 'loan';
-  const rateValue = Number(rate.replace(',', '.')) || 0;
+  // Khoản vay có kỳ hạn + cách trả: hạn trả tự tính theo kỳ hạn
+  const autoDue = loan && !!loanTermsOf(terms).loan_plan;
   const type = kind === 'receivable' ? 'income' : 'expense';
   const [categoryId, setCategoryId] = useState('');
   const category = data.categories.find((c) => c.id === categoryId && c.type === type) ?? data.categories.find((c) => c.type === type);
@@ -44,11 +47,11 @@ function DebtForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
     .slice(0, 6);
 
   const save = async () => {
-    const dateError = checkDate(date, 'Ngày', { notFuture: true }) ?? checkDate(dueOn, 'Hẹn trả ngày', { optional: true });
+    const dateError = checkDate(date, 'Ngày', { notFuture: true }) ?? (autoDue ? null : checkDate(dueOn, loan ? 'Hạn trả hết nợ' : 'Hẹn trả ngày', { optional: true }));
     if (dateError) return setError(dateError);
     setError(null);
     setSaving(true);
-    const input = { party, phone, amount, date, due_on: dueOn || null, garden_id: gardenId, note, ...(loan ? { interest_rate: rateValue || null } : {}) };
+    const input = { party, phone, amount, date, due_on: dueOn || null, garden_id: gardenId, note, ...(loan ? loanTermsOf(terms) : {}) };
     try {
       if (debt) {
         await ledger.updateDebt(debt.id, input);
@@ -87,9 +90,10 @@ function DebtForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
         </View>
       )}
       {loan && <Text style={[styles.muted, { marginBottom: 12 }]}>Tiền vay là tiền mượn nên không tính vào lời/lỗ. Mỗi lần trả, tiền lãi sẽ ghi thành tiền ra (hạng mục 🏦 Lãi vay).</Text>}
+      {loan && <LenderFields draft={terms} onChange={setTerms} party={party} onParty={setParty} />}
       {kind === 'payable' && !debt && <Text style={[styles.muted, { marginBottom: 12 }]}>Mua phân, thuốc thiếu: nên ghi ở Kho vật tư → Mua vật tư → “Mua thiếu” để biết cả số bao.</Text>}
       <TextField
-        label={loan ? 'Vay của ai (ngân hàng, người quen) *' : kind === 'payable' ? 'Nợ ai (đại lý, cửa hàng) *' : 'Ai nợ (thương lái, người mua) *'}
+        label={loan ? (terms.lenderType === 'bank' ? 'Tên ngân hàng * (chọn ở trên hoặc gõ tên)' : 'Tên bên cho vay *') : kind === 'payable' ? 'Nợ ai (đại lý, cửa hàng) *' : 'Ai nợ (thương lái, người mua) *'}
         value={party}
         onChange={setParty}
         maxLength={80}
@@ -104,14 +108,13 @@ function DebtForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
       )}
       <TextField label="Số điện thoại" value={phone} onChange={setPhone} maxLength={20} keyboardType="phone-pad" />
       <MoneyField label={loan ? 'Số tiền vay *' : 'Số tiền *'} value={amount} onChange={setAmount} />
-      {loan && (
-        <>
-          <TextField label="Lãi suất (%/năm)" value={rate} onChange={(t) => setRate(t.replace(/[^\d.,]/g, ''))} keyboardType="decimal-pad" maxLength={6} placeholder="Ví dụ: 9" />
-          {rateValue > 0 && amount > 0 && <Text style={[styles.muted, { marginTop: -6, marginBottom: 12 }]}>Lãi ước tính mỗi tháng: {formatVnd(monthlyInterest(amount, rateValue))}</Text>}
-        </>
-      )}
+      {loan && <LoanFields draft={terms} onChange={setTerms} party={party} amount={amount} date={date} />}
       <DateField label="Ngày" value={date} onChange={setDate} notFuture />
-      <DateField label="Hẹn trả ngày" value={dueOn} onChange={setDueOn} optional min={date} />
+      {autoDue ? (
+        <Text style={[styles.muted, { marginTop: -4, marginBottom: 12 }]}>Hạn trả: tự tính theo kỳ hạn vay.</Text>
+      ) : (
+        <DateField label={loan ? 'Hạn trả hết nợ' : 'Hẹn trả ngày'} value={dueOn} onChange={setDueOn} optional min={date} />
+      )}
       {data.gardens.length > 0 && (
         <GardenPicker data={data} value={gardenId} onChange={setGardenId} allowShared label={loan ? 'Tiền lãi tính cho vườn nào (vay chung cho các vườn: chọn Chi chung)' : 'Vườn'} />
       )}

@@ -1,9 +1,10 @@
-import { DEBT_KIND_LABELS, debtStatus, formatDate, formatVnd, interestPaid, monthlyInterest, telHref, today, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
+import { DEBT_KIND_LABELS, debtStatus, formatDate, formatVnd, interestPaid, LENDER_TYPE_LABELS, loanSchedule, monthlyInterest, telHref, today, type Installment, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { checkDate, DateField, ErrorNote, MoneyField } from '../../../components/fields';
 import { ItemRow, KIND_ICON, SectionTitle } from '../../../components/ledger';
+import { LoanScheduleCard } from '../../../components/loan';
 import { Button, Card, styles } from '../../../components/ui';
 import { confirmAsync } from '../../../lib/confirm';
 import { useLedger } from '../../../lib/ledger';
@@ -21,9 +22,13 @@ export default function DebtDetailScreen() {
 function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot; id: string }) {
   const status = debtStatus(data, today()).find((s) => s.debt.id === id);
   const isLoan = status?.debt.kind === 'loan';
-  // Khoản vay: mặc định trả lãi 1 tháng, gốc để trống; nợ thường: trả hết
-  const [amount, setAmount] = useState(isLoan ? 0 : (status?.left ?? 0));
-  const [interest, setInterest] = useState(isLoan && status ? monthlyInterest(status.left, status.debt.interest_rate) : 0);
+  // Khoản vay có lịch: mặc định trả kỳ tới; vay không lịch: trả lãi 1 tháng, gốc để trống; nợ thường: trả hết
+  const next = status && isLoan ? loanSchedule(status.debt, data.debt_payments, today())?.next : null;
+  const [installment, setInstallment] = useState<number | null>(next?.no ?? null);
+  const [amount, setAmount] = useState(next ? next.principal : isLoan ? 0 : (status?.left ?? 0));
+  const [interest, setInterest] = useState(next ? next.interest : isLoan && status ? monthlyInterest(status.left, status.debt) : 0);
+  const scrollRef = useRef<ScrollView>(null);
+  const payFormY = useRef(0);
   const [date, setDate] = useState(today());
   const [error, setError] = useState<string | null>(null);
 
@@ -48,13 +53,26 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
     if (dateError) return setError(dateError);
     setError(null);
     try {
-      await ledger.payDebt({ debt_id: id, amount, interest, date });
-      showToast({ message: `Đã ghi ${payable ? 'trả' : 'thu'} ${formatVnd(amount)}${interest > 0 ? ` + lãi ${formatVnd(interest)}` : ''}${amount === left ? '. Đã hết nợ 🎉' : ''}` });
-      setAmount(isLoan ? 0 : left - amount);
+      await ledger.payDebt({ debt_id: id, amount, interest, date, installment });
+      showToast({ message: `Đã ghi ${payable ? 'trả' : 'thu'} ${formatVnd(amount)}${interest > 0 ? ` + lãi ${formatVnd(interest)}` : ''}${installment ? ` (kỳ ${installment})` : ''}${amount === left ? '. Đã hết nợ 🎉' : ''}` });
+      // Chuyển sang kỳ kế tiếp
+      const after = isLoan ? loanSchedule(debt, ledger.getSnapshot().debt_payments, today())?.next : null;
+      setInstallment(after?.no ?? null);
+      setAmount(after ? after.principal : isLoan ? 0 : left - amount);
+      setInterest(after ? after.interest : interest);
     } catch (err) {
       setError((err as Error).message);
     }
   };
+
+  /** Chọn 1 kỳ trong lịch: điền sẵn gốc + lãi của kỳ rồi cuộn tới ô ghi trả */
+  const pick = (it: Installment) => {
+    setInstallment(it.no);
+    setAmount(it.principal);
+    setInterest(it.interest);
+    scrollRef.current?.scrollTo({ y: Math.max(0, payFormY.current - 8), animated: true });
+  };
+  const nextNow = isLoan && debt.loan_plan ? loanSchedule(debt, data.debt_payments, today())?.next : null;
 
   const remove = async () => {
     const ok = await confirmAsync(`Xóa khoản nợ với ${debt.party}?`, debt.transaction_id ? 'Khoản thu chi đi kèm cũng bị xóa.' : 'Các lần trả cũng bị xóa.');
@@ -65,7 +83,7 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen
         options={{
           title: `${KIND_ICON[debt.kind]} ${debt.party}`,
@@ -111,15 +129,33 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
         )}
         {isLoan && (
           <Text style={[styles.muted, { marginTop: 4 }]}>
-            {debt.interest_rate ? `Lãi suất ${String(debt.interest_rate).replace('.', ',')}%/năm · ước tính ${formatVnd(monthlyInterest(left, debt.interest_rate))}/tháng · ` : ''}
+            {debt.lender_type ? `${LENDER_TYPE_LABELS[debt.lender_type]} · ` : ''}
+            {debt.interest_rate ? `Lãi suất ${String(debt.interest_rate).replace('.', ',')}%/${debt.rate_unit === 'month' ? 'tháng' : 'năm'} · ước tính ${formatVnd(monthlyInterest(left, debt))}/tháng · ` : ''}
             Lãi đã trả {formatVnd(loanInterest)}
           </Text>
         )}
       </Card>
 
+      {isLoan && <LoanScheduleCard debt={debt} payments={data.debt_payments} onPick={pick} />}
+
       {left > 0 && (
+        <View onLayout={(e) => (payFormY.current = e.nativeEvent.layout.y)}>
         <Card>
           <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text, marginBottom: 8 }}>{payable ? 'Ghi lần trả nợ' : 'Ghi lần thu nợ'}</Text>
+          {isLoan && debt.loan_plan && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, marginBottom: 8 }}>
+              <Text style={[styles.body, { fontWeight: '700' }]}>{installment ? `Trả kỳ ${installment}` : 'Trả thêm ngoài lịch (trả bớt gốc sớm)'}</Text>
+              {(installment || nextNow) && (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => (installment ? setInstallment(null) : nextNow && pick(nextNow))}
+                  style={{ minHeight: 44, justifyContent: 'center' }}
+                >
+                  <Text style={{ color: colors.primary, fontSize: font.body, fontWeight: '600', textDecorationLine: 'underline' }}>{installment ? 'Trả thêm ngoài lịch' : 'Trả theo kỳ'}</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
           <MoneyField label={isLoan ? 'Tiền gốc trả (để 0 nếu chỉ trả lãi)' : 'Số tiền'} value={amount} onChange={setAmount} />
           {isLoan && <MoneyField label="Tiền lãi trả (tính vào tiền ra)" value={interest} onChange={setInterest} />}
           <View style={{ marginTop: -4, marginBottom: 12 }}>
@@ -132,6 +168,7 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
             {isLoan ? 'Tiền gốc không tính vào lời/lỗ; tiền lãi ghi thành tiền ra.' : `Trả/thu nợ không tính lại vào lời/lỗ: tiền đã tính lúc ${payable ? 'mua' : 'bán'}.`}
           </Text>
         </Card>
+        </View>
       )}
 
       <SectionTitle>Các lần {payable ? 'trả' : 'thu'}</SectionTitle>
@@ -140,7 +177,7 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
         <ItemRow
           key={p.id}
           icon="💵"
-          title={formatDate(p.date)}
+          title={`${formatDate(p.date)}${p.installment ? ` · kỳ ${p.installment}` : ''}`}
           sub={p.note}
           amount={`${formatVnd(p.amount)}${p.interest ? ` + lãi ${formatVnd(p.interest)}` : ''}`}
           deleteLabel="Xóa lần trả này"

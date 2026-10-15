@@ -359,6 +359,9 @@ describe('Lịch trả nợ vay + nhắc hạn', () => {
     expect(s1.items.map((i) => i.principal)).toEqual(Array(12).fill(1_000_000));
     expect(s1.items.map((i) => i.interest).slice(0, 3)).toEqual([120_000, 110_000, 100_000]);
     expect(s1.items[0].due).toBe('2026-02-15');
+    // Hạn trả hết nợ trùng ngày kỳ cuối (theo ngày trả 15), không báo quá hạn sớm
+    expect(gop.due_on).toBe('2027-01-15');
+    expect(s1.items.at(-1)!.due).toBe('2027-01-15');
     expect(s1.interestTotal).toBe(780_000); // 120k + 110k + … + 10k
 
     const motLan = await ledger.addDebt({ kind: 'loan', lender_type: 'person', party: 'Chú Sáu', amount: 50_000_000, date: '2026-03-01', interest_rate: 1.5, rate_unit: 'month', loan_plan: 'lump_sum', term_months: 6 });

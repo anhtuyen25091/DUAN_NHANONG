@@ -1,4 +1,4 @@
-import { formatVnd, SYNC_STATUS_LABELS, totals, type LedgerSnapshot } from '@nhanong/shared';
+import { formatDateTime, formatVnd, SYNC_STATUS_LABELS, totals, type LedgerSnapshot } from '@nhanong/shared';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { router, Stack } from 'expo-router';
@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, Switch, Text, View } from 'react-native';
 import { Button, Card, styles } from '../../components/ui';
 import { useLedger } from '../../lib/ledger';
+import { disableDueReminders, dueRemindersEnabled, enableDueReminders, remindersUnsupported } from '../../lib/reminders';
 import { getSync, useSyncStatus } from '../../lib/sync';
 import { colors, font } from '../../lib/theme';
 import { showToast } from '../../lib/toast';
@@ -95,6 +96,7 @@ export default function LedgerSettingsScreen() {
           />
         </View>
       </Card>
+      {(data.meta.advanced || data.debts.length > 0) && <DueReminderSetting data={data} />}
       <Card>
         <Text style={heading}>Sao lưu</Text>
         <Text style={[styles.muted, { marginBottom: 10 }]}>Lưu sổ ra 1 file (gửi qua Zalo, lưu Google Drive…). Đổi máy thì nhập lại file này.</Text>
@@ -108,6 +110,61 @@ export default function LedgerSettingsScreen() {
         <Button label="Xóa hết sổ trên máy này" variant="outline" onPress={wipe} />
       </Card>
     </ScrollView>
+  );
+}
+
+/** Bật / tắt thông báo nhắc hạn trả nợ trên điện thoại (chỉ hỏi quyền khi bật) */
+function DueReminderSetting({ data }: { data: LedgerSnapshot }) {
+  const [on, setOn] = useState(dueRemindersEnabled);
+  const [busy, setBusy] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
+
+  const toggle = async (value: boolean) => {
+    setReason(null);
+    if (remindersUnsupported) return setReason(remindersUnsupported);
+    setBusy(true);
+    try {
+      if (value) {
+        const result = await enableDueReminders(data);
+        if (result.ok) {
+          setOn(true);
+          showToast({ message: 'Đã bật nhắc hạn trả nợ.' });
+        } else setReason(result.reason);
+      } else {
+        await disableDueReminders(data);
+        setOn(false);
+      }
+    } catch (error) {
+      setReason((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <Text style={heading}>🔔 Nhắc hạn trả nợ trên điện thoại</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.body, { fontWeight: '700' }]}>Báo trước 1 ngày và sáng ngày đến hạn</Text>
+          <Text style={[styles.muted, { marginTop: 2 }]}>Kỳ trả nợ vay và các khoản hẹn trả trong 2 tháng tới. Báo lúc 8 giờ sáng hôm trước và 7 giờ sáng đúng ngày, không cần mạng.</Text>
+        </View>
+        <Switch
+          value={on}
+          disabled={busy}
+          onValueChange={(value) => void toggle(value)}
+          trackColor={{ true: colors.primary, false: colors.border }}
+          thumbColor="#fff"
+          accessibilityLabel="Bật nhắc hạn trả nợ"
+        />
+      </View>
+      {reason && (
+        <View style={{ marginTop: 10, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.loss, backgroundColor: colors.lossSoft, gap: 4 }}>
+          <Text style={[styles.body, { color: colors.error }]}>{reason}</Text>
+          <Text style={styles.muted}>Thẻ “🔔 Sắp đến hạn” ở đầu trang Sổ thu chi vẫn luôn hiện các khoản đến hạn trong 7 ngày tới.</Text>
+        </View>
+      )}
+    </Card>
   );
 }
 
@@ -150,7 +207,7 @@ function StoragePlace({ data }: { data: LedgerSnapshot }) {
       </Text>
       <Text style={[styles.muted, { marginVertical: 6 }]}>
         {SYNC_STATUS_LABELS[status]}
-        {data.meta.last_synced_at ? ` · Lần cuối: ${new Date(data.meta.last_synced_at).toLocaleString('vi-VN')}` : ''}
+        {data.meta.last_synced_at ? ` · Lần cuối: ${formatDateTime(data.meta.last_synced_at)}` : ''}
       </Text>
       <View style={{ gap: 8 }}>
         {status === 'expired' ? (

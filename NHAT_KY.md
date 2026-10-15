@@ -95,6 +95,59 @@ cd backend && php artisan crawl:run && php artisan shops:import-osm
 
 ---
 
+## 15/10/2026: Khoản vay: bên cho vay, lịch trả nợ, tổng lãi, nhắc hạn ✅
+
+**Yêu cầu:**
+- Khoản vay phải ghi được vay của ai; vay ngân hàng thì chọn từ danh sách tên ngân hàng.
+- Ghi ngày phải trả, và trả theo tháng hay trả 1 lần.
+- Nhắc người dùng khi đến hạn.
+- Biết được tới lúc trả hết thì tổng tiền lãi là bao nhiêu.
+
+**Thiết kế**
+- **Bên cho vay:** Ngân hàng / Quỹ tín dụng / Cá nhân / Doanh nghiệp, cửa hàng.
+  - Chọn Ngân hàng thì hiện danh sách 26 ngân hàng (`VN_BANKS`: Agribank, NH Chính sách xã hội, Vietcombank, BIDV…); vẫn gõ được tên khác.
+- **Lãi suất:** theo %/năm (ngân hàng) hoặc %/tháng (vay cá nhân, chọn Cá nhân thì tự chuyển sang tháng).
+- **Cách trả** (`loan_plan`), kèm kỳ hạn (tháng) và ngày trả hằng tháng:
+  1. Trả lãi hằng tháng, gốc trả cuối kỳ: lãi mỗi kỳ = dư nợ × lãi suất tháng.
+  2. Trả góp: gốc chia đều mỗi tháng + lãi tính trên dư nợ còn lại (giảm dần).
+  3. Trả 1 lần cuối kỳ: lãi = gốc × lãi suất tháng × số tháng.
+  4. Chưa có lịch cố định: trả lúc nào ghi lúc đó.
+- **Lịch trả nợ** (`loanSchedule`):
+  - Kỳ đã trả dùng số thật; kỳ chưa trả tính lại theo dư nợ hiện tại, nên trả bớt gốc sớm thì lãi các kỳ sau tự giảm.
+  - **Tổng lãi đến khi tất toán** = lãi đã trả + lãi dự kiến các kỳ còn lại.
+  - Hạn trả hết nợ tự tính theo kỳ hạn và ngày trả.
+- **Trả nợ:** form điền sẵn gốc + lãi của kỳ tới. Có thể "Trả thêm ngoài lịch" để trả bớt gốc. Bấm "Trả" ở một dòng trong lịch thì chọn đúng kỳ đó.
+- **Nhắc hạn:**
+  - Thẻ "🔔 Sắp đến hạn" trên trang sổ: kỳ vay và các khoản nợ có hẹn ngày trong 7 ngày tới, hoặc đã quá hạn (`dueReminders`).
+  - App: thông báo nhắc lúc 08:00 hôm trước và 07:00 đúng ngày, tối đa 60 thông báo vì iOS chỉ giữ 64. Bấm vào thông báo thì mở khoản nợ.
+  - Bật/tắt nhắc trong Cài đặt sổ; app chỉ xin quyền thông báo khi bật.
+  - Không chạy trong Expo Go Android và bản web; ở đó vẫn có thẻ nhắc trong app.
+
+**Đã làm**
+- Lõi: thêm các trường cho khoản vay (`lender_type`, `rate_unit`, `loan_plan`, `term_months`, `pay_day`) và `DebtPayment.installment`; các hàm `loanSchedule`, `dueReminders`, `addMonths`, `formatDateTime`.
+- Web:
+  - `Loan.tsx` (`LenderFields`, `LoanFields` có xem trước tổng lãi, `LoanScheduleCard`)
+  - form vay: chọn bên cho vay trước, rồi mới tới tên
+  - trang chi tiết khoản vay có lịch trả nợ; trang sổ có thẻ "Sắp đến hạn"
+- App (agent làm theo bản web, Claude kiểm lại):
+  - `components/loan.tsx`; `lib/reminders.ts` (thông báo nhắc hạn); công tắc nhắc hạn trong Cài đặt sổ
+  - danh sách ngân hàng hiện 6 ngân hàng hay dùng, bấm "Ngân hàng khác…" để xem hết
+
+**Lỗi tìm thấy và đã sửa**
+- Hạn trả hết nợ không theo "ngày trả hằng tháng" (vay ngày 10, trả ngày 15 thì hạn bị ghi ngày 10), làm app báo quá hạn sớm vài ngày. Agent phát hiện; đã sửa và thêm test.
+- App còn 2 chỗ dùng `toLocaleString('vi-VN')`, có thể sai trên Android (Hermes). Đã thay bằng `formatDateTime`.
+
+**Kiểm tra**
+- 58 test shared (thêm 6: 3 cách trả, trả bớt gốc sớm, nhắc hạn, ngày cuối tháng), 81 test backend, build + lint web, typecheck mobile: đều qua.
+- Web, bấm tự động (11/11 bước qua):
+  - vay Agribank 100 triệu, 9%/năm, trả lãi hằng tháng, 11 tháng → tổng lãi 8.250.000 đ, kỳ đầu 750.000 đ
+  - lịch 11 kỳ; thẻ nhắc hạn hiện kỳ 1; trả kỳ 1 → ✅, form chuyển sang kỳ 2
+  - trả bớt 40 triệu gốc → lãi còn dự kiến 4.500.000 đ
+  - vay Chú Sáu 50 triệu, 1,5%/tháng, trả 1 lần sau 6 tháng → tổng lãi 4.500.000 đ
+- App (Expo web), agent bấm thử 22/22 bước qua. **Thông báo trên điện thoại thật chưa thử được.**
+
+---
+
 ## 15/10/2026: Bán cho lái (cọc + cắt nhiều đợt), tiền vay, ngày chọn bằng lịch ✅
 
 **Yêu cầu** (anh Tuyên)

@@ -1,4 +1,4 @@
-import { allocatedEntries, contractSummaries, debtStatus, debtSummary, filterEntries, formatVnd, interestPaid, supplyStock, today, totals, type Ledger, type LedgerSnapshot, type StorageMode } from '@nhanong/shared';
+import { allocatedEntries, contractSummaries, debtStatus, debtSummary, dueReminders, filterEntries, formatDate, formatVnd, interestPaid, supplyStock, today, totals, type Ledger, type LedgerSnapshot, type StorageMode } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
@@ -45,6 +45,7 @@ export default function LedgerScreen() {
   const header = (
     <View>
       <SyncBadge />
+      <DueRemindersCard data={data} />
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
         {(Object.keys(PERIODS) as Period[]).map((p) => (
           <Chip key={p} label={PERIODS[p]} active={p === period} onPress={() => setPeriod(p)} />
@@ -93,6 +94,33 @@ export default function LedgerScreen() {
       />
       <Fab label="＋ Ghi tiền" href="/ledger/add" />
     </View>
+  );
+}
+
+/** 🔔 Các kỳ trả nợ / hẹn trả trong 7 ngày tới hoặc đã quá hạn; bấm để mở khoản nợ */
+function DueRemindersCard({ data }: { data: LedgerSnapshot }) {
+  const now = today();
+  const list = dueReminders(data, now, 7);
+  if (list.length === 0) return null;
+  return (
+    <Card style={{ borderLeftWidth: 6, borderLeftColor: colors.loss }}>
+      <Text accessibilityRole="header" style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+        🔔 Sắp đến hạn
+      </Text>
+      {list.map((r) => (
+        <Pressable
+          key={r.key}
+          onPress={() => router.push({ pathname: '/ledger/debts/[id]', params: { id: r.debt.id } })}
+          accessibilityRole="link"
+          style={({ pressed }) => ({ minHeight: 48, paddingVertical: 6, justifyContent: 'center', borderTopWidth: 1, borderTopColor: colors.border, opacity: pressed ? 0.6 : 1 })}
+        >
+          <Text style={{ fontSize: font.body, color: colors.primary, fontWeight: '600' }}>{r.title}</Text>
+          <Text style={[styles.muted, r.overdue && { color: colors.loss, fontWeight: '700' }]}>
+            {r.overdue ? `Quá hạn ${formatDate(r.due)}` : r.due === now ? 'Hôm nay' : formatDate(r.due)}
+          </Text>
+        </Pressable>
+      ))}
+    </Card>
   );
 }
 
