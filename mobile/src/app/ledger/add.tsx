@@ -2,6 +2,7 @@ import { formatVnd, pressAmountKey, readVnd, today, type AmountKey, type EntryTy
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { DatePicker } from '../../components/DatePicker';
 import { Button, Chip, styles } from '../../components/ui';
 import { useLedger } from '../../lib/ledger';
 import { colors, font } from '../../lib/theme';
@@ -146,16 +147,18 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
         </View>
       )}
 
+      <View style={{ marginBottom: 8 }}>
+        <Text style={[styles.muted, { marginBottom: 6 }]}>Ngày</Text>
+        <DatePicker value={date} onChange={setDate} max={today()} />
+      </View>
+
       <Pressable onPress={() => setMore(!more)} style={{ minHeight: 44, justifyContent: 'center' }}>
         <Text style={{ color: colors.primary, fontSize: font.body }}>
-          {more ? '▾' : '▸'} Ngày ({date === today() ? 'hôm nay' : date.split('-').reverse().join('/')}) · ghi chú
+          {more ? '▾' : '▸'} Ghi chú{note.trim() ? `: ${note.trim()}` : ''}
         </Text>
       </Pressable>
       {more && (
         <View style={{ gap: 10, marginBottom: 12 }}>
-          <Text style={styles.body}>Ngày (năm-tháng-ngày)</Text>
-          <TextInput value={date} onChangeText={setDate} placeholder="2026-10-14" keyboardType="numbers-and-punctuation" maxLength={10} style={inputStyle} />
-          <Text style={styles.body}>Ghi chú</Text>
           <TextInput value={note} onChangeText={setNote} placeholder="Ví dụ: 4 bao NPK" maxLength={200} style={inputStyle} />
         </View>
       )}

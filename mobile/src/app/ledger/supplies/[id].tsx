@@ -106,7 +106,7 @@ function SupplyDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapsh
           <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text, marginBottom: 8 }}>Dùng cho vườn</Text>
           <GardenPicker data={data} value={gardenId} onChange={setGardenId} />
           <QtyField label="Số lượng" text={qty} onText={setQty} suffix={supply.unit} />
-          <DateField label="Ngày dùng" value={usedOn} onChange={setUsedOn} />
+          <DateField label="Ngày dùng" value={usedOn} onChange={setUsedOn} notFuture />
           <ErrorNote message={error} />
           <Button label={`Ghi đã dùng · ${formatVnd(Math.round(quantity * supply.unit_price))}`} onPress={use} disabled={!gardenId || !(quantity > 0)} />
         </Card>

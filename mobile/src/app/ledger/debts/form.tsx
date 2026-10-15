@@ -85,8 +85,8 @@ function DebtForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
       />
       <TextField label="Số điện thoại" value={phone} onChange={setPhone} maxLength={20} keyboardType="phone-pad" />
       <MoneyField label="Số tiền *" value={amount} onChange={setAmount} />
-      <DateField label="Ngày" value={date} onChange={setDate} />
-      <DateField label="Hẹn trả ngày" value={dueOn} onChange={setDueOn} optional />
+      <DateField label="Ngày" value={date} onChange={setDate} notFuture />
+      <DateField label="Hẹn trả ngày" value={dueOn} onChange={setDueOn} optional min={date} />
       {data.gardens.length > 0 && <GardenPicker data={data} value={gardenId} onChange={setGardenId} allowShared />}
       {!debt && (
         <>

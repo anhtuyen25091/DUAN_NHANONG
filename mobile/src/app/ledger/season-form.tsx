@@ -60,7 +60,7 @@ function SeasonForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) 
       <Text style={[styles.muted, { marginBottom: 12 }]}>Các khoản của vườn ghi trong khoảng ngày của vụ sẽ tự tính vào vụ, không cần chọn lại.</Text>
       <TextField label="Tên vụ *" value={name} onChange={setName} maxLength={60} placeholder="Ví dụ: Vụ cà phê 2026" />
       <DateField label="Bắt đầu *" value={startedOn} onChange={setStartedOn} />
-      <DateField label="Kết thúc" value={endedOn} onChange={setEndedOn} optional />
+      <DateField label="Kết thúc" value={endedOn} onChange={setEndedOn} optional min={startedOn} />
       <Text style={[styles.muted, { marginTop: -6, marginBottom: 12 }]}>Để trống ngày kết thúc nếu vụ đang làm.</Text>
       <ErrorNote message={error} />
       <View style={{ gap: 10 }}>

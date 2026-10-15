@@ -1,7 +1,8 @@
-import { formatDate, parseVnd, readVnd, today, type EntryType, type LedgerSnapshot } from '@nhanong/shared';
+import { parseVnd, readVnd, today, type EntryType, type LedgerSnapshot } from '@nhanong/shared';
 import type { ReactNode } from 'react';
 import { Pressable, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { colors, font } from '../lib/theme';
+import { DatePicker } from './DatePicker';
 import { Chip, styles } from './ui';
 
 export const inputStyle = {
@@ -78,14 +79,11 @@ export function QtyField({ label, text, onText, suffix }: { label: string; text:
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Ngày gõ tay dạng năm-tháng-ngày (chưa có lịch chọn ngày), như màn Ghi tiền */
-export function DateField({ label, value, onChange, optional }: { label: string; value: string; onChange: (v: string) => void; optional?: boolean }) {
-  const ok = DATE_RE.test(value);
+/** Chọn ngày bằng lịch (hiện "Thứ Năm, 15/10/2026"). notFuture: không cho chọn sau hôm nay */
+export function DateField({ label, value, onChange, optional, notFuture, min }: { label: string; value: string; onChange: (v: string) => void; optional?: boolean; notFuture?: boolean; min?: string }) {
   return (
-    <Field
-      label={`${label} (năm-tháng-ngày)`}
-      hint={ok ? (value === today() ? 'Hôm nay' : formatDate(value)) : value ? 'Gõ theo dạng 2026-10-15' : optional ? 'Để trống nếu không có' : null}
-    >
-      <TextInput value={value} onChangeText={onChange} placeholder={today()} placeholderTextColor={colors.muted} keyboardType="numbers-and-punctuation" maxLength={10} style={inputStyle} />
+    <Field label={label} hint={optional && !value ? 'Để trống nếu không có' : null}>
+      <DatePicker value={value} onChange={onChange} optional={optional} max={notFuture ? today() : undefined} min={min || undefined} placeholder={optional ? 'Chưa chọn ngày' : 'Chọn ngày'} />
     </Field>
   );
 }
@@ -94,7 +92,7 @@ export function DateField({ label, value, onChange, optional }: { label: string;
 export function checkDate(value: string, label: string, opts: { optional?: boolean; notFuture?: boolean } = {}): string | null {
   if (!value && opts.optional) return null;
   const valid = DATE_RE.test(value) && !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime()) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
-  if (!valid) return `${label} chưa đúng. Gõ theo dạng năm-tháng-ngày, ví dụ ${today()}.`;
+  if (!valid) return `${label} chưa đúng. Hãy chọn lại ngày.`;
   if (opts.notFuture && value > today()) return `${label} không được sau hôm nay.`;
   return null;
 }

@@ -34,6 +34,14 @@ export function formatDate(date: string, short = false): string {
   return short ? `${d}/${m}` : `${d}/${m}/${y}`;
 }
 
+const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+/** "2026-10-15" -> "Thứ Năm, 15/10/2026" (thứ tính theo lịch, không phụ thuộc múi giờ) */
+export function formatDateLong(date: string): string {
+  const [y, m, d] = date.slice(0, 10).split('-').map(Number);
+  return `${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}, ${formatDate(date)}`;
+}
+
 /** Bỏ dấu tiếng Việt để tìm kiếm: "Hồ tiêu" -> "ho tieu" */
 export function foldVietnamese(text: string): string {
   return text

@@ -75,7 +75,7 @@ function SupplyForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) 
       </View>
       <MoneyField label={`Giá 1 ${unit || 'đơn vị'} *`} value={Math.round(unitPrice)} onChange={setUnitPrice} />
       <MoneyField label="Thành tiền (gõ vào đây nếu chỉ nhớ tổng tiền)" value={total} onChange={(t) => setUnitPrice(quantity > 0 ? t / quantity : 0)} />
-      <DateField label="Ngày mua" value={boughtOn} onChange={setBoughtOn} />
+      <DateField label="Ngày mua" value={boughtOn} onChange={setBoughtOn} notFuture />
       <TextField label="Mua ở đâu" value={shop} onChange={setShop} maxLength={80} placeholder="Ví dụ: Đại lý Hai Lúa" />
       <TextField label="Ghi chú" value={note} onChange={setNote} maxLength={200} />
 

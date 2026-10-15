@@ -114,7 +114,7 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
           <View style={{ marginTop: -4, marginBottom: 12 }}>
             <Button label={`${payable ? 'Trả hết' : 'Thu hết'} ${formatVnd(left)}`} variant="outline" onPress={() => setAmount(left)} />
           </View>
-          <DateField label="Ngày" value={date} onChange={setDate} />
+          <DateField label="Ngày" value={date} onChange={setDate} notFuture />
           <ErrorNote message={error} />
           <Button label="Lưu" onPress={pay} disabled={amount <= 0} />
           <Text style={[styles.muted, { marginTop: 8 }]}>Trả/thu nợ không tính lại vào lời/lỗ: tiền đã tính lúc {payable ? 'mua' : 'bán'}.</Text>
