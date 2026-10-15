@@ -2,7 +2,7 @@
  * Service worker cho bản web (PWA): mở được khi mất mạng.
  * - Trang + JS/CSS: lấy từ cache trước (file có hash nên không cũ), tải mới thì lưu lại.
  * - API giá (GET /api/...): lấy mạng trước, mất mạng thì dùng bản đã lưu gần nhất.
- * Sổ thu chi nằm trong IndexedDB nên không cần mạng.
+ * Sổ thu chi nằm trong IndexedDB nên không cần mạng; API đồng bộ (có token) không đi qua cache.
  */
 const VERSION = 'v1';
 const SHELL = `shell-${VERSION}`;
@@ -52,6 +52,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+  // Sổ thu chi / tài khoản (có token): không lưu vào cache vì là dữ liệu riêng, và mất mạng phải báo lỗi thật
+  if (request.headers.has('Authorization')) return;
 
   if (request.mode === 'navigate') {
     // Luôn thử lấy bản mới của trang, mất mạng thì dùng trang đã lưu

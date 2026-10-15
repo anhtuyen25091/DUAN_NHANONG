@@ -1,12 +1,18 @@
 import { Ledger, type LedgerSnapshot } from '@nhanong/shared'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { indexedDbStorage } from './storage'
+import { startSync } from './sync'
 
 let opening: Promise<Ledger> | null = null
 
-/** Mở sổ một lần cho cả app */
+/** Mở sổ một lần cho cả app (kèm bộ đồng bộ, chỉ chạy khi người dùng bật "lưu cả trên mạng") */
 export function openLedger(): Promise<Ledger> {
-  opening ??= indexedDbStorage().then((storage) => Ledger.open(storage))
+  opening ??= indexedDbStorage()
+    .then((storage) => Ledger.open(storage))
+    .then((ledger) => {
+      startSync(ledger)
+      return ledger
+    })
   return opening
 }
 

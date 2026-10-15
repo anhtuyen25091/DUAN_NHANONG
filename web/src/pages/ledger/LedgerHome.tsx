@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { href } from '../../hooks'
 import { PERIOD_LABELS, periodRange, type Period } from '../../ledger/period'
 import { EntryList } from './EntryList'
+import { SyncBadge } from './SyncBadge'
 
 export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
   const [period, setPeriod] = useState<Period>('year')
@@ -20,6 +21,7 @@ export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnaps
           ⚙️ Cài đặt
         </a>
       </div>
+      <SyncBadge />
 
       <nav className="segmented" aria-label="Thời gian">
         {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (

@@ -833,3 +833,52 @@ button.danger-outline {
     font-size: 0.9rem;
   }
 }
+
+/* ---- Lưu cả trên mạng ---- */
+.sync-badge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: -4px 0 12px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  font-size: 0.9rem;
+}
+
+.sync-badge.offline,
+.sync-badge.expired {
+  background: var(--loss-soft);
+}
+
+.sync-badge .linklike {
+  font-weight: 600;
+}
+
+.form label.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.form label.checkbox input {
+  min-height: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.switch-mode {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.switch-mode .actions {
+  margin-top: 8px;
+}
+
+.switch-mode button.danger-outline {
+  margin-top: 0;
+}

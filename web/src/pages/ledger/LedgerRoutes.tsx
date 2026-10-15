@@ -6,6 +6,7 @@ import { GardenDetail } from './GardenDetail'
 import { GardenForm } from './GardenForm'
 import { LedgerHome } from './LedgerHome'
 import { LedgerSettings } from './LedgerSettings'
+import { SignIn } from './SignIn'
 
 /** Mọi trang dưới #/so/... (tải riêng, không làm nặng trang bảng giá) */
 export default function LedgerRoutes({ path, query }: { path: string[]; query: URLSearchParams }) {
@@ -19,9 +20,10 @@ export default function LedgerRoutes({ path, query }: { path: string[]; query: U
     )
 
   const { ledger, data } = state
+  const [, page, id, action] = path
+  if (page === 'dang-nhap') return <SignIn data={data} />
   if (!data.meta.storage_mode) return <ChooseMode ledger={ledger} />
 
-  const [, page, id, action] = path
   return (
     <>
       {page === 'ghi' ? (
