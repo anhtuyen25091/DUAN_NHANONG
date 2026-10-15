@@ -171,20 +171,65 @@ export interface HarvestCut extends SyncRecord {
 export type CustomFieldTarget = 'garden' | 'transaction' | 'supply';
 export type CustomFieldType = 'text' | 'number' | 'date' | 'select';
 
+/**
+ * Ô thông tin người dùng tự thêm (vd "Số gốc cây", "Giống"). Giá trị lưu trong `extra[key]`
+ * của vườn / khoản thu chi / vật tư, nên thêm ô mới không phải đổi cấu trúc dữ liệu.
+ */
 export interface CustomFieldDef extends SyncRecord {
   target: CustomFieldTarget;
   key: string;
   label: string;
   type: CustomFieldType;
-  options: string[] | null;
+  options: string[] | null; // chỉ dùng cho type 'select'
+  sort: number;
 }
 
+/** Khoản hay dùng: bấm 1 lần là điền sẵn hạng mục, số tiền, vườn (vd "Xịt thuốc vườn sau – 350.000đ") */
 export interface QuickTemplate extends SyncRecord {
   label: string;
   type: EntryType;
   amount: number;
   category_id: string;
   garden_id: string | null;
+  note: string | null;
+}
+
+/**
+ * Sản lượng thu hoạch của 1 vườn. Có giá bán thì tự ghi 1 khoản tiền vào (transaction_id).
+ * Dùng để tính giá thành: tiền chi của vườn / số lượng thu được.
+ */
+export interface Harvest extends SyncRecord {
+  garden_id: string;
+  date: string;
+  crop: string | null;
+  quantity: number;
+  unit: string; // kg, tạ, tấn, trái…
+  price: number | null; // đồng / đơn vị, khi đã bán
+  transaction_id: string | null;
+  note: string | null;
+}
+
+/** Người làm thuê theo ngày */
+export interface Worker extends SyncRecord {
+  name: string;
+  phone: string | null;
+  wage: number; // tiền công 1 ngày
+  note: string | null;
+}
+
+/**
+ * 1 lần chấm công: người nào, làm ở vườn nào, bao nhiêu ngày công (1 = cả ngày, 0.5 = nửa ngày).
+ * Lúc trả công tự ghi khoản tiền ra "Nhân công" theo từng vườn (transaction_id), paid_on = ngày trả.
+ */
+export interface WorkLog extends SyncRecord {
+  worker_id: string;
+  garden_id: string | null;
+  date: string;
+  days: number;
+  wage: number; // tiền công/ngày lúc chấm (đổi giá sau không làm lệch công cũ)
+  paid_on: string | null;
+  transaction_id: string | null;
+  note: string | null;
 }
 
 /** Hạng mục mặc định cho chế độ Cơ bản (người dùng có thể thêm/sửa) */

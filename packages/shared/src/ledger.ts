@@ -2,7 +2,7 @@
  * Sổ thu chi: dữ liệu nằm trong bộ nhớ, ghi xuống máy (IndexedDB trên web, SQLite trên mobile)
  * qua LedgerStorage. Web và mobile dùng chung class này; mỗi nơi chỉ viết phần lưu trữ.
  */
-import { addMonths, cutKg, cutValue, formatQty, supplyCost, supplyEntryNote } from './advanced';
+import { addMonths, cutKg, cutValue, formatQty, formatQtyGrouped, supplyCost, supplyEntryNote } from './advanced';
 import { randomUuid, type Deal } from './api';
 import { formatVnd } from './money';
 import {
@@ -12,21 +12,32 @@ import {
   type DebtPayment,
   type EntryType,
   type CutLine,
+  type CustomFieldDef,
+  type CustomFieldTarget,
+  type CustomFieldType,
   type Garden,
+  type Harvest,
   type HarvestContract,
   type HarvestCut,
   type LedgerCategory,
   type LenderType,
   type LoanPlan,
+  type QuickTemplate,
   type Season,
   type StorageMode,
   type Supply,
   type SupplyUsage,
   type SyncRecord,
   type Transaction,
+  type Worker,
+  type WorkLog,
 } from './types';
 
-/** Bảng của sổ; các bảng sau `transactions` dùng cho chế độ Nâng cao (mùa vụ, kho vật tư, công nợ, bán cho lái) */
+/**
+ * Bảng của sổ; các bảng sau `transactions` dùng cho chế độ Nâng cao
+ * (mùa vụ, kho vật tư, công nợ, bán cho lái, khoản hay dùng, thu hoạch, nhân công, ô tự thêm).
+ * Tên bảng phải có trong LedgerRecord::TABLES ở backend thì mới đồng bộ được.
+ */
 export const LEDGER_TABLES = [
   'gardens',
   'categories',
@@ -38,6 +49,11 @@ export const LEDGER_TABLES = [
   'debt_payments',
   'harvest_contracts',
   'harvest_cuts',
+  'templates',
+  'harvests',
+  'workers',
+  'work_logs',
+  'custom_fields',
 ] as const;
 export type LedgerTable = (typeof LEDGER_TABLES)[number];
 
@@ -52,6 +68,11 @@ export interface LedgerRecords {
   debt_payments: DebtPayment[];
   harvest_contracts: HarvestContract[];
   harvest_cuts: HarvestCut[];
+  templates: QuickTemplate[];
+  harvests: Harvest[];
+  workers: Worker[];
+  work_logs: WorkLog[];
+  custom_fields: CustomFieldDef[];
 }
 
 /** Cài đặt của sổ, lưu cùng chỗ với dữ liệu */
@@ -175,6 +196,52 @@ export interface NewPayment {
   note?: string | null;
 }
 
+export interface NewTemplate {
+  label?: string | null;
+  type: EntryType;
+  amount: number;
+  category_id: string;
+  garden_id: string | null;
+  note?: string | null;
+}
+
+export interface NewHarvest {
+  garden_id: string;
+  date?: string;
+  crop?: string | null;
+  quantity: number;
+  unit?: string;
+  /** Có giá (đồng / đơn vị) = đã bán: tự ghi khoản tiền vào */
+  price?: number | null;
+  category_id?: string;
+  note?: string | null;
+}
+
+export interface NewWorker {
+  name: string;
+  phone?: string | null;
+  wage: number;
+  note?: string | null;
+}
+
+/** Chấm công 1 ngày cho nhiều người cùng lúc */
+export interface NewWorkDay {
+  date?: string;
+  garden_id: string | null;
+  workers: Array<{ worker_id: string; days: number }>;
+  note?: string | null;
+}
+
+export interface NewCustomField {
+  target: CustomFieldTarget;
+  label: string;
+  type: CustomFieldType;
+  options?: string[] | null;
+}
+
+/** Bảng có ô tự thêm, theo loại đối tượng */
+export const CUSTOM_FIELD_TABLES = { garden: 'gardens', transaction: 'transactions', supply: 'supplies' } as const;
+
 /** Ảnh chụp dữ liệu (đã bỏ bản ghi bị xóa) cho giao diện; đổi object mỗi lần dữ liệu đổi */
 export interface LedgerSnapshot extends LedgerRecords {
   meta: LedgerMeta;
@@ -221,6 +288,11 @@ export class Ledger {
     debt_payments: new Map(),
     harvest_contracts: new Map(),
     harvest_cuts: new Map(),
+    templates: new Map(),
+    harvests: new Map(),
+    workers: new Map(),
+    work_logs: new Map(),
+    custom_fields: new Map(),
   };
   private meta: LedgerMeta = {};
   private listeners = new Set<Listener>();
@@ -273,6 +345,11 @@ export class Ledger {
       debt_payments: alive(this.tables.debt_payments).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)),
       harvest_contracts: alive(this.tables.harvest_contracts).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)),
       harvest_cuts: alive(this.tables.harvest_cuts).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)),
+      templates: alive(this.tables.templates).sort((a, b) => a.label.localeCompare(b.label, 'vi')),
+      harvests: alive(this.tables.harvests).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)),
+      workers: alive(this.tables.workers).sort((a, b) => a.name.localeCompare(b.name, 'vi')),
+      work_logs: alive(this.tables.work_logs).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)),
+      custom_fields: alive(this.tables.custom_fields).sort((a, b) => a.sort - b.sort),
       meta: { ...this.meta },
     };
     this.listeners.forEach((l) => l());
@@ -352,7 +429,8 @@ export class Ledger {
 
   /**
    * Xóa vườn; các khoản và nợ của vườn chuyển thành "chi chung" để không mất tiền.
-   * Mùa vụ của vườn bị xóa; vật tư đã dùng cho vườn được trả về kho. Trả về hàm hoàn tác.
+   * Mùa vụ, sản lượng thu hoạch của vườn bị xóa; vật tư đã dùng cho vườn được trả về kho;
+   * ngày công của vườn chuyển sang "chi chung". Trả về hàm hoàn tác.
    */
   async removeGarden(id: string): Promise<Undo> {
     const garden = this.tables.gardens.get(id);
@@ -361,18 +439,22 @@ export class Ledger {
     const at = this.stamp();
     const moved = this.live('transactions').filter((t) => t.garden_id === id);
     const movedDebts = this.live('debts').filter((d) => d.garden_id === id);
+    const movedLogs = this.live('work_logs').filter((l) => l.garden_id === id);
     await this.write('gardens', [{ ...garden, deleted_at: at, updated_at: at }]);
+    if (movedLogs.length) await this.write('work_logs', movedLogs.map((l) => ({ ...l, garden_id: null, updated_at: at })));
     if (moved.length) await this.write('transactions', moved.map((t) => ({ ...t, garden_id: null, updated_at: at })));
     if (movedDebts.length) await this.write('debts', movedDebts.map((d) => ({ ...d, garden_id: null, updated_at: at })));
     const undoChildren = await this.removeRecords([
       ...this.live('seasons').filter((s) => s.garden_id === id).map((r) => ['seasons', r] as const),
       ...this.live('supply_usages').filter((u) => u.garden_id === id).map((r) => ['supply_usages', r] as const),
+      ...this.live('harvests').filter((h) => h.garden_id === id).map((r) => ['harvests', r] as const),
     ]);
     return async () => {
       const back = this.stamp();
       await this.write('gardens', [{ ...garden, deleted_at: null, updated_at: back }]);
       if (moved.length) await this.write('transactions', moved.map((t) => ({ ...t, garden_id: id, updated_at: back })));
       if (movedDebts.length) await this.write('debts', movedDebts.map((d) => ({ ...d, garden_id: id, updated_at: back })));
+      if (movedLogs.length) await this.write('work_logs', movedLogs.map((l) => ({ ...l, garden_id: id, updated_at: back })));
       await undoChildren();
     };
   }
@@ -492,6 +574,9 @@ export class Ledger {
     if (payment) return this.removePayment(payment.id);
     const settled = this.live('harvest_contracts').find((c) => c.settle_transaction_id === id);
     if (settled) return this.reopenContract(settled.id);
+    const harvest = this.live('harvests').find((h) => h.transaction_id === id);
+    if (harvest) return this.removeHarvest(harvest.id);
+    if (this.live('work_logs').some((l) => l.transaction_id === id)) return this.unpayWork(id);
     return this.removeRecords([['transactions', entry]]);
   }
 
@@ -1161,6 +1246,332 @@ export class Ledger {
     }
   }
 
+  // ---- Khoản hay dùng (mẫu ghi nhanh) ----
+
+  async addTemplate(input: NewTemplate): Promise<QuickTemplate> {
+    if (!(input.amount > 0)) throw new Error('Số tiền phải lớn hơn 0.');
+    const category = this.alive('categories', input.category_id);
+    const note = input.note?.trim() || null;
+    const template: QuickTemplate = {
+      id: randomUuid(),
+      label: input.label?.trim() || [category?.name, note].filter(Boolean).join(' – ') || 'Khoản hay dùng',
+      type: input.type,
+      amount: Math.round(input.amount),
+      category_id: input.category_id,
+      garden_id: input.garden_id,
+      note,
+      updated_at: this.stamp(),
+      deleted_at: null,
+    };
+    await this.write('templates', [template]);
+    return template;
+  }
+
+  /** Lưu 1 khoản đã ghi làm khoản hay dùng */
+  async templateFromEntry(entryId: string, label?: string): Promise<QuickTemplate> {
+    const entry = this.alive('transactions', entryId);
+    if (!entry) throw new Error('Không tìm thấy khoản này.');
+    return this.addTemplate({ label, type: entry.type, amount: entry.amount, category_id: entry.category_id, garden_id: entry.garden_id, note: entry.note });
+  }
+
+  async updateTemplate(id: string, patch: Partial<NewTemplate>): Promise<void> {
+    const template = this.alive('templates', id);
+    if (!template) return;
+    const next = { ...template, ...patch, label: (patch.label ?? template.label).trim() || template.label };
+    if (patch.amount !== undefined) next.amount = Math.round(patch.amount);
+    if (patch.note !== undefined) next.note = patch.note?.trim() || null;
+    await this.write('templates', [{ ...next, updated_at: this.stamp() } as QuickTemplate]);
+  }
+
+  async removeTemplate(id: string): Promise<Undo> {
+    const template = this.alive('templates', id);
+    return template ? this.removeRecords([['templates', template]]) : async () => {};
+  }
+
+  /** Ghi 1 khoản theo mẫu (đổi được số tiền / ngày lúc ghi). Vườn của mẫu đã xóa thì ghi chi chung. */
+  async useTemplate(id: string, override: { amount?: number; date?: string; garden_id?: string | null } = {}): Promise<Transaction> {
+    const template = this.alive('templates', id);
+    if (!template) throw new Error('Không tìm thấy khoản hay dùng này.');
+    const gardenId = override.garden_id !== undefined ? override.garden_id : template.garden_id && this.alive('gardens', template.garden_id) ? template.garden_id : null;
+    return this.addEntry({
+      type: template.type,
+      amount: override.amount ?? template.amount,
+      category_id: this.alive('categories', template.category_id) ? template.category_id : this.categoryByName(template.type, template.type === 'income' ? 'Thu khác' : 'Khác'),
+      garden_id: gardenId,
+      date: override.date,
+      note: template.note,
+    });
+  }
+
+  // ---- Sản lượng thu hoạch ----
+
+  async addHarvest(input: NewHarvest): Promise<Harvest> {
+    this.checkHarvest(input);
+    const harvest: Harvest = {
+      id: randomUuid(),
+      garden_id: input.garden_id,
+      date: input.date ?? today(this.now()),
+      crop: input.crop?.trim() || this.alive('gardens', input.garden_id)?.crop || null,
+      quantity: input.quantity,
+      unit: input.unit?.trim() || 'kg',
+      price: input.price && input.price > 0 ? input.price : null,
+      transaction_id: null,
+      note: input.note?.trim() || null,
+      updated_at: this.stamp(),
+      deleted_at: null,
+    };
+    harvest.transaction_id = await this.syncHarvestEntry(harvest, input.category_id);
+    await this.write('harvests', [harvest]);
+    return harvest;
+  }
+
+  async updateHarvest(id: string, patch: Partial<NewHarvest>): Promise<void> {
+    const harvest = this.alive('harvests', id);
+    if (!harvest) return;
+    const next: Harvest = {
+      ...harvest,
+      garden_id: patch.garden_id ?? harvest.garden_id,
+      date: patch.date ?? harvest.date,
+      crop: patch.crop === undefined ? harvest.crop : patch.crop?.trim() || null,
+      quantity: patch.quantity ?? harvest.quantity,
+      unit: patch.unit?.trim() || harvest.unit,
+      price: patch.price === undefined ? harvest.price : patch.price && patch.price > 0 ? patch.price : null,
+      note: patch.note === undefined ? harvest.note : patch.note?.trim() || null,
+      updated_at: this.stamp(),
+    };
+    this.checkHarvest(next);
+    next.transaction_id = await this.syncHarvestEntry(next, patch.category_id);
+    await this.write('harvests', [next]);
+  }
+
+  /** Xóa sản lượng kèm khoản tiền bán (nếu có); trả về hàm hoàn tác */
+  async removeHarvest(id: string): Promise<Undo> {
+    const harvest = this.alive('harvests', id);
+    if (!harvest) return async () => {};
+    const entry = harvest.transaction_id ? this.alive('transactions', harvest.transaction_id) : undefined;
+    return this.removeRecords([['harvests', harvest], ...(entry ? [['transactions', entry] as const] : [])]);
+  }
+
+  private checkHarvest(input: Pick<NewHarvest, 'garden_id' | 'quantity'>) {
+    if (!this.alive('gardens', input.garden_id)) throw new Error('Hãy chọn vườn.');
+    if (!(input.quantity > 0)) throw new Error('Số lượng phải lớn hơn 0.');
+  }
+
+  /** Có giá bán: tạo / cập nhật khoản tiền vào; bỏ giá: xóa khoản đó. Trả về id khoản (hoặc null). */
+  private async syncHarvestEntry(harvest: Harvest, categoryId?: string): Promise<string | null> {
+    const current = harvest.transaction_id ? this.alive('transactions', harvest.transaction_id) : undefined;
+    if (!harvest.price) {
+      if (current) await this.removeRecords([['transactions', current]]);
+      return null;
+    }
+    const entry: Transaction = {
+      id: current?.id ?? randomUuid(),
+      type: 'income',
+      amount: Math.round(harvest.quantity * harvest.price),
+      date: harvest.date,
+      garden_id: harvest.garden_id,
+      season_id: null,
+      category_id: categoryId ?? current?.category_id ?? this.incomeCategory('Bán nông sản'),
+      supply_id: null,
+      note: `Bán ${formatQtyGrouped(harvest.quantity)} ${harvest.unit}${harvest.crop ? ` ${harvest.crop.toLowerCase()}` : ''} × ${formatVnd(harvest.price)}`,
+      extra: current?.extra,
+      updated_at: this.stamp(),
+      deleted_at: null,
+    };
+    await this.write('transactions', [entry]);
+    return entry.id;
+  }
+
+  // ---- Nhân công: người làm, chấm công, trả công ----
+
+  async addWorker(input: NewWorker): Promise<Worker> {
+    if (!input.name.trim()) throw new Error('Cần nhập tên người làm.');
+    const worker: Worker = {
+      id: randomUuid(),
+      name: input.name.trim(),
+      phone: input.phone?.trim() || null,
+      wage: Math.max(0, Math.round(input.wage)),
+      note: input.note?.trim() || null,
+      updated_at: this.stamp(),
+      deleted_at: null,
+    };
+    await this.write('workers', [worker]);
+    return worker;
+  }
+
+  /** Đổi tiền công chỉ áp dụng cho ngày công chấm sau đó */
+  async updateWorker(id: string, patch: Partial<NewWorker>): Promise<void> {
+    const worker = this.alive('workers', id);
+    if (!worker) return;
+    const next: Worker = {
+      ...worker,
+      name: patch.name?.trim() || worker.name,
+      phone: patch.phone === undefined ? worker.phone : patch.phone?.trim() || null,
+      wage: patch.wage === undefined ? worker.wage : Math.max(0, Math.round(patch.wage)),
+      note: patch.note === undefined ? worker.note : patch.note?.trim() || null,
+      updated_at: this.stamp(),
+    };
+    await this.write('workers', [next]);
+  }
+
+  /** Xóa người làm: phải trả hết công trước (để không mất số nợ công) */
+  async removeWorker(id: string): Promise<Undo> {
+    const worker = this.alive('workers', id);
+    if (!worker) return async () => {};
+    if (this.live('work_logs').some((l) => l.worker_id === id && !l.paid_on)) throw new Error(`${worker.name} còn công chưa trả. Hãy trả công hoặc xóa ngày công trước.`);
+    return this.removeRecords([['workers', worker]]);
+  }
+
+  /** Chấm công 1 ngày cho nhiều người; trả về các ngày công đã ghi */
+  async addWorkDay(input: NewWorkDay): Promise<WorkLog[]> {
+    const date = input.date ?? today(this.now());
+    if (input.garden_id && !this.alive('gardens', input.garden_id)) throw new Error('Vườn này không còn.');
+    const logs: WorkLog[] = [];
+    for (const { worker_id, days } of input.workers) {
+      const worker = this.alive('workers', worker_id);
+      if (!worker || !(days > 0)) continue;
+      logs.push({
+        id: randomUuid(),
+        worker_id,
+        garden_id: input.garden_id,
+        date,
+        days,
+        wage: worker.wage,
+        paid_on: null,
+        transaction_id: null,
+        note: input.note?.trim() || null,
+        updated_at: this.stamp(),
+        deleted_at: null,
+      });
+    }
+    if (logs.length === 0) throw new Error('Hãy chọn ít nhất 1 người làm.');
+    await this.write('work_logs', logs);
+    if (input.garden_id) await this.setMeta({ last_garden_id: input.garden_id });
+    return logs;
+  }
+
+  async updateWorkLog(id: string, patch: Partial<Pick<WorkLog, 'garden_id' | 'date' | 'days' | 'wage' | 'note'>>): Promise<void> {
+    const log = this.alive('work_logs', id);
+    if (!log) return;
+    if (log.paid_on) throw new Error('Ngày công này đã trả tiền. Hãy bỏ lần trả công trước rồi mới sửa.');
+    if (patch.days !== undefined && !(patch.days > 0)) throw new Error('Số ngày công phải lớn hơn 0.');
+    await this.write('work_logs', [{ ...log, ...patch, note: patch.note === undefined ? log.note : patch.note?.trim() || null, updated_at: this.stamp() }]);
+  }
+
+  async removeWorkLog(id: string): Promise<Undo> {
+    const log = this.alive('work_logs', id);
+    if (!log) return async () => {};
+    if (log.paid_on) throw new Error('Ngày công này đã trả tiền. Hãy bỏ lần trả công trước rồi mới xóa.');
+    return this.removeRecords([['work_logs', log]]);
+  }
+
+  /**
+   * Trả công cho 1 người: các ngày công chưa trả (hoặc logIds) được đánh dấu đã trả,
+   * và ghi khoản tiền ra "Nhân công" — mỗi vườn 1 khoản, để tiền công tính đúng vào vườn đã làm.
+   * Trả về hàm hoàn tác.
+   */
+  async payWorker(workerId: string, options: { date?: string; logIds?: string[] } = {}): Promise<Undo> {
+    const worker = this.alive('workers', workerId);
+    if (!worker) throw new Error('Không tìm thấy người làm.');
+    const logs = this.live('work_logs').filter((l) => l.worker_id === workerId && !l.paid_on && (!options.logIds || options.logIds.includes(l.id)));
+    if (logs.length === 0) throw new Error(`${worker.name} không còn công chưa trả.`);
+    const date = options.date ?? today(this.now());
+    const byGarden = new Map<string | null, WorkLog[]>();
+    for (const l of logs) byGarden.set(l.garden_id, [...(byGarden.get(l.garden_id) ?? []), l]);
+
+    const entries: Transaction[] = [];
+    const paid: WorkLog[] = [];
+    for (const [gardenId, group] of byGarden) {
+      const days = group.reduce((sum, l) => sum + l.days, 0);
+      const entry: Transaction = {
+        id: randomUuid(),
+        type: 'expense',
+        amount: Math.round(group.reduce((sum, l) => sum + l.days * l.wage, 0)),
+        date,
+        garden_id: gardenId,
+        season_id: null,
+        category_id: this.categoryByName('expense', 'Nhân công'),
+        supply_id: null,
+        note: `Trả công ${worker.name}: ${formatQtyGrouped(days)} ngày`,
+        updated_at: this.stamp(),
+        deleted_at: null,
+      };
+      entries.push(entry);
+      for (const l of group) paid.push({ ...l, paid_on: date, transaction_id: entry.id, updated_at: entry.updated_at });
+    }
+    await this.write('transactions', entries);
+    await this.write('work_logs', paid);
+    return async () => {
+      for (const entry of entries) await this.unpayWork(entry.id);
+    };
+  }
+
+  /** Bỏ 1 lần trả công (xóa khoản tiền ra, các ngày công thành "chưa trả" lại); trả về hàm hoàn tác */
+  async unpayWork(transactionId: string): Promise<Undo> {
+    const entry = this.alive('transactions', transactionId);
+    const logs = this.live('work_logs').filter((l) => l.transaction_id === transactionId);
+    const at = this.stamp();
+    if (entry) await this.write('transactions', [{ ...entry, deleted_at: at, updated_at: at }]);
+    if (logs.length) await this.write('work_logs', logs.map((l) => ({ ...l, paid_on: null, transaction_id: null, updated_at: at })));
+    return async () => {
+      const back = this.stamp();
+      if (entry) await this.write('transactions', [{ ...entry, deleted_at: null, updated_at: back }]);
+      if (logs.length) await this.write('work_logs', logs.map((l) => ({ ...l, updated_at: back })));
+    };
+  }
+
+  // ---- Ô thông tin tự thêm ----
+
+  async addCustomField(input: NewCustomField): Promise<CustomFieldDef> {
+    const label = input.label.trim();
+    if (!label) throw new Error('Cần đặt tên ô thông tin.');
+    if (this.live('custom_fields').some((f) => f.target === input.target && f.label.toLowerCase() === label.toLowerCase())) throw new Error(`Đã có ô "${label}".`);
+    const options = input.type === 'select' ? cleanOptions(input.options) : null;
+    if (input.type === 'select' && (!options || options.length < 2)) throw new Error('Ô lựa chọn cần ít nhất 2 lựa chọn.');
+    const field: CustomFieldDef = {
+      id: randomUuid(),
+      target: input.target,
+      // key không đổi khi đổi tên ô, nên giá trị đã nhập vẫn giữ
+      key: `f_${randomUuid().slice(0, 8)}`,
+      label,
+      type: input.type,
+      options,
+      sort: this.live('custom_fields').filter((f) => f.target === input.target).length,
+      updated_at: this.stamp(),
+      deleted_at: null,
+    };
+    await this.write('custom_fields', [field]);
+    return field;
+  }
+
+  /** Đổi tên / lựa chọn; không đổi loại ô (giá trị cũ có thể không hợp) */
+  async updateCustomField(id: string, patch: { label?: string; options?: string[] | null }): Promise<void> {
+    const field = this.alive('custom_fields', id);
+    if (!field) return;
+    const options = field.type === 'select' && patch.options !== undefined ? cleanOptions(patch.options) : field.options;
+    if (field.type === 'select' && (!options || options.length < 2)) throw new Error('Ô lựa chọn cần ít nhất 2 lựa chọn.');
+    await this.write('custom_fields', [{ ...field, label: patch.label?.trim() || field.label, options, updated_at: this.stamp() }]);
+  }
+
+  /** Xóa ô: giá trị đã nhập vẫn nằm trong dữ liệu (hoàn tác là hiện lại) */
+  async removeCustomField(id: string): Promise<Undo> {
+    const field = this.alive('custom_fields', id);
+    return field ? this.removeRecords([['custom_fields', field]]) : async () => {};
+  }
+
+  /** Ghi giá trị ô tự thêm cho 1 vườn / khoản / vật tư; giá trị rỗng thì xóa khỏi extra */
+  async setExtra(target: CustomFieldTarget, id: string, values: Record<string, string | number | null>): Promise<void> {
+    const table = CUSTOM_FIELD_TABLES[target];
+    const record = this.alive(table, id);
+    if (!record) return;
+    const extra: Record<string, string | number | null> = { ...(record.extra ?? {}) };
+    for (const [key, value] of Object.entries(values)) {
+      if (value === null || value === '') delete extra[key];
+      else extra[key] = value;
+    }
+    await this.write(table, [{ ...record, extra, updated_at: this.stamp() } as never]);
+  }
+
   /** Vườn mẫu để người dùng bấm thử; xóa như vườn bình thường */
   async createSampleGarden(): Promise<Garden> {
     const garden = await this.addGarden({ name: 'Vườn mẫu (bấm thử)', crop: 'Cà phê', area_m2: 5000 });
@@ -1371,4 +1782,9 @@ function loanTerms(input: Partial<NewDebt>, date: string): Pick<Debt, 'interest_
     // Hạn trả hết nợ = ngày của kỳ cuối (theo ngày trả hằng tháng nếu có)
     ...(term ? { due_on: addMonths(date, term, payDay ?? undefined) } : {}),
   };
+}
+
+function cleanOptions(options: string[] | null | undefined): string[] | null {
+  const list = [...new Set((options ?? []).map((o) => o.trim()).filter(Boolean))];
+  return list.length ? list : null;
 }

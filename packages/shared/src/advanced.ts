@@ -18,6 +18,15 @@ export function formatQty(quantity: number): string {
   return String(Math.round(quantity * 1000) / 1000).replace('.', ',');
 }
 
+/**
+ * Chỉ để hiển thị: 1200 -> "1.200", 1234.5 -> "1.234,5".
+ * Không dùng để điền sẵn vào ô nhập: parseQty đọc "." là dấu thập phân (dùng formatQty cho ô nhập).
+ */
+export function formatQtyGrouped(quantity: number): string {
+  const [int, dec] = formatQty(quantity).split(',');
+  return int.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec ? `,${dec}` : '');
+}
+
 /** Ghi chú của khoản tiền ra khi mua vật tư: "4 bao NPK 16-16-8 · Đại lý Hai Lúa" */
 export function supplyEntryNote(supply: Pick<Supply, 'quantity' | 'unit' | 'name' | 'shop_name'>): string {
   return `${formatQty(supply.quantity)} ${supply.unit} ${supply.name}${supply.shop_name ? ` · ${supply.shop_name}` : ''}`;

@@ -420,3 +420,13 @@ describe('Hoàn tất hợp đồng bán cho lái (quyết toán)', () => {
     await expect(ledger.settleContract(hd.id, 'deduct')).rejects.toThrow('thiếu 60.000.000 đ');
   });
 });
+
+describe('formatQtyGrouped', () => {
+  it('nhóm hàng nghìn bằng dấu chấm, phần lẻ dấu phẩy', async () => {
+    const { formatQtyGrouped } = await import('./advanced');
+    expect(formatQtyGrouped(1200)).toBe('1.200');
+    expect(formatQtyGrouped(1234.5)).toBe('1.234,5');
+    expect(formatQtyGrouped(0.5)).toBe('0,5');
+    expect(formatQtyGrouped(1_000_000)).toBe('1.000.000');
+  });
+});

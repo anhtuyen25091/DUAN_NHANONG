@@ -30,6 +30,41 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
   - lùi về tháng 9, chọn ngày 14: lịch tự đóng, ô hiện "Thứ Hai, 14/09/2026", dòng tóm tắt đổi theo
   - nút Hôm qua / Hôm nay đổi đúng ngày
 
+### Mục 19: Khoản hay dùng, thu hoạch, nhân công, ô tự thêm (đang làm)
+
+#### 19.1 Phần lõi dùng chung ✅
+**Đã làm** (`packages/shared`)
+- 5 bảng mới: `templates`, `harvests`, `workers`, `work_logs`, `custom_fields`.
+  - Backend đã cho phép sẵn các bảng này nên đồng bộ chạy được ngay, không phải sửa server.
+  - Web nâng IndexedDB lên phiên bản 4 để tạo kho cho các bảng mới.
+- **Khoản hay dùng:**
+  - `addTemplate`, `templateFromEntry` (lưu từ khoản đã ghi), `updateTemplate`, `removeTemplate`
+  - `useTemplate`: ghi 1 khoản theo mẫu, đổi được số tiền và ngày lúc ghi. Vườn của mẫu đã bị xóa thì ghi vào chi chung.
+- **Thu hoạch:**
+  - `addHarvest` / `updateHarvest` / `removeHarvest`. Có giá bán thì tự ghi khoản tiền vào "Bán nông sản"; bỏ giá thì xóa khoản đó.
+  - Cây trồng mặc định lấy theo vườn.
+  - Xóa khoản tiền bán ở sổ thì xóa luôn sản lượng, để số liệu không lệch.
+- **Nhân công:**
+  - Người làm: `addWorker`, `updateWorker`, `removeWorker` (không cho xóa nếu còn công chưa trả).
+  - Chấm công: `addWorkDay` (nhiều người cùng ngày, cả ngày / nửa ngày), `updateWorkLog`, `removeWorkLog` (không sửa / xóa được ngày công đã trả).
+  - Trả công: `payWorker` ghi khoản tiền ra "Nhân công", mỗi vườn 1 khoản để tiền công tính đúng vào vườn đã làm. `unpayWork` bỏ lần trả; xóa khoản trả công ở sổ cũng bỏ lần trả.
+  - Mỗi ngày công lưu tiền công lúc chấm, nên đổi giá công sau không làm lệch công cũ.
+  - Xóa vườn thì ngày công của vườn chuyển sang "chi chung".
+- **Ô tự thêm:**
+  - `addCustomField` / `updateCustomField` / `removeCustomField` cho vườn, khoản thu chi, vật tư. Loại ô: chữ, số, ngày, lựa chọn.
+  - `setExtra` ghi giá trị vào `extra`, giữ nguyên các khóa khác (như mã đơn mua bán).
+  - Mỗi ô có mã cố định riêng, nên đổi tên ô thì giá trị đã nhập vẫn còn.
+- Các hàm tính trong `extras.ts`:
+  - `harvestTotals`: sản lượng theo vườn; quy tạ/tấn ra kg; **tự cộng cả số kg đã cắt bán cho lái**, không phải ghi lại
+  - `costPerUnit`: giá thành / kg
+  - `workerBalances`: công còn nợ, đã trả, ngày làm gần nhất
+  - `fieldLines`, `parseFieldInput`: hiển thị và đọc giá trị ô tự thêm
+- `formatQtyGrouped` ("1.200 kg") chỉ dùng để hiển thị.
+  - **Không đổi `formatQty`**, vì `qtyText` dùng nó để điền sẵn số vào ô nhập, mà `parseQty` đọc "." là dấu thập phân.
+  - Nếu đổi `formatQty` thì sửa vật tư 1.200 kg sẽ bị đọc thành 1,2 kg.
+
+**Kiểm tra:** 89 test `packages/shared` qua (thêm 18 test); typecheck shared, web, mobile sạch.
+
 ---
 
 ## 15/10/2026 (tối): Pull code mới + nạp backup giá trên máy dev Docker (192.168.1.10)
