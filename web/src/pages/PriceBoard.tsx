@@ -1,9 +1,10 @@
-import { CATEGORY_TYPE_LABELS, formatDate, formatPriceRange, groupByProduct, matchesSearch, type CategoryType } from '@nhanong/shared'
+import { CATEGORY_TYPE_LABELS, describeLocation, formatDate, formatPriceRange, groupByProduct, matchesSearch, type CategoryType } from '@nhanong/shared'
 import { useState } from 'react'
 import { api } from '../api'
 import { Change } from '../components/Change'
 import { Status } from '../components/Status'
 import { href, replaceQuery, useAsync } from '../hooks'
+import { useMyLocation } from '../myLocation'
 
 const TYPES = Object.keys(CATEGORY_TYPE_LABELS) as CategoryType[]
 
@@ -22,6 +23,7 @@ export function PriceBoard({ query }: { query: URLSearchParams }) {
 
   return (
     <>
+      <LocalBanner />
       <nav className="tabs" aria-label="Nhóm hàng">
         {TYPES.map((t) => (
           <button key={t} type="button" className={t === type ? 'active' : ''} aria-pressed={t === type} onClick={() => setFilter({ type: t })}>
@@ -92,5 +94,20 @@ export function PriceBoard({ query }: { query: URLSearchParams }) {
         </section>
       ))}
     </>
+  )
+}
+
+/** Lối vào "Giá quanh tôi": giá các điểm mua quanh khu vực của tôi */
+function LocalBanner() {
+  const location = useMyLocation()
+  return (
+    <a className="card local-banner" href={href('gia-quanh-toi')}>
+      <span>
+        <b>📍 Giá quanh tôi</b>
+        <br />
+        <span className="small muted">{location ? describeLocation(location) : 'Chọn khu vực để xem giá các điểm mua gần bạn'}</span>
+      </span>
+      <span aria-hidden>›</span>
+    </a>
   )
 }

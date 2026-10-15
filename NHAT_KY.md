@@ -76,6 +76,46 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 - API client: `localPrices`, `flagLocalPrice`, `saveMyLocation`, `myBuyer`, `saveBuyer`, `myBuyerPrices`, `postBuyerPrice`, `deleteBuyerPrice`. `AccountUser` có thêm `location`, `buyer_status`.
 - **Kiểm tra:** 92 test shared qua (thêm 3 test); typecheck shared, web, mobile sạch.
 
+### Bước C: Giao diện web ✅
+**Đã làm**
+- **Khu vực của tôi** (`web/src/myLocation.ts`, `components/LocationPicker.tsx`):
+  - chọn tỉnh; "📍 Dùng vị trí của tôi" (GPS, tự đoán tỉnh); tên chỗ ở; bán kính 10 / 20 / 30 / 50 km
+  - lưu trên trình duyệt; đã đăng nhập thì lưu cả vào tài khoản; máy mới đăng nhập thì tự lấy khu vực đã lưu ở tài khoản
+  - Lưu ý: trình duyệt chỉ cho lấy GPS khi trang mở bằng https hoặc localhost. Mở qua http://192.168.1.10 thì báo rõ và dùng trung tâm tỉnh.
+- **`#/gia-quanh-toi`**:
+  - khu vực của tôi ở trên cùng; tab Nông sản / Phân bón / Thuốc BVTV
+  - mỗi mặt hàng: **giá giữa**, thấp nhất – cao nhất, số điểm mua, **so với giá chung của tỉnh** (xanh là có lợi cho mình)
+  - danh sách điểm mua: ✓ đã xác minh, loại, khoảng cách, ngày; nút 📞 Gọi và "Báo giá sai"
+  - "🏪 Dịch vụ quanh đây": điểm thu mua / bán phân / bán thuốc trong bán kính
+- **Bảng giá**: dải "📍 Giá quanh tôi" trên cùng. **Trang mặt hàng**: mục "Giá các điểm mua quanh bạn".
+- **`#/diem-mua`** (vào từ Tài khoản hoặc cuối trang Giá quanh tôi):
+  - chưa đăng nhập thì mời đăng nhập
+  - đăng ký hồ sơ: tên, loại, mua/bán gì, SĐT, địa chỉ, tỉnh, vị trí
+  - xem trạng thái chờ duyệt / lý do không duyệt; sửa và gửi lại
+  - đã duyệt: form **Đăng giá** (chỉ hiện mặt hàng đúng nhóm, ngày trong 7 ngày); **"Đăng lại cho hôm nay"** bấm "Giữ giá …" 1 lần; danh sách giá đã đăng 30 ngày kèm trạng thái / lý do chờ duyệt, nút xóa
+- Trang Tài khoản có link "🏪 Đăng giá của điểm mua" và "📍 Khu vực của tôi".
+
+### Bước E (một phần): Dữ liệu demo `LocalPriceDemoSeeder` ✅
+- Chạy: `php artisan db:seed --class=LocalPriceDemoSeeder` (chỉ chạy được khi APP_ENV=local; chạy lại thì cập nhật, không tạo trùng).
+- 7 điểm mua đã duyệt:
+  - quanh **Buôn Ma Thuột**: Công ty Cà phê Tây Nguyên Xanh ✓, Đại lý Hai Lúa ✓, Thương lái Tư Hùng, Cửa hàng vật tư Ba Thành, Vựa sầu riêng Bảy Lợi ✓
+  - quanh **Cần Thơ**: Nhà máy xay xát Mười Hạnh ✓, Đại lý vật tư Sáu Phước
+  - mỗi điểm có giá 3 ngày gần đây
+- Thêm 1 điểm chờ duyệt (Đại lý Năm Tèo) và 1 giá chờ duyệt (tiêu 210.000 đ) để thử trang admin.
+- Tài khoản demo: 0900000101 → 0900000108, mật khẩu `nhanong-demo` (chỉ máy dev).
+
+**Kiểm tra web** (Chrome headless)
+- Chọn Đắk Lắk 20 km:
+  - cà phê có 3 điểm, giá giữa 93.000 đ
+  - tiêu 140.500 đ, cao hơn giá chung 1%
+  - phân bón xếp rẻ trước (Hai Lúa 545.000 đ, Ba Thành 560.000 đ)
+  - dịch vụ quanh đây có các điểm mua vừa duyệt
+- Trang mặt hàng cà phê có mục giá quanh bạn.
+- Đăng nhập Hai Lúa (0900000102) → thấy "✅ Đã duyệt" → đăng cà phê 93.800 đ → "Đã đăng giá".
+- Typecheck, lint sạch. Backend 125 test vẫn qua.
+
+**Lỗi tìm thấy khi bấm thử, đã sửa:** "Đăng lại cho hôm nay" hiện cả mặt hàng đã đăng hôm nay và kèm **giá cũ nhất**. Nguyên nhân: `new Map(...)` giữ bản cuối, mà danh sách xếp mới nhất trước. Đã sửa thành giữ bản mới nhất, rồi bỏ mặt hàng đã đăng hôm nay.
+
 ---
 
 ## 15/10/2026 (tối): Dữ liệu demo cho tài khoản 0900000003

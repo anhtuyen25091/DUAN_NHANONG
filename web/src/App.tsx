@@ -3,6 +3,8 @@ import { Notices } from './components/Notices'
 import { startDealWatch, useDealWatch } from './dealWatch'
 import { href, useRoute } from './hooks'
 import { Account } from './pages/Account'
+import { BuyerArea } from './pages/BuyerArea'
+import { LocalPrices } from './pages/LocalPrices'
 import { PriceBoard } from './pages/PriceBoard'
 import { ProductDetail } from './pages/ProductDetail'
 import { ShopList } from './pages/ShopList'
@@ -56,6 +58,10 @@ export default function App() {
           <Suspense fallback={<p className="muted center">Đang mở…</p>}>
             <DealRoutes path={path} query={query} />
           </Suspense>
+        ) : path[0] === 'gia-quanh-toi' ? (
+          <LocalPrices query={query} />
+        ) : path[0] === 'diem-mua' ? (
+          <BuyerArea />
         ) : path[0] === 'tai-khoan' ? (
           <Account query={query} />
         ) : path[0] === 'diem-ban' && path[1] === 'de-xuat' ? (

@@ -2,8 +2,9 @@ import { ApiError, formatDate, formatVnd } from '@nhanong/shared'
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api'
 import { setAuth, updateAuthUser, useAuth } from '../auth'
+import { adoptAccountLocation } from '../myLocation'
 import { Status } from '../components/Status'
-import { useAsync } from '../hooks'
+import { href, useAsync } from '../hooks'
 
 /**
  * #/tai-khoan: đăng nhập / đăng ký bằng số điện thoại, xem mức xem giá và các gói.
@@ -17,7 +18,10 @@ export function Account({ query }: { query: URLSearchParams }) {
   // Cập nhật mức xem / hạn gói mới nhất (admin vừa kích hoạt gói…)
   useEffect(() => {
     if (!auth) return
-    api.me(auth.token).then(updateAuthUser, (error) => {
+    api.me(auth.token).then((user) => {
+      updateAuthUser(user)
+      adoptAccountLocation(user.location)
+    }, (error) => {
       if (error instanceof ApiError && error.status === 401) setAuth(null)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,6 +92,12 @@ function SignedIn() {
       </p>
       <p className={premium ? 'in' : ''}>
         {premium ? `⭐ Có gói xem giá${user.premium_until ? ` đến ${formatDate(user.premium_until)}` : ''}` : 'Tài khoản thường (chưa có gói)'}
+      </p>
+      <p>
+        <a href={href('diem-mua')}>🏪 {user.buyer_status === 'approved' ? 'Đăng giá của điểm mua' : user.buyer_status ? 'Hồ sơ điểm mua' : 'Tôi là doanh nghiệp / đại lý / thương lái: đăng giá'} ›</a>
+      </p>
+      <p>
+        <a href={href('gia-quanh-toi')}>📍 Khu vực của tôi &amp; giá quanh tôi ›</a>
       </p>
       <button type="button" onClick={logout}>
         Đăng xuất

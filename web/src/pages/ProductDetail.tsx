@@ -6,6 +6,7 @@ import { Change } from '../components/Change'
 import { PriceChart } from '../components/PriceChart'
 import { Status } from '../components/Status'
 import { href, replaceQuery, useAsync } from '../hooks'
+import { LocalPriceForProduct } from './LocalPrices'
 
 const RANGES: Array<{ days: number; label: string }> = [
   { days: 10, label: '10 ngày' },
@@ -136,6 +137,8 @@ export function ProductDetail({ code, query }: { code: string; query: URLSearchP
           </table>
         </section>
       )}
+
+      <LocalPriceForProduct code={code} />
 
       <p className="notice small">Muốn nhận báo khi giá thay đổi? Cài app Nhà Nông trên điện thoại để đặt cảnh báo giá.</p>
     </>

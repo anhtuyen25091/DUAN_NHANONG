@@ -1709,3 +1709,85 @@ input.days-input {
   color: var(--muted);
   font-weight: 500;
 }
+
+/* ---- Giá theo khu vực, khu vực của tôi, điểm mua ---- */
+a.card.local-banner,
+.card.location-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: var(--text);
+}
+
+a.card.local-banner {
+  border-left: 6px solid var(--primary);
+}
+
+.location-editor h2 {
+  margin-bottom: 2px;
+}
+
+.local-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 20px;
+  margin: 6px 0;
+}
+
+.local-summary p {
+  margin: 0;
+}
+
+.local-summary .big {
+  font-size: 1.6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.local-summary .reference {
+  text-align: right;
+}
+
+.local-entry {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.local-entry-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.local-entry-price {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.local-entry .actions {
+  grid-column: 1 / -1;
+}
+
+.buyer-status p {
+  margin: 4px 0;
+}
+
+.buyer-status.approved {
+  border-left: 6px solid var(--gain);
+}
+
+.buyer-status.pending {
+  border-left: 6px solid #ca8a04;
+}
+
+.buyer-status.rejected,
+.buyer-status.suspended {
+  border-left: 6px solid var(--loss);
+}
