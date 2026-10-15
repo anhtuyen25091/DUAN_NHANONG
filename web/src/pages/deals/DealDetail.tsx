@@ -346,7 +346,7 @@ function LedgerLinkCard({ deal }: { deal: Deal }) {
 
   const connect = async () => {
     const category = seller
-      ? data.categories.find((c) => c.type === 'income' && c.name === 'Bán nông sản')!.id
+      ? await ledger.ensureCategory('income', 'Bán nông sản', '💰', '#15803d')
       : await ledger.ensureCategory('expense', 'Mua nông sản', '🧺', '#b45309')
     await ledger.linkDeal(deal.uuid, { garden_id: seller ? (gardenId ?? data.gardens[0]?.id ?? null) : null, category_id: category })
     const changed = await ledger.applyDeal(deal)

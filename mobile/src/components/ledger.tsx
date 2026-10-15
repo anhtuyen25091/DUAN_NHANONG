@@ -58,8 +58,11 @@ export function EntryItemRow({ item, ledger, data, showGarden }: { item: EntryIt
   // Khoản của đợt cắt / bỏ cọc / đền cọc: mở hợp đồng bán cho lái
   const cut = data.harvest_cuts.find((c) => c.transaction_id === t.id);
   const contractId = cut?.contract_id ?? data.harvest_contracts.find((c) => c.settle_transaction_id === t.id)?.id;
+  // Khoản tự ghi từ đơn mua bán chung: mở đơn (sửa / xóa ở đơn)
+  const dealId = ledger.dealOf(t);
   const open = () => {
-    if (t.supply_id) router.push({ pathname: '/ledger/supplies/[id]', params: { id: t.supply_id } });
+    if (dealId) router.push({ pathname: '/deals/[id]', params: { id: dealId } });
+    else if (t.supply_id) router.push({ pathname: '/ledger/supplies/[id]', params: { id: t.supply_id } });
     else if (debtId ?? interestDebtId) router.push({ pathname: '/ledger/debts/[id]', params: { id: (debtId ?? interestDebtId)! } });
     else if (contractId) router.push({ pathname: '/ledger/contracts/[id]', params: { id: contractId } });
     else router.push({ pathname: '/ledger/add', params: { sua: t.id } });
@@ -67,8 +70,13 @@ export function EntryItemRow({ item, ledger, data, showGarden }: { item: EntryIt
 
   const remove = async () => {
     const linked = t.supply_id ? ' (xóa cả vật tư trong kho)' : debtId ? ' (xóa cả khoản nợ)' : interestDebtId ? ' (xóa cả lần trả nợ)' : cut ? ' (xóa đợt cắt)' : contractId ? ' (mở lại hợp đồng)' : '';
-    const undo = await ledger.removeEntry(t.id);
-    showToast({ message: `Đã xóa ${formatVnd(t.amount)}${linked}`, undo });
+    try {
+      const undo = await ledger.removeEntry(t.id);
+      showToast({ message: `Đã xóa ${formatVnd(t.amount)}${linked}`, undo });
+    } catch (err) {
+      // Khoản tự ghi từ đơn mua bán chung không xóa ở sổ được
+      showToast({ message: (err as Error).message });
+    }
   };
 
   return (

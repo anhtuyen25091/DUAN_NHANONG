@@ -60,6 +60,10 @@ export default function RootLayout() {
         <Stack.Screen name="ledger/contracts/form" options={{ title: 'Nhận cọc của lái' }} />
         <Stack.Screen name="ledger/contracts/[id]" options={{ title: 'Bán cho lái' }} />
         <Stack.Screen name="ledger/contracts/cut-form" options={{ title: 'Ghi đợt cắt' }} />
+        <Stack.Screen name="deals/new" options={{ title: 'Tạo đơn mua bán' }} />
+        <Stack.Screen name="deals/join" options={{ title: '🔑 Tham gia đơn' }} />
+        <Stack.Screen name="deals/[id]" options={{ title: 'Đơn mua bán' }} />
+        <Stack.Screen name="deals/entry" options={{ title: 'Ghi mục' }} />
       </Stack>
       <ToastHost />
       <StatusBar style="dark" />

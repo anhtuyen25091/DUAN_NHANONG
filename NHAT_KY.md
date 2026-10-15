@@ -95,6 +95,58 @@ cd backend && php artisan crawl:run && php artisan shops:import-osm
 
 ---
 
+## 15/10/2026: Phân quyền xem giá, dữ liệu giá cũ, đơn mua bán chung 2 bên
+
+### Phân quyền xem lịch sử giá ✅
+- Khách xem 10 ngày, đăng ký miễn phí xem 30 ngày, có gói (tháng 29.000 đ / năm 199.000 đ, sửa trong /admin) xem toàn bộ.
+- Server cắt theo mức tài khoản tính từ hôm nay. Khoảng dài thì gộp điểm theo tuần/tháng.
+- Thanh toán làm sau: admin bấm "Kích hoạt gói" trong /admin → Tài khoản.
+- Web `#/tai-khoan`, app nút 👤 trên tab Bảng giá; biểu đồ có mốc 🔒.
+
+### Dữ liệu giá cũ (đang chạy)
+- Lệnh `php artisan crawl:backfill {nguồn…} --from=Y-m --to=Y-m`:
+  - duyệt sitemap theo tháng, ngày giá lấy theo ngày đăng bài;
+  - chạy lại được (bỏ qua bài đã lấy); mặc định không lưu HTML.
+- Nguồn `baoquocte-ca-phe` (4 tỉnh) và `baoquocte-ho-tieu` (6 tỉnh), 11/2021 → nay. Log: `backend/storage/logs/backfill-baoquocte.log`.
+- vietbao chỉ có dữ liệu từ khoảng 04/2026.
+- Không có nguồn miễn phí đủ 5 năm cho sầu riêng (chỉ có từ khoảng 07/2024) và phân bón theo vùng (chỉ có giá bán lẻ An Giang).
+- Lúa gạo, phân bón An Giang, sầu riêng: agent đang làm (agro.gov.vn, congthuong.vn, thuonghieucongluan.com.vn).
+- Lỗi đã sửa trong bộ trích giá:
+  - bài gộp cà phê + tiêu (tách theo H2);
+  - bảng lồng trong bảng;
+  - nhiều tỉnh dùng chung 1 giá;
+  - giá FOB lọt vào (thêm khoảng giá hợp lý);
+  - hàng tiêu đề thiếu ô đầu (làm cà phê 04–05/2022 không có giá, đã lấy lại).
+
+### Đơn mua bán chung 2 bên ✅
+**Yêu cầu:** thương lái nhỏ mua của nông dân rồi bán lại cho chi nhánh lớn, hoặc chi nhánh đi mua, đặt cọc. Đơn tạo ra có mã để bên kia tham gia, 2 bên cùng xem chi tiết.
+
+**Quy tắc** (anh chọn):
+- cả 2 bên ghi, bên kia xác nhận;
+- vai trò tính theo từng đơn, không chọn vai trò khi đăng ký;
+- nối đơn mua với đơn bán để tính lời lô;
+- tự ghi vào Sổ thu chi khi đã xác nhận.
+
+**Đã làm**
+- **Backend:**
+  - bảng `deals` (bên bán / bên mua, mã 6 ký tự bỏ 0/O/1/I), `deal_entries` (cọc, đợt cân nhiều loại hàng, trả tiền, chi phí riêng), `deal_sources`;
+  - API `/deals`, `/deals/join`, `/deal-entries/{id}/confirm|dispute`, `/deals/{id}/sources`;
+  - `DealSummary` chỉ tính mục đã xác nhận.
+- **Lõi:** `Ledger.linkDeal` / `applyDeal`. Đợt cân đã xác nhận thành tiền vào (bên bán) / tiền ra (bên mua, hạng mục "Mua nông sản"); chi phí riêng thành tiền ra. Mã khoản = mã mục, nên chạy lại không trùng. Sửa hoặc bỏ xác nhận thì tự gỡ.
+- **Web** `#/don`; **app** có tab "🤝 Đơn" (agent làm theo bản web, Claude kiểm lại).
+
+**Kiểm tra**
+- 101 test backend, 64 test shared.
+- Web, 3 trình duyệt (lái, nông dân, chi nhánh): 11/11 bước qua. App (Expo web): 15/15 bước qua.
+- Ví dụ thử: cọc 100tr → đợt cân 1200 + 300 kg → báo sai "1250 kg" → sửa → đồng ý → 124,25tr, thanh toán đủ → sổ nông dân tiền vào 124,25tr → lái bán chi nhánh 1500 kg × 90k, chi phí xe 2tr → lời cả lô 8,75tr, hao hụt 50 kg.
+
+**Còn tồn**
+- Chưa có thông báo đẩy khi bên kia ghi / xác nhận. Hiện là thẻ "🔔 chờ bạn xác nhận" và tự tải lại 30 giây/lần.
+- Link mã chỉ mở bản web; app phải nhập mã tay.
+- Chưa thử trên điện thoại thật.
+
+---
+
 ## 15/10/2026: Bán cho lái: nút Hoàn tất + bảng quyết toán ✅
 
 **Lỗi anh Tuyên gặp:** cọc 100 triệu, cắt 2 lần, nhưng không có nút hoàn tất để ra số liệu.

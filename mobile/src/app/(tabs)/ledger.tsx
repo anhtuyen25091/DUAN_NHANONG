@@ -1,9 +1,10 @@
 import { allocatedEntries, contractSummaries, debtStatus, debtSummary, dueReminders, filterEntries, formatDate, formatVnd, interestPaid, supplyStock, today, totals, type Ledger, type LedgerSnapshot, type StorageMode } from '@nhanong/shared';
-import { router } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { EntryItemRow, entryItems, Fab, ProfitCard, SyncBadge } from '../../components/ledger';
 import { Button, Card, Chip, styles } from '../../components/ui';
+import { refreshLinkedDeals } from '../../lib/deals';
 import { useLedger } from '../../lib/ledger';
 import { getSync, useSyncStatus } from '../../lib/sync';
 import { colors, font } from '../../lib/theme';
@@ -22,6 +23,13 @@ export default function LedgerScreen() {
   const state = useLedger();
   const [period, setPeriod] = useState<Period>('year');
   const syncStatus = useSyncStatus();
+
+  // Đơn mua bán chung đã nối với sổ: ghi lại các đợt cân bên kia vừa xác nhận
+  useFocusEffect(
+    useCallback(() => {
+      void refreshLinkedDeals();
+    }, []),
+  );
 
   if (!state.ledger) {
     return state.error ? (

@@ -42,6 +42,7 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="deals" options={{ title: '🤝 Đơn mua bán', tabBarLabel: 'Đơn', tabBarIcon: icon('🤝') }} />
       <Tabs.Screen name="shops" options={{ title: 'Điểm bán · thu mua', tabBarLabel: 'Điểm bán', tabBarIcon: icon('🏪') }} />
       <Tabs.Screen name="alerts" options={{ title: 'Cảnh báo giá', tabBarLabel: 'Cảnh báo', tabBarIcon: icon('🔔') }} />
     </Tabs>
