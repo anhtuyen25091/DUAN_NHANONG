@@ -77,6 +77,114 @@ export interface PriceHistory {
   };
 }
 
+// ---- Đơn mua bán chung 2 bên (thương lái / chi nhánh / nông dân) ----
+
+export type DealRole = 'seller' | 'buyer';
+export type DealEntryKind = 'deposit' | 'cut' | 'payment' | 'cost';
+export type DealEntryStatus = 'pending' | 'confirmed' | 'disputed' | 'private';
+
+export interface DealLine {
+  grade: string;
+  kg: number;
+  price: number;
+}
+
+export interface DealEntry {
+  uuid: string;
+  kind: DealEntryKind;
+  date: string;
+  lines: DealLine[] | null;
+  amount: number;
+  kg: number;
+  deposit_deduct: number;
+  paid: number;
+  note: string | null;
+  status: DealEntryStatus;
+  /** Mục do mình ghi */
+  mine: boolean;
+  created_by_name: string | null;
+  dispute_reason: string | null;
+  responded_at: string | null;
+  updated_at: string;
+}
+
+export interface DealTotals {
+  delivered: number;
+  kg: number;
+  deposit: number;
+  deducted: number;
+  deposit_left: number;
+  paid: number;
+  /** > 0: bên mua còn nợ bên bán; < 0: bên bán nhận dư */
+  balance: number;
+}
+
+export interface DealLot {
+  revenue: number;
+  sell_kg: number;
+  buy_cost: number;
+  buy_kg: number;
+  costs: number;
+  profit: number;
+  kg_loss: number;
+  sources: number;
+}
+
+export interface Deal {
+  uuid: string;
+  /** Mã để bên kia tham gia */
+  code: string;
+  title: string;
+  unit: string;
+  product: { code: string; name: string } | null;
+  status: 'open' | 'done' | 'cancelled';
+  closed_at: string | null;
+  note: string | null;
+  my_role: DealRole;
+  is_creator: boolean;
+  /** Bên kia đã tham gia */
+  joined: boolean;
+  seller_name: string | null;
+  buyer_name: string | null;
+  counterpart: { name: string; phone: string | null } | null;
+  summary: {
+    confirmed: DealTotals;
+    /** Nếu bên kia đồng ý hết các mục đang chờ */
+    with_pending: DealTotals;
+    /** Mục bên kia ghi, chờ mình xác nhận */
+    awaiting_me: number;
+    awaiting_other: number;
+    disputed: number;
+  };
+  /** Lời cả lô (chỉ bên bán thấy, khi đã gộp đơn mua) */
+  lot: DealLot | null;
+  sources?: Array<{ uuid: string; title: string; seller_name: string | null }>;
+  /** Có ở API chi tiết, không có ở danh sách */
+  entries?: DealEntry[];
+  updated_at: string;
+}
+
+export interface NewDeal {
+  role: DealRole;
+  title: string;
+  counterpart_name?: string | null;
+  product_code?: string | null;
+  unit?: string;
+  note?: string | null;
+  deposit?: number;
+  deposit_date?: string;
+}
+
+export interface DealEntryInput {
+  kind?: DealEntryKind;
+  date: string;
+  lines?: DealLine[];
+  amount?: number;
+  deposit_deduct?: number;
+  paid?: number;
+  note?: string | null;
+}
+
 export interface Plan {
   code: string;
   name: string;
@@ -279,6 +387,24 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
     history: (productCode: string, { token, ...options }: { region?: string | null; days?: number; to?: string; token?: string | null } = {}) =>
       request<PriceHistory>('GET', `/products/${encodeURIComponent(productCode)}/history`, { query: options, token: token ?? undefined }),
     plans: () => request<PlanList>('GET', '/plans'),
+
+    deals: (token: string) => request<{ data: Deal[] }>('GET', '/deals', { token }).then((r) => r.data),
+    deal: (token: string, uuid: string) => request<{ data: Deal }>('GET', `/deals/${uuid}`, { token }).then((r) => r.data),
+    createDeal: (token: string, deal: NewDeal) => request<{ data: Deal }>('POST', '/deals', { token, body: deal }).then((r) => r.data),
+    updateDeal: (token: string, uuid: string, patch: { title?: string; note?: string | null; counterpart_name?: string | null; status?: Deal['status'] }) =>
+      request<{ data: Deal }>('PATCH', `/deals/${uuid}`, { token, body: patch }).then((r) => r.data),
+    deleteDeal: (token: string, uuid: string) => request<void>('DELETE', `/deals/${uuid}`, { token }),
+    joinDeal: (token: string, code: string) => request<{ data: Deal }>('POST', '/deals/join', { token, body: { code } }).then((r) => r.data),
+    setDealSources: (token: string, uuid: string, buyDeals: string[]) =>
+      request<{ data: Deal }>('PUT', `/deals/${uuid}/sources`, { token, body: { buy_deals: buyDeals } }).then((r) => r.data),
+    addDealEntry: (token: string, uuid: string, entry: DealEntryInput) =>
+      request<{ data: Deal }>('POST', `/deals/${uuid}/entries`, { token, body: entry }).then((r) => r.data),
+    updateDealEntry: (token: string, entryUuid: string, entry: DealEntryInput) =>
+      request<{ data: Deal }>('PATCH', `/deal-entries/${entryUuid}`, { token, body: entry }).then((r) => r.data),
+    deleteDealEntry: (token: string, entryUuid: string) => request<{ data: Deal }>('DELETE', `/deal-entries/${entryUuid}`, { token }).then((r) => r.data),
+    confirmDealEntry: (token: string, entryUuid: string) => request<{ data: Deal }>('POST', `/deal-entries/${entryUuid}/confirm`, { token }).then((r) => r.data),
+    disputeDealEntry: (token: string, entryUuid: string, reason: string) =>
+      request<{ data: Deal }>('POST', `/deal-entries/${entryUuid}/dispute`, { token, body: { reason } }).then((r) => r.data),
 
     updateDevice: (pushToken: string | null, platform?: 'android' | 'ios' | 'web') =>
       request<{ data: { uuid: string; push_enabled: boolean } }>('PUT', '/device', {

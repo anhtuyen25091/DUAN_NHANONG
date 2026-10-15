@@ -1,4 +1,6 @@
 import type { DebtKind } from '@nhanong/shared'
+import { useEffect } from 'react'
+import { refreshLinkedDeals } from '../../ledger/deals'
 import { useLedger } from '../../ledger/useLedger'
 import { hideToast, useToast } from '../../ledger/toast'
 import { AddEntry } from './AddEntry'
@@ -16,6 +18,10 @@ import { SupplyDetail, SupplyForm, SupplyList } from './Supplies'
 /** Mọi trang dưới #/so/... (tải riêng, không làm nặng trang bảng giá) */
 export default function LedgerRoutes({ path, query }: { path: string[]; query: URLSearchParams }) {
   const state = useLedger()
+  // Ghi vào sổ các đợt cân mới xác nhận của đơn mua bán chung đã nối
+  useEffect(() => {
+    void refreshLinkedDeals()
+  }, [])
 
   if (!state.ledger)
     return state.error ? (

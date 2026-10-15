@@ -3,7 +3,7 @@
  * qua LedgerStorage. Web và mobile dùng chung class này; mỗi nơi chỉ viết phần lưu trữ.
  */
 import { addMonths, cutKg, cutValue, formatQty, supplyCost, supplyEntryNote } from './advanced';
-import { randomUuid } from './api';
+import { randomUuid, type Deal } from './api';
 import { formatVnd } from './money';
 import {
   DEFAULT_CATEGORIES,
@@ -68,6 +68,15 @@ export interface LedgerMeta {
   last_synced_at?: string;
   /** Bật chế độ Nâng cao: mùa vụ, kho vật tư, công nợ */
   advanced?: boolean;
+  /** Đơn mua bán chung đã nối vào sổ: uuid đơn => ghi vào vườn / hạng mục nào */
+  deal_links?: Record<string, DealLink>;
+}
+
+/** Cách ghi 1 đơn mua bán chung vào sổ của mình */
+export interface DealLink {
+  garden_id: string | null;
+  /** Hạng mục cho các đợt cân (tiền vào nếu mình bán, tiền ra nếu mình mua) */
+  category_id: string;
 }
 
 export interface LedgerStorage {
@@ -393,6 +402,79 @@ export class Ledger {
     await this.write('transactions', [{ ...entry, ...patch, note: patch.note === undefined ? entry.note : patch.note?.trim() || null, updated_at: this.stamp() }]);
   }
 
+  /** Khoản tự ghi từ đơn mua bán chung (sửa / xóa ở đơn, không sửa ở sổ) */
+  dealOf(entry: Transaction): string | null {
+    const deal = entry.extra?.deal;
+    return typeof deal === 'string' ? deal : null;
+  }
+
+  /** Tìm hoặc tạo hạng mục theo tên (vd "Mua nông sản" cho thương lái) */
+  async ensureCategory(type: EntryType, name: string, icon: string, color = '#64748b'): Promise<string> {
+    const found = this.snapshot.categories.find((c) => c.type === type && c.name === name);
+    if (found) return found.id;
+    const category: LedgerCategory = { id: randomUuid(), type, name, icon, color, sort: this.snapshot.categories.length, updated_at: this.stamp(), deleted_at: null };
+    await this.write('categories', [category]);
+    return category.id;
+  }
+
+  /** Nối / bỏ nối đơn mua bán chung với sổ. Bỏ nối thì gỡ các khoản đã tự ghi. */
+  async linkDeal(dealUuid: string, link: DealLink | null): Promise<void> {
+    const links = { ...(this.meta.deal_links ?? {}) };
+    if (link) links[dealUuid] = link;
+    else delete links[dealUuid];
+    await this.setMeta({ deal_links: links });
+    if (!link) await this.applyDeal({ uuid: dealUuid, entries: [] } as unknown as Deal);
+  }
+
+  /**
+   * Ghi các mục của đơn mua bán chung vào sổ (đơn phải có entries, tức lấy từ API chi tiết):
+   * - đợt cân đã xác nhận: tiền vào nếu mình là bên bán, tiền ra nếu mình là bên mua (tiền hàng của đợt)
+   * - chi phí riêng của mình: tiền ra
+   * Cọc / lần trả tiền không ghi (không phải lời/lỗ). Đợt cân bị sửa (chưa xác nhận lại) hoặc xóa thì gỡ khoản tương ứng.
+   * Mã khoản = mã mục của đơn, nên chạy lại nhiều lần / trên nhiều máy không bị trùng.
+   * Trả về số khoản đã thay đổi.
+   */
+  async applyDeal(deal: Deal): Promise<number> {
+    const link = this.meta.deal_links?.[deal.uuid];
+    const at = this.stamp();
+    const wanted = new Map<string, Transaction>();
+    if (link && deal.entries) {
+      for (const e of deal.entries) {
+        const isCut = e.kind === 'cut' && e.status === 'confirmed';
+        const isCost = e.kind === 'cost' && e.mine;
+        if (!isCut && !isCost) continue;
+        const type: EntryType = isCut && deal.my_role === 'seller' ? 'income' : 'expense';
+        wanted.set(e.uuid, {
+          id: e.uuid,
+          type,
+          amount: e.amount,
+          date: e.date,
+          garden_id: link.garden_id,
+          season_id: null,
+          category_id: isCut ? link.category_id : this.categoryByName('expense', 'Khác'),
+          supply_id: null,
+          note: isCut ? `Đơn "${deal.title}": ${formatQty(e.kg)} ${deal.unit}` : `Chi phí đơn "${deal.title}"${e.note ? `: ${e.note}` : ''}`,
+          extra: { deal: deal.uuid },
+          updated_at: at,
+          deleted_at: null,
+        });
+      }
+    }
+
+    const changed: Transaction[] = [];
+    const same = (a: Transaction, b: Transaction) =>
+      a.deleted_at === null && a.type === b.type && a.amount === b.amount && a.date === b.date && a.garden_id === b.garden_id && a.category_id === b.category_id && a.note === b.note;
+    for (const [id, tx] of wanted) {
+      const current = this.tables.transactions.get(id);
+      if (!current || !same(current, tx)) changed.push(tx);
+    }
+    for (const current of this.tables.transactions.values()) {
+      if (current.deleted_at === null && current.extra?.deal === deal.uuid && !wanted.has(current.id)) changed.push({ ...current, deleted_at: at, updated_at: at });
+    }
+    if (changed.length) await this.write('transactions', changed);
+    return changed.length;
+  }
+
   /**
    * Xóa một khoản; trả về hàm hoàn tác (nút "Hoàn tác" hiện vài giây).
    * Khoản sinh ra khi mua vật tư / ghi nợ thì xóa luôn vật tư / khoản nợ đó, để số liệu không lệch.
@@ -400,6 +482,7 @@ export class Ledger {
   async removeEntry(id: string): Promise<Undo> {
     const entry = this.tables.transactions.get(id);
     if (!entry) return async () => {};
+    if (this.dealOf(entry)) throw new Error('Khoản này tự ghi từ đơn mua bán chung. Hãy sửa / xóa ở đơn, hoặc bỏ nối đơn với sổ.');
     if (entry.supply_id && this.alive('supplies', entry.supply_id)) return this.removeSupply(entry.supply_id);
     const debt = this.live('debts').find((d) => d.transaction_id === id);
     if (debt) return this.removeDebt(debt.id);

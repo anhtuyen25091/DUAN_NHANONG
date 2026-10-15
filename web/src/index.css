@@ -1262,3 +1262,113 @@ table.schedule tr.next {
 .card.tiers p {
   margin: 4px 0;
 }
+
+/* ---- Đơn mua bán chung ---- */
+.share-code {
+  text-align: center;
+  background: var(--primary-soft);
+}
+
+.share-code .code {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  margin: 4px 0 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.code-input {
+  font-size: 1.6rem;
+  letter-spacing: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+dl.deal-totals {
+  margin: 8px 0 4px;
+}
+
+dl.deal-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+dl.deal-totals dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.deal-add {
+  margin: 8px 0;
+}
+
+.deal-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card.deal-entry {
+  margin: 0;
+  border-left: 5px solid var(--border);
+}
+
+.card.deal-entry.pending {
+  border-left-color: #d97706;
+}
+
+.card.deal-entry.confirmed {
+  border-left-color: var(--gain);
+}
+
+.card.deal-entry.disputed {
+  border-left-color: var(--loss);
+}
+
+.deal-entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+}
+
+.deal-entry p {
+  margin: 6px 0;
+}
+
+.deal-entry .big-amount {
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+ul.deal-lines {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+
+.checkbox-row {
+  cursor: pointer;
+}
+
+.checkbox-row input {
+  min-height: 0;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+
+/* 5 mục menu: màn hẹp chỉ giữ biểu tượng 🌾 để menu không xuống dòng */
+@media (max-width: 440px) {
+  .brand-name {
+    display: none;
+  }
+
+  .topnav {
+    gap: 10px;
+  }
+}

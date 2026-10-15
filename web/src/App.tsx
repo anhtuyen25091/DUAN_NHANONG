@@ -7,16 +7,17 @@ import { ShopList } from './pages/ShopList'
 import { ShopSubmit } from './pages/ShopSubmit'
 
 const LedgerRoutes = lazy(() => import('./pages/ledger/LedgerRoutes'))
+const DealRoutes = lazy(() => import('./pages/deals/DealRoutes'))
 
 export default function App() {
   const { path, query } = useRoute()
-  const section = path[0] === 'diem-ban' ? 'shops' : path[0] === 'so' ? 'ledger' : 'prices'
+  const section = path[0] === 'diem-ban' ? 'shops' : path[0] === 'so' ? 'ledger' : path[0] === 'don' ? 'deals' : 'prices'
 
   return (
     <>
       <header className="topbar">
-        <a href={href('')} className="brand">
-          🌾 Nhà Nông
+        <a href={href('')} className="brand" aria-label="Nhà Nông, về bảng giá">
+          🌾 <span className="brand-name">Nhà Nông</span>
         </a>
         <nav className="topnav">
           <a href={href('')} aria-current={section === 'prices' ? 'page' : undefined}>
@@ -24,6 +25,9 @@ export default function App() {
           </a>
           <a href={href('so')} aria-current={section === 'ledger' ? 'page' : undefined}>
             Sổ thu chi
+          </a>
+          <a href={href('don')} aria-current={section === 'deals' ? 'page' : undefined}>
+            Đơn
           </a>
           <a href={href('diem-ban')} aria-current={section === 'shops' ? 'page' : undefined}>
             Điểm bán
@@ -39,6 +43,10 @@ export default function App() {
         ) : path[0] === 'so' ? (
           <Suspense fallback={<p className="muted center">Đang mở sổ…</p>}>
             <LedgerRoutes path={path} query={query} />
+          </Suspense>
+        ) : path[0] === 'don' ? (
+          <Suspense fallback={<p className="muted center">Đang mở…</p>}>
+            <DealRoutes path={path} query={query} />
           </Suspense>
         ) : path[0] === 'tai-khoan' ? (
           <Account query={query} />
