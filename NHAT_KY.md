@@ -22,10 +22,16 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
   - Bảng users, shops, sổ thu chi, đơn mua bán giữ nguyên.
   - Đã sao lưu 8 bảng cũ trước khi nạp: `/private/tmp/claude-501/db-backup/truoc-khi-nap-20261015.sql.gz` (thư mục tạm).
 - **Đang chạy:** backend `:8000`, web `:5173` (mở từ Wi-Fi bằng http://192.168.1.10:5173).
-- **Metro (Expo Go)** bị segfault (exit 139) khi chạy trong Claude Code, 3 lần liên tiếp. Chạy trong Terminal thường:
+- **Metro (Expo Go) bị segfault (exit 139)** ngay khi build bundle, và cả khi chạy ngoài sandbox, nên đây là lỗi thật trên máy này (Node 24.15, macOS 26.2, arm64). Đây cũng là lý do Expo Go trên điện thoại báo "Something went wrong": app chưa từng gọi tới server.
+  - Cách tìm ra: `npx expo export --platform android --max-workers 1` thì build thành công; build song song nhiều tiến trình thì crash.
+  - **Cách sửa: luôn chạy Metro với `--max-workers 1`.** Sau khi sửa, bundle Android build đủ 1708 module trong khoảng 3 giây.
+- **Tài khoản trên máy dev này:**
+  - admin `admin@nhanong.local`: dùng cho web `/admin`; không có số điện thoại nên không đăng nhập được trên app.
+  - nông dân thử `0900000001`: dùng để đăng nhập app và web ("Lưu cả trên mạng"). Mật khẩu không ghi ở đây.
+- Lệnh chạy app cho điện thoại:
 
 ```bash
-cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.10 npx expo start --go --lan --port 8081 --clear
+cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.10 npx expo start --go --lan --port 8081 --max-workers 1 --clear
 ```
   - Lệnh này tự in mã QR; Expo Go mở link `exp://192.168.1.10:8081`.
 
@@ -91,7 +97,7 @@ cd backend && php artisan serve --host=0.0.0.0 --port=8000
 cd web && npx vite --host 0.0.0.0 --port 5180 --strictPort
 
 # 4. App cho điện thoại (Expo Go), ép dùng IP Wi-Fi vì máy có 2 mạng
-cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.13 npx expo start --go --lan --port 8081 --clear
+cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.13 npx expo start --go --lan --port 8081 --max-workers 1 --clear
 #    Xem app trên trình duyệt: cd mobile && CI=1 npx expo start --web --port 8082
 
 # Lấy giá hôm nay / lấy dữ liệu cũ (chạy lại được, bỏ qua bài đã lấy)
