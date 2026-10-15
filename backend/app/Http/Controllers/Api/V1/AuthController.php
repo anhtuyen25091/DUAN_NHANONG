@@ -82,6 +82,8 @@ class AuthController extends Controller
             'phone' => $user->phone,
             'tier' => PriceAccess::tier($user),
             'premium_until' => $user->premium_until?->toDateString(),
+            'location' => $user->homeLocation(),
+            'buyer_status' => $user->buyer?->status->value,
         ];
     }
 }

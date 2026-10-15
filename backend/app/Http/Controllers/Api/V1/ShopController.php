@@ -9,6 +9,7 @@ use App\Http\Requests\ShopSubmissionStoreRequest;
 use App\Http\Resources\ShopResource;
 use App\Models\Shop;
 use App\Models\ShopSubmission;
+use App\Support\Geo;
 use App\Support\Provinces;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -52,14 +53,9 @@ class ShopController extends Controller
         $lat = (float) $lat;
         $lng = (float) $request->validated('lng');
         $radius = (int) ($request->validated('radius') ?? self::DEFAULT_RADIUS);
-        $dLat = $radius / 111.0;
-        $dLng = $radius / (111.0 * max(cos(deg2rad($lat)), 0.01));
-
-        $shops = $query
-            ->whereBetween('lat', [$lat - $dLat, $lat + $dLat])
-            ->whereBetween('lng', [$lng - $dLng, $lng + $dLng])
+        $shops = Geo::withinBox($query, $lat, $lng, $radius)
             ->get()
-            ->each(fn (Shop $shop) => $shop->distance_km = self::distanceKm($lat, $lng, $shop->lat, $shop->lng))
+            ->each(fn (Shop $shop) => $shop->distance_km = Geo::distanceKm($lat, $lng, $shop->lat, $shop->lng))
             ->filter(fn (Shop $shop): bool => $shop->distance_km <= $radius)
             ->sortBy('distance_km')
             ->values();
@@ -102,14 +98,5 @@ class ShopController extends Controller
         ]);
 
         return response()->json(['message' => 'Cảm ơn bạn! Thông tin sẽ hiện sau khi được kiểm tra.'], 201);
-    }
-
-    private static function distanceKm(float $lat1, float $lng1, float $lat2, float $lng2): float
-    {
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLng = deg2rad($lng2 - $lng1);
-        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
-
-        return 6371 * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 }

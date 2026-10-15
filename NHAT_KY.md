@@ -11,6 +11,66 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 15/10/2026 (tối): Giá theo khu vực do điểm mua đóng góp + "Khu vực của tôi" (đang làm)
+
+**Yêu cầu:** giá crawl là giá chung, nhưng thực tế mỗi khu vực mua bán một giá khác. Cần:
+- cho điểm mua (doanh nghiệp, đại lý, thương lái, điểm bán lẻ) đăng giá từng mặt hàng theo khu vực và ngày
+- người dùng chọn khu vực của mình để được gợi ý giá và dịch vụ quanh đó
+
+**Bạn đã chọn:**
+- Chỉ **điểm mua admin đã duyệt** mới đăng giá được.
+- Giá **hiện ngay**; giá lệch nhiều thì **chờ duyệt**.
+- Khu vực = **tỉnh + chấm vị trí**, gợi ý theo bán kính.
+
+### Bước A: Backend ✅
+**Đã làm**
+- Migration `2026_10_15_210000_create_buyers_and_price_reports`:
+  - `buyers`: hồ sơ điểm mua (1 tài khoản 1 hồ sơ)
+    - loại: Doanh nghiệp / Đại lý / Thương lái / Điểm bán lẻ
+    - mua/bán gì: thu mua nông sản / bán phân / bán thuốc
+    - SĐT, địa chỉ, tỉnh, tọa độ
+    - trạng thái: chờ duyệt / đã duyệt / không duyệt / tạm khóa; có dấu xác minh ✓
+  - `price_reports`: giá 1 điểm mua đăng cho 1 mặt hàng trong 1 ngày (khóa duy nhất, đăng lại trong ngày thì sửa). Lưu kèm vị trí, giá tham chiếu, lý do chờ duyệt, số lượt báo sai.
+  - `price_report_flags`: báo giá sai, mỗi máy 1 lần cho 1 giá.
+  - `users.home_*`: khu vực của tôi (tỉnh, tọa độ, tên chỗ ở, bán kính).
+- **Quy tắc:**
+  - Hồ sơ mới thì chờ duyệt. Hồ sơ bị từ chối mà gửi lại thì chờ duyệt lại. Hồ sơ đã duyệt sửa thông tin thì vẫn giữ duyệt.
+  - Admin duyệt thì tự tạo một **điểm bán** (`source = buyer`) để hiện trong Điểm bán / Dịch vụ quanh đây. Tạm khóa hoặc từ chối thì ẩn điểm bán đó.
+  - Đăng giá phải đúng nhóm hàng đã chọn trong hồ sơ: nông sản cần "thu mua", phân bón cần "bán phân", thuốc cần "bán thuốc".
+  - Đăng bổ sung được tối đa 7 ngày trước; không đăng cho ngày tương lai.
+  - **Giá tham chiếu:** giá giữa của các điểm mua khác trong 50 km / 14 ngày (cần ít nhất 2 giá). Không đủ thì lấy giá chung crawl mới nhất của tỉnh (14 ngày). **Lệch hơn 30% thì chờ duyệt**, có ghi lý do, ví dụ "Lệch 61% so với giá chung đắk lắk (93.000 đ)".
+  - Đủ 3 máy khác nhau báo sai thì giá chuyển sang chờ duyệt.
+- **API** (`/api/v1`):
+  - `GET local-prices?lat&lng&radius&days&type&product`: không cần đăng nhập.
+    - Gom theo mặt hàng: số điểm mua, thấp nhất, cao nhất, giá giữa, giá chung của tỉnh để so, danh sách điểm mua (khoảng cách, SĐT).
+    - Mỗi điểm mua chỉ lấy giá mới nhất. Nông sản xếp điểm trả giá cao trước; phân / thuốc xếp điểm bán rẻ trước.
+  - `POST local-prices/{id}/flag`: báo giá sai (cần header `X-Device-Id`).
+  - `PUT me/location`: lưu khu vực của tôi; không gửi tọa độ thì lấy trung tâm tỉnh. `GET user` có thêm `location`, `buyer_status`.
+  - `GET/PUT me/buyer`, `GET/POST me/buyer/prices`, `DELETE me/buyer/prices/{id}`.
+- `App\Support\Geo`: tọa độ trung tâm 34 tỉnh, tính khoảng cách, lọc theo bán kính. `ShopController` dùng chung hàm này.
+- Trang `/admin`, nhóm menu mới **"Giá theo khu vực"**:
+  - "Điểm mua đăng giá": duyệt, xác minh ✓, không duyệt / tạm khóa kèm lý do
+  - "Giá điểm mua đăng": danh sách chờ duyệt có lý do, giá tham chiếu, số lần báo sai; cho hiện / gỡ, chọn nhiều để duyệt hàng loạt
+- Thêm factory `BuyerFactory` (có state `approved`) và `PriceReportFactory`.
+
+**Kiểm tra:** 125 test backend qua (thêm 10 test):
+- phải được duyệt mới đăng giá, duyệt thì tạo điểm bán
+- sai nhóm hàng thì bị chặn
+- đăng lại trong ngày thì sửa giá; giới hạn ngày đăng bổ sung
+- lệch 61% so với giá chung thì chờ duyệt
+- ưu tiên giá giữa của điểm mua gần đó làm tham chiếu
+- gom theo bán kính, loại điểm xa / chưa duyệt / giá chờ duyệt
+- phân bón xếp rẻ trước, lọc theo nhóm
+- 3 máy báo sai thì chờ duyệt (cùng máy báo 2 lần chỉ tính 1)
+- khu vực của tôi lấy trung tâm tỉnh khi không có GPS
+- gửi lại hồ sơ bị từ chối; không xóa được giá của người khác
+
+**Lỗi tìm thấy nhờ test, đã sửa:**
+- Controller dùng `$request->user()->buyer` thì có thể nhận kết quả "chưa có hồ sơ" đã nạp sẵn. Đã đổi sang truy vấn thẳng (`myBuyer`).
+- Cột `prices.date` là chuỗi, gọi `toDateString()` bị lỗi 500. Đã đọc lại bằng `CarbonImmutable::parse`.
+
+---
+
 ## 15/10/2026 (tối): Dữ liệu demo cho tài khoản 0900000003
 - Tạo dữ liệu demo trên server (máy dev Docker) để thử các chức năng mục 19 trên app.
   - Script chạy đúng `Ledger` + `SyncEngine` của dự án, qua `vite.runnerImport`. Script nằm ở thư mục tạm, không nằm trong repo.

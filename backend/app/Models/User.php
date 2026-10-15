@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Support\Provinces;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -37,12 +39,46 @@ class User extends Authenticatable implements FilamentUser
             'is_admin' => 'boolean',
             'ledger_version' => 'integer',
             'premium_until' => 'datetime',
+            'home_lat' => 'float',
+            'home_lng' => 'float',
+            'home_radius' => 'integer',
         ];
     }
 
     /**
      * @return HasMany<LedgerRecord, $this>
      */
+    /**
+     * Hồ sơ điểm mua (nếu tài khoản đăng ký làm điểm mua đăng giá)
+     *
+     * @return HasOne<Buyer, $this>
+     */
+    public function buyer(): HasOne
+    {
+        return $this->hasOne(Buyer::class);
+    }
+
+    /**
+     * Khu vực của tôi (để gợi ý giá + dịch vụ quanh đó); null nếu chưa chọn.
+     *
+     * @return array{province: string, province_name: ?string, lat: float, lng: float, label: ?string, radius: int}|null
+     */
+    public function homeLocation(): ?array
+    {
+        if ($this->home_province === null || $this->home_lat === null) {
+            return null;
+        }
+
+        return [
+            'province' => $this->home_province,
+            'province_name' => Provinces::name($this->home_province),
+            'lat' => $this->home_lat,
+            'lng' => $this->home_lng,
+            'label' => $this->home_label,
+            'radius' => $this->home_radius ?? 30,
+        ];
+    }
+
     public function ledgerRecords(): HasMany
     {
         return $this->hasMany(LedgerRecord::class);
