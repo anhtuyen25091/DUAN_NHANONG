@@ -1363,7 +1363,7 @@ ul.deal-lines {
 }
 
 /* 5 mục menu: màn hẹp chỉ giữ biểu tượng 🌾 để menu không xuống dòng */
-@media (max-width: 440px) {
+@media (max-width: 520px) {
   .brand-name {
     display: none;
   }
@@ -1486,4 +1486,9 @@ a.button.small-btn {
   line-height: 18px;
   text-align: center;
   vertical-align: top;
+}
+
+.ledger-link .field-label {
+  margin: 12px 0 6px;
+  font-weight: 600;
 }

@@ -336,10 +336,13 @@ function LotCard({ deal, token, onDeal }: { deal: Deal; token: string; onDeal: (
   )
 }
 
-/** Ghi các đợt cân đã xác nhận vào Sổ thu chi của mình (chọn vườn, hạng mục) */
+/**
+ * Ghi các đợt cân đã xác nhận vào Sổ thu chi của mình. Chọn vườn (hoặc chi chung) + hạng mục;
+ * đã nối rồi thì đổi vườn / hạng mục là các khoản đã ghi chuyển theo ngay.
+ */
 function LedgerLinkCard({ deal }: { deal: Deal }) {
   const state = useLedger()
-  const [gardenId, setGardenId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<{ garden_id: string | null; category_id: string | null } | null>(null)
   // Đơn thay đổi (bên kia vừa xác nhận…) thì cập nhật sổ ngay
   const linked = !!state.ledger?.getSnapshot().meta.deal_links?.[deal.uuid]
   useEffect(() => {
@@ -349,14 +352,26 @@ function LedgerLinkCard({ deal }: { deal: Deal }) {
   const { ledger, data } = state
   const link = data.meta.deal_links?.[deal.uuid]
   const seller = deal.my_role === 'seller'
+  const type = seller ? 'income' : 'expense'
+  const categories = data.categories.filter((c) => c.type === type)
+  const defaultCategory = categories.find((c) => c.name === (seller ? 'Bán nông sản' : 'Mua nông sản'))?.id ?? null
+  const gardenId = link ? link.garden_id : draft ? draft.garden_id : seller ? (data.gardens[0]?.id ?? null) : null
+  const categoryId = link?.category_id ?? draft?.category_id ?? defaultCategory
+  const gardenName = (id: string | null) => (id ? (data.gardens.find((g) => g.id === id)?.name ?? 'vườn đã xóa') : 'Chi chung')
 
-  const connect = async () => {
-    const category = seller
-      ? await ledger.ensureCategory('income', 'Bán nông sản', '💰', '#15803d')
-      : await ledger.ensureCategory('expense', 'Mua nông sản', '🧺', '#b45309')
-    await ledger.linkDeal(deal.uuid, { garden_id: seller ? (gardenId ?? data.gardens[0]?.id ?? null) : null, category_id: category })
+  const save = async (next: { garden_id: string | null; category_id: string | null }, message?: (changed: number) => string) => {
+    const category =
+      next.category_id ??
+      (seller ? await ledger.ensureCategory('income', 'Bán nông sản', '💰', '#15803d') : await ledger.ensureCategory('expense', 'Mua nông sản', '🧺', '#b45309'))
+    await ledger.linkDeal(deal.uuid, { garden_id: next.garden_id, category_id: category })
     const changed = await ledger.applyDeal(deal)
-    showToast({ message: `Đã nối với sổ, ghi ${changed} khoản` })
+    if (message) showToast({ message: message(changed) })
+  }
+  // Đã nối: đổi là lưu ngay; chưa nối: chỉ chọn, bấm "Nối với sổ" mới ghi
+  const pick = (patch: Partial<{ garden_id: string | null; category_id: string | null }>) => {
+    const next = { garden_id: gardenId, category_id: categoryId, ...patch }
+    if (link) void save(next, (n) => `Đã chuyển sang ${gardenName(next.garden_id)}${n ? ` (${n} khoản)` : ''}`)
+    else setDraft(next)
   }
 
   if (!data.meta.storage_mode)
@@ -364,49 +379,75 @@ function LedgerLinkCard({ deal }: { deal: Deal }) {
       <section className="card">
         <h2>📒 Sổ thu chi</h2>
         <p className="small muted">Mở Sổ thu chi 1 lần để có thể tự ghi các đợt cân vào sổ.</p>
+        <a className="button" href={href('so')}>
+          Mở Sổ thu chi
+        </a>
       </section>
     )
 
   return (
-    <section className="card">
+    <section className="card ledger-link">
       <h2>📒 Sổ thu chi</h2>
-      {link ? (
+      <p className="small muted">
+        {link
+          ? `✅ Đã nối: các đợt cân đã xác nhận tự ghi ${seller ? 'tiền vào' : 'tiền ra'} vào ${gardenName(link.garden_id)}; chi phí riêng ghi tiền ra. Đổi vườn / hạng mục bên dưới, các khoản đã ghi chuyển theo.`
+          : `Tự ghi các đợt cân đã xác nhận vào sổ (${seller ? 'tiền vào' : 'tiền ra'}). Cọc và tiền trả không tính vào lời/lỗ.`}
+      </p>
+
+      <p className="field-label">{seller ? 'Tiền bán hàng ghi cho vườn nào' : 'Tiền mua hàng ghi cho vườn nào'}</p>
+      <div className="segmented wrap">
+        {data.gardens.map((g) => (
+          <button key={g.id} type="button" className={gardenId === g.id ? 'active' : ''} aria-pressed={gardenId === g.id} onClick={() => pick({ garden_id: g.id })}>
+            🌳 {g.name}
+          </button>
+        ))}
+        <button type="button" className={gardenId === null ? 'active' : ''} aria-pressed={gardenId === null} onClick={() => pick({ garden_id: null })}>
+          📦 Chi chung
+        </button>
+        <a className="button subtle" href={href('so/vuon-moi', { ve: `don/${deal.uuid}` })}>
+          ＋ Thêm vườn
+        </a>
+      </div>
+      {seller && data.gardens.length === 0 && <p className="small out">Chưa có vườn nào: bấm "＋ Thêm vườn" để tạo vườn rồi chọn lại.</p>}
+
+      {categories.length > 1 && (
         <>
-          <p className="small">
-            ✅ Đã nối: các đợt cân đã xác nhận tự ghi {seller ? 'tiền vào' : 'tiền ra'}
-            {link.garden_id ? ` của ${data.gardens.find((g) => g.id === link.garden_id)?.name ?? 'vườn'}` : ' (chi chung)'}; chi phí riêng ghi tiền ra.
-          </p>
-          <div className="btn-row">
+          <p className="field-label">Hạng mục</p>
+          <div className="segmented wrap">
+            {categories.map((c) => (
+              <button key={c.id} type="button" className={categoryId === c.id ? 'active' : ''} aria-pressed={categoryId === c.id} onClick={() => pick({ category_id: c.id })}>
+                {c.icon} {c.name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="btn-row">
+        {link ? (
+          <>
             <button type="button" onClick={async () => showToast({ message: `Đã cập nhật ${await ledger.applyDeal(deal)} khoản` })}>
               🔄 Cập nhật sổ
             </button>
-            <button type="button" className="linklike" onClick={async () => {
-              await ledger.linkDeal(deal.uuid, null)
-              showToast({ message: 'Đã bỏ nối, gỡ các khoản tự ghi' })
-            }}>
+            <button
+              type="button"
+              className="danger-outline"
+              onClick={async () => {
+                if (!window.confirm('Bỏ nối đơn với sổ? Các khoản tự ghi từ đơn sẽ bị gỡ khỏi sổ.')) return
+                await ledger.linkDeal(deal.uuid, null)
+                setDraft(null)
+                showToast({ message: 'Đã bỏ nối, gỡ các khoản tự ghi' })
+              }}
+            >
               Bỏ nối
             </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="small muted">
-            Tự ghi các đợt cân đã xác nhận vào sổ: {seller ? 'tiền vào (Bán nông sản)' : 'tiền ra (hạng mục "Mua nông sản")'}. Cọc và tiền trả không tính vào lời/lỗ.
-          </p>
-          {seller && data.gardens.length > 0 && (
-            <div className="segmented wrap">
-              {data.gardens.map((g) => (
-                <button key={g.id} type="button" className={(gardenId ?? data.gardens[0].id) === g.id ? 'active' : ''} onClick={() => setGardenId(g.id)}>
-                  {g.name}
-                </button>
-              ))}
-            </div>
-          )}
-          <button type="button" className="primary" onClick={connect}>
+          </>
+        ) : (
+          <button type="button" className="primary" onClick={() => save({ garden_id: gardenId, category_id: categoryId }, (n) => `Đã nối với sổ: ghi ${n} khoản vào ${gardenName(gardenId)}`)}>
             Nối với sổ
           </button>
-        </>
-      )}
+        )}
+      </div>
     </section>
   )
 }

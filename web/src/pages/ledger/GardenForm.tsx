@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { go, href } from '../../hooks'
 
 /** Thêm vườn mới, hoặc sửa vườn (id) */
-export function GardenForm({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot; id?: string }) {
+export function GardenForm({ ledger, data, id, back }: { ledger: Ledger; data: LedgerSnapshot; id?: string; back?: string | null }) {
   const garden = data.gardens.find((g) => g.id === id)
   const [name, setName] = useState(garden?.name ?? '')
   const [crop, setCrop] = useState(garden?.crop ?? '')
@@ -18,7 +18,7 @@ export function GardenForm({ ledger, data, id }: { ledger: Ledger; data: LedgerS
       go(`so/vuon/${garden.id}`)
     } else {
       const created = await ledger.addGarden(input)
-      go(`so/vuon/${created.id}`)
+      go(back ?? `so/vuon/${created.id}`)
     }
   }
 

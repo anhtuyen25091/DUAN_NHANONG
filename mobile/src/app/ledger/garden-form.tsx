@@ -13,7 +13,8 @@ export default function GardenFormScreen() {
 }
 
 function GardenForm({ ledger, gardens }: { ledger: NonNullable<ReturnType<typeof useLedger>['ledger']>; gardens: ReturnType<typeof ledger.getSnapshot>['gardens'] }) {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  // back=1: mở từ màn khác (vd đơn mua bán cần chọn vườn) thì thêm xong quay lại màn đó
+  const { id, back } = useLocalSearchParams<{ id?: string; back?: string }>();
   const garden = gardens.find((g) => g.id === id);
   const [name, setName] = useState(garden?.name ?? '');
   const [crop, setCrop] = useState(garden?.crop ?? '');
@@ -27,7 +28,8 @@ function GardenForm({ ledger, gardens }: { ledger: NonNullable<ReturnType<typeof
       router.back();
     } else {
       const created = await ledger.addGarden(input);
-      router.replace({ pathname: '/ledger/garden/[id]', params: { id: created.id } });
+      if (back) router.back();
+      else router.replace({ pathname: '/ledger/garden/[id]', params: { id: created.id } });
     }
   };
 

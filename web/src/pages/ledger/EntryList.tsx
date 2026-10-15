@@ -20,7 +20,9 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
   const interestOf = new Map<string, string>()
   for (const p of data.debt_payments) if (p.interest_transaction_id) interestOf.set(p.interest_transaction_id, p.debt_id)
   const entryHref = (t: Transaction) =>
-    t.supply_id
+    ledger.dealOf(t)
+      ? href(`don/${ledger.dealOf(t)}`)
+      : t.supply_id
       ? href(`so/kho/${t.supply_id}`)
       : debtOf.has(t.id) || interestOf.has(t.id)
         ? href(`so/no/${debtOf.get(t.id) ?? interestOf.get(t.id)}`)
@@ -29,6 +31,10 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
           : href('so/ghi', { sua: t.id })
 
   const remove = async (entry: Transaction) => {
+    if (ledger.dealOf(entry)) {
+      showToast({ message: 'Khoản này tự ghi từ đơn mua bán. Bấm vào khoản để mở đơn và đổi vườn / bỏ nối.' })
+      return
+    }
     const linked = entry.supply_id
       ? ' (xóa cả vật tư trong kho)'
       : debtOf.has(entry.id)

@@ -39,7 +39,7 @@ export default function LedgerRoutes({ path, query }: { path: string[]; query: U
       {page === 'ghi' ? (
         <AddEntry key={query.get('sua') ?? 'new'} ledger={ledger} data={data} query={query} />
       ) : page === 'vuon-moi' ? (
-        <GardenForm ledger={ledger} data={data} />
+        <GardenForm ledger={ledger} data={data} back={query.get('ve')} />
       ) : page === 'vuon' && id && action === 'sua' ? (
         <GardenForm ledger={ledger} data={data} id={id} />
       ) : page === 'vuon' && id && action === 'vu-moi' ? (

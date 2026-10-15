@@ -364,9 +364,13 @@ function LotCard({ deal, token, run }: { deal: Deal; token: string; run: Run }) 
 }
 
 /** Ghi các đợt cân đã xác nhận vào Sổ thu chi của mình (chọn vườn, hạng mục) */
+/**
+ * Ghi các đợt cân đã xác nhận vào Sổ thu chi của mình. Chọn vườn (hoặc chi chung) + hạng mục;
+ * đã nối rồi thì đổi vườn / hạng mục là các khoản đã ghi chuyển theo ngay.
+ */
 function LedgerLinkCard({ deal }: { deal: Deal }) {
   const state = useLedger();
-  const [gardenId, setGardenId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ garden_id: string | null; category_id: string | null } | null>(null);
   const ledger = state.ledger;
   const linked = !!(state.ledger && state.data.meta.deal_links?.[deal.uuid]);
   // Đơn thay đổi (bên kia vừa xác nhận…) thì cập nhật sổ ngay
@@ -377,19 +381,28 @@ function LedgerLinkCard({ deal }: { deal: Deal }) {
   const { ledger: lg, data } = state;
   const link = data.meta.deal_links?.[deal.uuid];
   const seller = deal.my_role === 'seller';
-  const chosenGarden = gardenId ?? data.gardens[0]?.id ?? null;
+  const categories = data.categories.filter((c) => c.type === (seller ? 'income' : 'expense'));
+  const defaultCategory = categories.find((c) => c.name === (seller ? 'Bán nông sản' : 'Mua nông sản'))?.id ?? null;
+  const gardenId = link ? link.garden_id : draft ? draft.garden_id : seller ? (data.gardens[0]?.id ?? null) : null;
+  const categoryId = link?.category_id ?? draft?.category_id ?? defaultCategory;
+  const gardenName = (id: string | null) => (id ? (data.gardens.find((g) => g.id === id)?.name ?? 'vườn đã xóa') : 'Chi chung');
 
-  const connect = async () => {
+  const save = async (next: { garden_id: string | null; category_id: string | null }, message: (changed: number) => string) => {
     try {
-      const category = seller
-        ? (data.categories.find((c) => c.type === 'income' && c.name === 'Bán nông sản')?.id ?? (await lg.ensureCategory('income', 'Bán nông sản', '💰', '#15803d')))
-        : await lg.ensureCategory('expense', 'Mua nông sản', '🧺', '#b45309');
-      await lg.linkDeal(deal.uuid, { garden_id: seller ? chosenGarden : null, category_id: category });
-      const changed = await lg.applyDeal(deal);
-      showToast({ message: `Đã nối với sổ, ghi ${changed} khoản` });
+      const category =
+        next.category_id ??
+        (seller ? await lg.ensureCategory('income', 'Bán nông sản', '💰', '#15803d') : await lg.ensureCategory('expense', 'Mua nông sản', '🧺', '#b45309'));
+      await lg.linkDeal(deal.uuid, { garden_id: next.garden_id, category_id: category });
+      showToast({ message: message(await lg.applyDeal(deal)) });
     } catch (err) {
       showToast({ message: (err as Error).message });
     }
+  };
+  // Đã nối: đổi là lưu ngay; chưa nối: chỉ chọn, bấm "Nối với sổ" mới ghi
+  const pick = (patch: Partial<{ garden_id: string | null; category_id: string | null }>) => {
+    const next = { garden_id: gardenId, category_id: categoryId, ...patch };
+    if (link) void save(next, (n) => `Đã chuyển sang ${gardenName(next.garden_id)}${n ? ` (${n} khoản)` : ''}`);
+    else setDraft(next);
   };
 
   if (!data.meta.storage_mode) {
@@ -405,43 +418,52 @@ function LedgerLinkCard({ deal }: { deal: Deal }) {
   return (
     <Card>
       <Text style={heading}>📒 Sổ thu chi</Text>
-      {link ? (
+      <Text style={[styles.muted, { marginBottom: 8 }]}>
+        {link
+          ? `✅ Đã nối: các đợt cân đã xác nhận tự ghi ${seller ? 'tiền vào' : 'tiền ra'} vào ${gardenName(link.garden_id)}; chi phí riêng ghi tiền ra. Đổi vườn / hạng mục bên dưới, các khoản đã ghi chuyển theo.`
+          : `Tự ghi các đợt cân đã xác nhận vào sổ (${seller ? 'tiền vào' : 'tiền ra'}). Cọc và tiền trả không tính vào lời/lỗ.`}
+      </Text>
+      <Text style={[styles.body, { fontWeight: '700', marginBottom: 6 }]}>{seller ? 'Tiền bán hàng ghi cho vườn nào' : 'Tiền mua hàng ghi cho vườn nào'}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+        {data.gardens.map((g) => (
+          <Chip key={g.id} label={`🌳 ${g.name}`} active={gardenId === g.id} onPress={() => pick({ garden_id: g.id })} />
+        ))}
+        <Chip label="📦 Chi chung" active={gardenId === null} onPress={() => pick({ garden_id: null })} />
+        <Chip label="＋ Thêm vườn" active={false} onPress={() => router.push({ pathname: '/ledger/garden-form', params: { back: '1' } })} />
+      </View>
+      {seller && data.gardens.length === 0 && (
+        <Text style={[styles.muted, { color: colors.loss, marginBottom: 8 }]}>Chưa có vườn nào: bấm "＋ Thêm vườn" để tạo vườn rồi chọn lại.</Text>
+      )}
+      {categories.length > 1 && (
         <>
-          <Text style={[styles.body, { marginBottom: 8 }]}>
-            ✅ Đã nối: các đợt cân đã xác nhận tự ghi {seller ? 'tiền vào' : 'tiền ra'}
-            {link.garden_id ? ` của ${data.gardens.find((g) => g.id === link.garden_id)?.name ?? 'vườn'}` : ' (chi chung)'}; chi phí riêng ghi tiền ra.
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Button label="🔄 Cập nhật sổ" variant="outline" onPress={async () => showToast({ message: `Đã cập nhật ${await lg.applyDeal(deal)} khoản` })} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button
-                label="Bỏ nối"
-                variant="danger"
-                onPress={async () => {
-                  if (!(await confirmAsync('Bỏ nối đơn với sổ?', 'Các khoản đã tự ghi từ đơn này sẽ bị gỡ khỏi sổ.', 'Bỏ nối'))) return;
-                  await lg.linkDeal(deal.uuid, null);
-                  showToast({ message: 'Đã bỏ nối, gỡ các khoản tự ghi' });
-                }}
-              />
-            </View>
+          <Text style={[styles.body, { fontWeight: '700', marginBottom: 6 }]}>Hạng mục</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+            {categories.map((c) => (
+              <Chip key={c.id} label={`${c.icon} ${c.name}`} active={categoryId === c.id} onPress={() => pick({ category_id: c.id })} />
+            ))}
           </View>
         </>
+      )}
+      {link ? (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Button label="🔄 Cập nhật sổ" variant="outline" onPress={async () => showToast({ message: `Đã cập nhật ${await lg.applyDeal(deal)} khoản` })} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              label="Bỏ nối"
+              variant="danger"
+              onPress={async () => {
+                if (!(await confirmAsync('Bỏ nối đơn với sổ?', 'Các khoản đã tự ghi từ đơn này sẽ bị gỡ khỏi sổ.', 'Bỏ nối'))) return;
+                await lg.linkDeal(deal.uuid, null);
+                setDraft(null);
+                showToast({ message: 'Đã bỏ nối, gỡ các khoản tự ghi' });
+              }}
+            />
+          </View>
+        </View>
       ) : (
-        <>
-          <Text style={[styles.muted, { marginBottom: 8 }]}>
-            Tự ghi các đợt cân đã xác nhận vào sổ: {seller ? 'tiền vào (Bán nông sản)' : 'tiền ra (hạng mục "Mua nông sản")'}. Cọc và tiền trả không tính vào lời/lỗ.
-          </Text>
-          {seller && data.gardens.length > 0 && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-              {data.gardens.map((g) => (
-                <Chip key={g.id} label={g.name} active={chosenGarden === g.id} onPress={() => setGardenId(g.id)} />
-              ))}
-            </View>
-          )}
-          <Button label="Nối với sổ" onPress={() => void connect()} />
-        </>
+        <Button label="Nối với sổ" onPress={() => void save({ garden_id: gardenId, category_id: categoryId }, (n) => `Đã nối với sổ: ghi ${n} khoản vào ${gardenName(gardenId)}`)} />
       )}
     </Card>
   );
