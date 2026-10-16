@@ -3,6 +3,7 @@
 namespace App\Shops;
 
 use App\Models\Shop;
+use App\Support\PlaceSearch;
 use App\Support\Provinces;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -15,6 +16,8 @@ use RuntimeException;
  */
 class OsmShopImporter
 {
+    public function __construct(private PlaceSearch $places) {}
+
     private const ENDPOINTS = [
         'https://overpass-api.de/api/interpreter',
         'https://overpass.kumi.systems/api/interpreter',
@@ -43,6 +46,11 @@ class OsmShopImporter
                 $counts['skipped']++;
 
                 continue;
+            }
+
+            // OSM nhiều điểm không ghi tỉnh: tra ngược từ tọa độ (giữ tỉnh đã có nếu tra không ra)
+            if ($attributes['province_code'] === null && $attributes['lat'] !== null && $attributes['lng'] !== null) {
+                $attributes['province_code'] = $this->places->provinceAt((float) $attributes['lat'], (float) $attributes['lng']) ?? $shop->province_code;
             }
 
             $counts[$shop->exists ? 'updated' : 'imported']++;

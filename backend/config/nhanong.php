@@ -19,6 +19,8 @@ return [
     */
     'geocoder' => [
         'url' => env('GEOCODER_URL', 'https://photon.komoot.io/api/'),
+        // Tra ngược tọa độ → địa danh (điền tỉnh cho điểm bán không ghi tỉnh)
+        'reverse_url' => env('GEOCODER_REVERSE_URL', 'https://photon.komoot.io/reverse'),
         'cache_days' => 30,
     ],
 

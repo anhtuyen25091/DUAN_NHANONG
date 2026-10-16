@@ -122,6 +122,39 @@ class ShopApiTest extends TestCase
         $this->assertSame('Admin đã sửa', Shop::query()->where('source_ref', 'osm:node/3')->value('name'));
     }
 
+    public function test_osm_shop_without_province_gets_it_from_coordinates(): void
+    {
+        Http::fake([
+            'photon.komoot.io/reverse*' => Http::response(['features' => [
+                // Điểm lẻ không kèm tỉnh: bỏ qua, lấy kết quả gần đó có ghi tỉnh / thành phố trực thuộc trung ương
+                ['properties' => ['countrycode' => 'VN', 'name' => 'Cửa hàng']],
+                ['properties' => ['countrycode' => 'VN', 'name' => 'Đường số 4', 'city' => 'Cần Thơ']],
+            ]]),
+            '*' => Http::response(['elements' => [
+                ['type' => 'way', 'id' => 7, 'center' => ['lat' => 10.11, 'lon' => 105.70], 'tags' => ['name' => 'Đại lý phân bón Trà Nóc', 'shop' => 'fertilizer_supplier']],
+            ]]),
+        ]);
+
+        app(OsmShopImporter::class)->run();
+
+        $this->assertSame('can-tho', Shop::query()->where('source_ref', 'osm:way/7')->value('province_code'));
+    }
+
+    public function test_fill_provinces_command_leaves_unknown_empty(): void
+    {
+        Http::fake(['photon.komoot.io/reverse*' => Http::sequence()
+            ->push(['features' => [['properties' => ['countrycode' => 'VN', 'state' => 'Đắk Lắk']]]])
+            ->push(['features' => [['properties' => ['countrycode' => 'VN', 'name' => 'Không rõ']]]]),
+        ]);
+        $known = Shop::factory()->create(['province_code' => null, 'lat' => 12.91, 'lng' => 108.26]);
+        $unknown = Shop::factory()->create(['province_code' => null, 'lat' => 20.43, 'lng' => 106.36]);
+
+        $this->artisan('shops:fill-provinces', ['--delay' => 0])->expectsOutput('Đã điền tỉnh 1/2 điểm bán.')->assertSuccessful();
+
+        $this->assertSame('dak-lak', $known->refresh()->province_code);
+        $this->assertNull($unknown->refresh()->province_code);
+    }
+
     public function test_csv_import(): void
     {
         $file = tempnam(sys_get_temp_dir(), 'shops');

@@ -46,6 +46,48 @@ class PlaceSearch
     }
 
     /**
+     * Tỉnh (mới) chứa 1 tọa độ, tra ngược qua Photon (tra ra thì lưu cache 90 ngày theo tọa độ làm tròn ~100 m).
+     * Dịch vụ lỗi hoặc không nhận ra tỉnh thì null: để trống còn hơn điền sai tỉnh.
+     */
+    public function provinceAt(float $lat, float $lng): ?string
+    {
+        $key = sprintf('province-at:%.3f,%.3f', $lat, $lng);
+        $cached = Cache::get($key);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
+        try {
+            $response = Http::withUserAgent(config('crawler.user_agent'))
+                ->timeout(8)
+                ->get(config('nhanong.geocoder.reverse_url'), ['lat' => $lat, 'lon' => $lng, 'limit' => 5])
+                ->throw();
+        } catch (ConnectionException|RequestException) {
+            return null;
+        }
+
+        // Lấy kết quả gần nhất có ghi tỉnh (điểm lẻ trên OSM có khi không kèm tỉnh, đường / khu vực quanh đó thì có).
+        // Thành phố trực thuộc trung ương (Cần Thơ, Hà Nội, TP.HCM…) Photon ghi ở "city", không có "state".
+        $province = null;
+        foreach ((array) $response->json('features', []) as $feature) {
+            $props = (array) ($feature['properties'] ?? []);
+            if (($props['countrycode'] ?? null) !== 'VN') {
+                continue;
+            }
+            $province = Provinces::detect($props['state'] ?? null) ?? Provinces::detect($props['city'] ?? null);
+            if ($province !== null) {
+                break;
+            }
+        }
+        // Chỉ nhớ khi tra ra; tra hụt thì lần sau tra lại
+        if ($province !== null) {
+            Cache::put($key, $province, now()->addDays(90));
+        }
+
+        return $province;
+    }
+
+    /**
      * @return list<array<string, mixed>>|null
      */
     private function fetch(string $query, ?string $province): ?array
