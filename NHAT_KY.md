@@ -11,6 +11,43 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026: Thêm mặt hàng chanh dây (chanh leo) ✅
+
+**Tìm nguồn giá:** không có nguồn nào đăng giá chanh dây đều đặn để lấy tự động.
+- agro.gov.vn (CSDL giá của Bộ): không có chanh dây trong 230 mặt hàng.
+- Sở Công Thương Đắk Lắk: bảng giá nông sản chỉ có cà phê, hồ tiêu.
+- banggianongsan.com, nhabeagri.com: có sầu riêng, bơ, điều… nhưng không có chanh dây.
+- Báo Gia Lai, Nông nghiệp & Môi trường, Tuổi Trẻ: chỉ có bài lẻ khi giá biến động, vài tháng 1 bài.
+  - Ví dụ Báo Gia Lai 06/03/2026: chanh múc 23–27 nghìn/kg, loại xuất khẩu 32–40 nghìn/kg.
+- Các trang "giá chanh dây hôm nay" (canhdieuviet, kingfoodmart, dongnaitv…): nội dung cũ, số liệu lệch nhau, không dùng.
+
+**Cách lấy giá đã chọn:** điểm mua đăng giá theo khu vực (vựa, thương lái, nhà máy ở Gia Lai, Đắk Lắk), cộng với admin nhập tay giá tham khảo vào /admin → Giá. Không có dữ liệu cũ 5 năm.
+
+**Đã làm**
+- `CatalogSeeder`:
+  - danh mục mới `chanh-day` "Chanh dây (chanh leo)", loại Nông sản
+  - 3 mặt hàng (đ/kg):
+    - `chanh-day-xuat-khau`: loại xuất khẩu (loại 1)
+    - `chanh-day-loai-2`: loại 2
+    - `chanh-day-muc`: múc / xô
+  - khu vực mới `son-la` (Sơn La)
+- Điểm mua loại "thu mua nông sản" đăng được giá chanh dây ngay (đăng giá lọc theo loại danh mục, không cần sửa code).
+- `LocalPriceDemoSeeder`:
+  - thêm 2 điểm mua ở Gia Lai: Vựa chanh dây Ba Tâm `0900000109` và Nhà máy chế biến nông sản Ia Grai `0900000110`
+  - Thương lái Tư Hùng (Đắk Lắk) đăng thêm giá chanh dây
+  - mật khẩu demo như các điểm mua khác
+
+**Kiểm tra**
+- `GET /categories` có danh mục chanh dây với 3 mặt hàng.
+- `GET /local-prices` quanh Chư Păh (Gia Lai) trả 2 điểm mua: 33.000–34.000 đ/kg loại xuất khẩu.
+- Toàn bộ 125 test backend pass, Pint sạch.
+
+**Còn tồn**
+- Bảng giá chính (trang chủ) chỉ hiện chanh dây khi admin đã nhập giá tham khảo, hoặc khi có nguồn crawl.
+- Máy khác: chạy `php artisan db:seed --class=CatalogSeeder`, rồi `php artisan db:seed --class=LocalPriceDemoSeeder` nếu muốn dữ liệu demo.
+
+---
+
 ## 15/10/2026 (tối): Giá theo khu vực do điểm mua đóng góp + "Khu vực của tôi" ✅
 
 **Yêu cầu:** giá crawl là giá chung, nhưng thực tế mỗi khu vực mua bán một giá khác. Cần:

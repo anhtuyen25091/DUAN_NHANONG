@@ -13,8 +13,8 @@ use Illuminate\Database\Seeder;
 use RuntimeException;
 
 /**
- * Dữ liệu demo cho "Giá quanh tôi": điểm mua đã duyệt quanh Buôn Ma Thuột (cà phê, tiêu, sầu riêng, phân bón)
- * và Cần Thơ (lúa, phân bón), giá 3 ngày gần đây; 1 điểm chờ duyệt và 1 giá chờ duyệt để thử trang admin.
+ * Dữ liệu demo cho "Giá quanh tôi": điểm mua đã duyệt quanh Buôn Ma Thuột (cà phê, tiêu, sầu riêng, chanh dây, phân bón),
+ * Gia Lai (chanh dây) và Cần Thơ (lúa, phân bón), giá 3 ngày gần đây; 1 điểm chờ duyệt và 1 giá chờ duyệt để thử trang admin.
  *
  * Chỉ chạy trên máy dev: php artisan db:seed --class=LocalPriceDemoSeeder (chạy lại thì cập nhật, không trùng).
  * Tài khoản điểm mua: 09000001xx, mật khẩu: nhanong-demo
@@ -36,7 +36,7 @@ class LocalPriceDemoSeeder extends Seeder
             ['0900000102', 'Đại lý Hai Lúa', BuyerKind::Agent, ['thu_mua', 'phan_bon'], 'dak-lak', 12.6600, 108.0700, '123 Nguyễn Tất Thành, Buôn Ma Thuột', true,
                 ['ca-phe-robusta' => 92500, 'ho-tieu' => 140000, 'ure-phu-my' => 545000, 'npk-20-20-15-binh-dien' => 845000]],
             ['0900000103', 'Thương lái Tư Hùng', BuyerKind::Trader, ['thu_mua'], 'dak-lak', 12.7500, 108.1200, 'Xã Hòa Thuận', false,
-                ['ca-phe-robusta' => 93300, 'sau-rieng-ri6' => 36000]],
+                ['ca-phe-robusta' => 93300, 'sau-rieng-ri6' => 36000, 'chanh-day-xuat-khau' => 31000, 'chanh-day-muc' => 21000]],
             ['0900000104', 'Cửa hàng vật tư nông nghiệp Ba Thành', BuyerKind::Retail, ['phan_bon', 'thuoc_bvtv'], 'dak-lak', 12.6900, 108.0000, 'Xã Hòa Thắng', false,
                 ['ure-phu-my' => 560000, 'npk-20-20-15-binh-dien' => 860000]],
             ['0900000105', 'Vựa sầu riêng Bảy Lợi', BuyerKind::Trader, ['thu_mua'], 'dak-lak', 12.8000, 108.2000, 'Xã Ea Kao', true,
@@ -45,6 +45,10 @@ class LocalPriceDemoSeeder extends Seeder
                 ['lua-ir-50404' => 6150, 'lua-om-18' => 6300, 'lua-dai-thom-8' => 6350]],
             ['0900000107', 'Đại lý vật tư Sáu Phước', BuyerKind::Agent, ['phan_bon'], 'can-tho', 10.0300, 105.7800, 'Phường Cái Khế, Cần Thơ', false,
                 ['ure-phu-my' => 552000, 'npk-20-20-15-binh-dien' => 850000]],
+            ['0900000109', 'Vựa chanh dây Ba Tâm', BuyerKind::Trader, ['thu_mua'], 'gia-lai', 14.0500, 107.9300, 'Xã Ia Ly, Chư Păh', true,
+                ['chanh-day-xuat-khau' => 33000, 'chanh-day-loai-2' => 26000, 'chanh-day-muc' => 22000]],
+            ['0900000110', 'Nhà máy chế biến nông sản Ia Grai', BuyerKind::Company, ['thu_mua'], 'gia-lai', 13.9900, 107.8400, 'Xã Ia Grai', true,
+                ['chanh-day-xuat-khau' => 34000, 'chanh-day-muc' => 23500]],
         ];
 
         $products = Product::query()->pluck('id', 'code');
