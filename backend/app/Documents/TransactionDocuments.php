@@ -333,7 +333,7 @@ final class TransactionDocuments
      */
     private static function itemsText(array $items): string
     {
-        return implode('; ', array_map(fn (array $i): string => $i['name'].' '.self::kg((float) $i['kg']).' kg', $items));
+        return implode('; ', array_map(fn (array $i): string => $i['name'].': '.self::kg((float) $i['kg']).' kg', $items));
     }
 
     public static function money(int $amount): string

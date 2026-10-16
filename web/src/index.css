@@ -1382,6 +1382,12 @@ ul.deal-lines {
   margin-top: 10px;
 }
 
+/* Hàng nút hành động ngay trên hàng tab: tách ra cho khỏi dính, dễ phân biệt nút bấm với tab */
+.btn-row + .segmented,
+.btn-row + nav.segmented {
+  margin-top: 16px;
+}
+
 .btn-row > button,
 .btn-row > a.button {
   display: inline-flex;

@@ -145,9 +145,9 @@ export function purchaseTotals(lines: PurchaseLineInput[]): { lines: PurchaseLin
   return { lines: computed, kg: round3(computed.reduce((s, l) => s + l.net_kg, 0)), amount: computed.reduce((s, l) => s + l.amount, 0) };
 }
 
-/** "Cà phê nhân xô 1.238 kg; Hồ tiêu đen 320 kg" */
+/** "Cà phê nhân xô: 1.238 kg; Tiêu loại 1: 320 kg" (dấu hai chấm để tên hàng có số không dính vào số kg) */
 export function itemsText(items: { name: string; kg: number }[]): string {
-  return items.map((i) => `${i.name} ${formatKg(i.kg)} kg`).join('; ');
+  return items.map((i) => `${i.name}: ${formatKg(i.kg)} kg`).join('; ');
 }
 
 /** 1238.5 → "1.238,5" */

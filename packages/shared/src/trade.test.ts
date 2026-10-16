@@ -22,7 +22,7 @@ describe('formatKg / itemsText', () => {
     expect(formatKg(1238)).toBe('1.238');
     expect(formatKg(1250.5)).toBe('1.250,5');
     expect(formatKg(0.125)).toBe('0,125');
-    expect(itemsText([{ name: 'Cà phê', kg: 1238 }, { name: 'Tiêu', kg: 320.5 }])).toBe('Cà phê 1.238 kg; Tiêu 320,5 kg');
+    expect(itemsText([{ name: 'Cà phê', kg: 1238 }, { name: 'Tiêu', kg: 320.5 }])).toBe('Cà phê: 1.238 kg; Tiêu: 320,5 kg');
   });
 });
 
