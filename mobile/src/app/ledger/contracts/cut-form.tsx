@@ -2,7 +2,7 @@ import { contractSummaries, CUT_GRADES, cutKg, cutValue, formatQty, formatVnd, t
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { checkDate, DateField, ErrorNote, Field, groupDigits, inputStyle, MoneyField, TextField } from '../../../components/fields';
+import { checkDate, DateField, ErrorNote, groupDigits, inputStyle, MoneyField, TextField } from '../../../components/fields';
 import { Button, Card, Chip, styles } from '../../../components/ui';
 import { useLedger } from '../../../lib/ledger';
 import { parseQty, qtyText } from '../../../lib/qty';
@@ -30,6 +30,8 @@ function CutForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
   );
   const [date, setDate] = useState(cut?.date ?? today());
   const [deduct, setDeduct] = useState(cut?.deposit_deduct ?? 0);
+  // Lái trả đợt này (ngoài trừ cọc); null = trả đủ
+  const [paid, setPaid] = useState<number | null>(cut?.paid ?? null);
   const [note, setNote] = useState(cut?.note ?? '');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -47,6 +49,9 @@ function CutForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
   // Cọc có thể trừ ở đợt này = cọc còn lại (cộng lại số đợt này đang trừ khi sửa)
   const depositLeft = summary.contract.deposit - summary.deducted + (cut?.deposit_deduct ?? 0);
   const canDeduct = Math.min(depositLeft, value);
+  // Lái phải trả đợt này = tiền hàng − trừ cọc
+  const due = Math.max(0, value - deduct);
+  const paidNow = paid === null ? due : Math.min(paid, due);
   const setLine = (i: number, patch: Partial<LineDraft>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
 
   const save = async () => {
@@ -55,8 +60,8 @@ function CutForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
     setError(null);
     setSaving(true);
     try {
-      if (cut) await ledger.updateCut(cut.id, { lines: parsed, date, deposit_deduct: deduct, note });
-      else await ledger.addCut({ contract_id: summary.contract.id, lines: parsed, date, deposit_deduct: deduct, note });
+      if (cut) await ledger.updateCut(cut.id, { lines: parsed, date, deposit_deduct: deduct, paid, note });
+      else await ledger.addCut({ contract_id: summary.contract.id, lines: parsed, date, deposit_deduct: deduct, paid, note });
       showToast({ message: `Đã lưu đợt cắt: ${formatVnd(value)}` });
       router.back();
     } catch (err) {
@@ -153,9 +158,12 @@ function CutForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
           <Chip label="Không trừ" active={deduct === 0} onPress={() => setDeduct(0)} />
         </View>
       )}
-      <Field label="Lái trả thêm đợt này">
-        <Text style={{ fontSize: font.title, fontWeight: '800', color: colors.text }}>{formatVnd(Math.max(0, value - deduct))}</Text>
-      </Field>
+      <MoneyField label={`Lái trả đợt này (phải trả ${formatVnd(due)})`} value={paidNow} onChange={(v) => setPaid(v >= due ? null : v)} />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: -4, marginBottom: 12 }}>
+        <Chip label={`Trả đủ ${formatVnd(due)}`} active={paid === null && due > 0} onPress={() => setPaid(null)} />
+        <Chip label="Chưa trả" active={paid === 0} onPress={() => setPaid(0)} />
+      </View>
+      {due - paidNow > 0 && <Text style={[styles.body, { color: colors.loss, fontWeight: '700', marginBottom: 12 }]}>Lái còn nợ đợt này: {formatVnd(due - paidNow)}</Text>}
       <TextField label="Ghi chú" value={note} onChange={setNote} maxLength={200} />
       <ErrorNote message={error} />
       <Button label={saving ? 'Đang lưu…' : 'Lưu đợt cắt'} onPress={save} disabled={value <= 0 || saving} />

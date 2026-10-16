@@ -1,10 +1,10 @@
-import { CONTRACT_STATUS_LABELS, contractSettlement, contractSummaries, cutValue, formatDate, formatQty, formatVnd, telHref, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
+import { CONTRACT_STATUS_LABELS, contractSettlement, contractSummaries, cutOwing, cutValue, formatDate, formatQty, formatVnd, telHref, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { ErrorNote, MoneyField } from '../../../components/fields';
 import { ItemRow, SectionTitle } from '../../../components/ledger';
-import { Button, Card, styles } from '../../../components/ui';
+import { Button, Card, Chip, styles } from '../../../components/ui';
 import { confirmAsync } from '../../../lib/confirm';
 import { useLedger } from '../../../lib/ledger';
 import { colors, font } from '../../../lib/theme';
@@ -24,6 +24,7 @@ function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnap
   const [how, setHow] = useState<'deduct' | 'refund' | 'forfeit'>('deduct');
   const [refunding, setRefunding] = useState(false);
   const [refund, setRefund] = useState(summary?.depositLeft ?? 0);
+  const [payAmount, setPayAmount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!summary) {
@@ -34,7 +35,7 @@ function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnap
       </Card>
     );
   }
-  const { contract, cuts, delivered, kg, deducted, depositLeft, paidByCuts } = summary;
+  const { contract, cuts, delivered, kg, deducted, depositLeft, paidByCuts, owing } = summary;
   const garden = data.gardens.find((g) => g.id === contract.garden_id);
   const open = contract.status === 'open';
   const settlement = contractSettlement(summary, data.transactions);
@@ -103,11 +104,32 @@ function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnap
             Đã trừ cọc <Text style={{ fontWeight: '700' }}>{formatVnd(deducted)}</Text>
           </Text>
           <Text style={styles.body}>
-            Lái trả thêm <Text style={{ fontWeight: '700' }}>{formatVnd(paidByCuts)}</Text>
+            Lái đã trả thêm <Text style={{ fontWeight: '700' }}>{formatVnd(paidByCuts)}</Text>
           </Text>
         </View>
         {open && <Text style={[styles.muted, depositLeft > 0 && { color: colors.loss, fontWeight: '700' }, { marginTop: 4 }]}>Cọc còn chưa trừ: {formatVnd(depositLeft)}</Text>}
+        {owing > 0 && <Text style={[styles.body, { color: colors.loss, fontWeight: '700', marginTop: 4 }]}>Lái còn nợ tiền hàng: {formatVnd(owing)}</Text>}
       </Card>
+
+      {owing > 0 && (
+        <Card>
+          <MoneyField label="Lái trả thêm" value={payAmount ?? owing} onChange={setPayAmount} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Chip label={`Trả hết ${formatVnd(owing)}`} active={(payAmount ?? owing) === owing} onPress={() => setPayAmount(owing)} />
+          </View>
+          <View style={{ marginTop: 8 }}>
+            <Button
+              label="💵 Ghi lái trả"
+              disabled={(payAmount ?? owing) <= 0}
+              onPress={() => {
+                const amount = payAmount ?? owing;
+                setPayAmount(null);
+                void run(() => ledger.payContractOwing(id, amount), `Đã ghi lái trả thêm ${formatVnd(Math.min(amount, owing))}`);
+              }}
+            />
+          </View>
+        </Card>
+      )}
 
       {open && <Button label="✂️ Ghi đợt cắt" onPress={() => router.push({ pathname: '/ledger/contracts/cut-form', params: { contractId: id } })} />}
 
@@ -119,7 +141,7 @@ function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnap
           icon="✂️"
           subLines={6}
           title={`Đợt ${i + 1} · ${formatDate(cut.date)}`}
-          sub={`${cut.lines.map((l) => `${l.grade} ${formatQty(l.kg)} kg × ${formatVnd(l.price)}`).join(' · ')}${cut.deposit_deduct > 0 ? ` · trừ cọc ${formatVnd(cut.deposit_deduct)}` : ''}`}
+          sub={`${cut.lines.map((l) => `${l.grade} ${formatQty(l.kg)} kg × ${formatVnd(l.price)}`).join(' · ')}${cut.deposit_deduct > 0 ? ` · trừ cọc ${formatVnd(cut.deposit_deduct)}` : ''}${cutOwing(cut) > 0 ? ` · lái còn nợ ${formatVnd(cutOwing(cut))}` : ''}`}
           amount={`+${formatVnd(cutValue(cut.lines))}`}
           amountColor={colors.gain}
           onPress={() => router.push({ pathname: '/ledger/contracts/cut-form', params: { contractId: id, id: cut.id } })}

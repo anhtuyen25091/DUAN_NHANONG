@@ -4,6 +4,7 @@ import {
   contractSummaries,
   CUT_GRADES,
   cutKg,
+  cutOwing,
   cutValue,
   formatDate,
   formatQty,
@@ -26,6 +27,7 @@ export function ContractList({ data }: { data: LedgerSnapshot }) {
   const summaries = contractSummaries(data)
   const gardens = new Map(data.gardens.map((g) => [g.id, g.name]))
   const depositLeft = summaries.reduce((s, x) => s + x.depositLeft, 0)
+  const owing = summaries.reduce((s, x) => s + x.owing, 0)
 
   return (
     <div className="ledger">
@@ -39,12 +41,13 @@ export function ContractList({ data }: { data: LedgerSnapshot }) {
         <section className="card">
           <p className="small muted">Cọc của lái còn chưa trừ</p>
           <p className="big">{formatVnd(depositLeft)}</p>
+          {owing > 0 && <p className="out">Lái còn nợ tiền hàng: {formatVnd(owing)}</p>}
         </section>
       )}
       {summaries.length === 0 && <div className="notice">Chưa có hợp đồng nào. Bấm “＋ Nhận cọc” khi lái đặt cọc vườn.</div>}
 
       <div className="garden-list">
-        {summaries.map(({ contract, cuts, delivered, depositLeft }) => (
+        {summaries.map(({ contract, cuts, delivered, depositLeft, owing: left }) => (
           <a key={contract.id} className={`card garden-row${contract.status === 'open' ? '' : ' faded-row'}`} href={href(`so/ban/${contract.id}`)}>
             <span className="garden-name">
               🤝 {contract.buyer}
@@ -53,6 +56,7 @@ export function ContractList({ data }: { data: LedgerSnapshot }) {
                 · {gardens.get(contract.garden_id) ?? 'Vườn đã xóa'} · {cuts.length} đợt · {CONTRACT_STATUS_LABELS[contract.status]}
               </span>
               {contract.status === 'open' && depositLeft > 0 && <span className="tag">Cọc còn {formatVnd(depositLeft)}</span>}
+              {left > 0 && <span className="tag overdue">Lái còn nợ {formatVnd(left)}</span>}
             </span>
             <span className="profit gain">{formatVnd(delivered)}</span>
           </a>
@@ -156,7 +160,7 @@ export function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: Led
         Không tìm thấy hợp đồng này. <a href={href('so/ban')}>Về danh sách</a>
       </div>
     )
-  const { contract, cuts, delivered, kg, deducted, depositLeft, paidByCuts } = summary
+  const { contract, cuts, delivered, kg, deducted, depositLeft, paidByCuts, owing } = summary
   const garden = data.gardens.find((g) => g.id === contract.garden_id)
   const open = contract.status === 'open'
   const settlement = contractSettlement(summary, data.transactions)
@@ -216,11 +220,18 @@ export function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: Led
             Đã trừ cọc <b>{formatVnd(deducted)}</b>
           </span>
           <span>
-            Lái trả thêm <b>{formatVnd(paidByCuts)}</b>
+            Lái đã trả thêm <b>{formatVnd(paidByCuts)}</b>
           </span>
         </div>
         {open && <p className={`small ${depositLeft > 0 ? 'out' : 'muted'}`}>Cọc còn chưa trừ: {formatVnd(depositLeft)}</p>}
+        {owing > 0 && (
+          <p className="out">
+            <b>Lái còn nợ tiền hàng: {formatVnd(owing)}</b>
+          </p>
+        )}
       </section>
+
+      {owing > 0 && <PayOwing owing={owing} onPay={(amount) => run(async () => ledger.payContractOwing(id, amount), `Đã ghi lái trả thêm ${formatVnd(Math.min(amount, owing))}`)} />}
 
       {open && (
         <a className="button primary wide" href={href(`so/ban/${id}/dot-moi`)}>
@@ -243,6 +254,7 @@ export function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: Led
               <span className="small muted">
                 {cut.lines.map((l) => `${l.grade} ${formatQty(l.kg)} kg × ${formatVnd(l.price)}`).join(' · ')}
                 {cut.deposit_deduct > 0 && ` · trừ cọc ${formatVnd(cut.deposit_deduct)}`}
+                {cutOwing(cut) > 0 && <span className="out"> · lái còn nợ {formatVnd(cutOwing(cut))}</span>}
               </span>
             </span>
             <span className="amount in">+{formatVnd(cutValue(cut.lines))}</span>
@@ -374,6 +386,24 @@ export function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: Led
 }
 
 /** Trả lại cọc kèm tiền đền (mình không bán nữa, phải đền cho lái) */
+/** Lái trả thêm tiền hàng còn nợ (chia vào các đợt còn nợ, đợt cũ trước) */
+function PayOwing({ owing, onPay }: { owing: number; onPay: (amount: number) => void }) {
+  const [amount, setAmount] = useState(owing)
+  return (
+    <section className="card form">
+      <MoneyField label="Lái trả thêm" value={amount} onChange={setAmount} />
+      <div className="actions">
+        <button type="button" className={`choice${amount === owing ? ' active' : ''}`} aria-pressed={amount === owing} onClick={() => setAmount(owing)}>
+          Trả hết {formatVnd(owing)}
+        </button>
+        <button type="button" className="primary" disabled={amount <= 0} onClick={() => onPay(amount)}>
+          💵 Ghi lái trả
+        </button>
+      </div>
+    </section>
+  )
+}
+
 function RefundWithPenalty({ depositLeft, onRefund }: { depositLeft: number; onRefund: (amount: number) => void }) {
   const [open, setOpen] = useState(false)
   const [amount, setAmount] = useState(depositLeft)
@@ -410,6 +440,8 @@ export function CutForm({ ledger, data, contractId, id }: { ledger: Ledger; data
   )
   const [date, setDate] = useState(cut?.date ?? today())
   const [deduct, setDeduct] = useState(cut?.deposit_deduct ?? 0)
+  // Lái trả đợt này (ngoài trừ cọc); null = trả đủ
+  const [paid, setPaid] = useState<number | null>(cut?.paid ?? null)
   const [note, setNote] = useState(cut?.note ?? '')
   const [error, setError] = useState<string | null>(null)
 
@@ -425,13 +457,16 @@ export function CutForm({ ledger, data, contractId, id }: { ledger: Ledger; data
   const canDeduct = Math.min(summary.contract.deposit - summary.deducted + (cut?.deposit_deduct ?? 0), value)
   const setLine = (i: number, patch: Partial<LineDraft>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)))
   const back = `so/ban/${contractId}`
+  // Lái phải trả đợt này = tiền hàng − trừ cọc
+  const due = Math.max(0, value - deduct)
+  const paidNow = paid === null ? due : Math.min(paid, due)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
     try {
-      if (cut) await ledger.updateCut(cut.id, { lines: parsed, date, deposit_deduct: deduct, note })
-      else await ledger.addCut({ contract_id: contractId, lines: parsed, date, deposit_deduct: deduct, note })
+      if (cut) await ledger.updateCut(cut.id, { lines: parsed, date, deposit_deduct: deduct, paid, note })
+      else await ledger.addCut({ contract_id: contractId, lines: parsed, date, deposit_deduct: deduct, paid, note })
       showToast({ message: `Đã lưu đợt cắt: ${formatVnd(value)}` })
       go(back)
     } catch (err) {
@@ -511,9 +546,16 @@ export function CutForm({ ledger, data, contractId, id }: { ledger: Ledger; data
           </button>
         </div>
       )}
-      <p>
-        Lái trả thêm đợt này: <b>{formatVnd(Math.max(0, value - deduct))}</b>
-      </p>
+      <MoneyField label={`Lái trả đợt này (phải trả ${formatVnd(due)})`} value={paidNow} onChange={(v) => setPaid(v >= due ? null : v)} />
+      <div className="actions">
+        <button type="button" className={`choice${paid === null && due > 0 ? ' active' : ''}`} aria-pressed={paid === null && due > 0} onClick={() => setPaid(null)}>
+          Trả đủ {formatVnd(due)}
+        </button>
+        <button type="button" className={`choice${paid === 0 ? ' active' : ''}`} aria-pressed={paid === 0} onClick={() => setPaid(0)}>
+          Chưa trả
+        </button>
+      </div>
+      {due - paidNow > 0 && <p className="out">Lái còn nợ đợt này: {formatVnd(due - paidNow)}</p>}
       <label>
         Ghi chú
         <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />

@@ -164,6 +164,11 @@ export interface HarvestCut extends SyncRecord {
   date: string;
   lines: CutLine[];
   deposit_deduct: number; // số tiền cọc trừ vào đợt này (hai bên tự thỏa thuận)
+  /**
+   * Tiền lái đã trả cho đợt này (ngoài phần trừ cọc). Không có (đợt ghi trước khi có trường này) = lái trả đủ.
+   * Lái còn nợ đợt này = giá trị hàng − trừ cọc − paid.
+   */
+  paid?: number | null;
   transaction_id: string | null; // khoản tiền vào = giá trị hàng của đợt
   note: string | null;
 }

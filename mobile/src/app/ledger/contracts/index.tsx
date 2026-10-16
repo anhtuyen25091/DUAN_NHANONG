@@ -17,6 +17,7 @@ function ContractList({ data }: { data: LedgerSnapshot }) {
   const summaries = contractSummaries(data);
   const gardens = new Map(data.gardens.map((g) => [g.id, g.name]));
   const depositLeft = summaries.reduce((s, x) => s + x.depositLeft, 0);
+  const owing = summaries.reduce((s, x) => s + x.owing, 0);
 
   return (
     <View style={{ flex: 1 }}>
@@ -28,6 +29,7 @@ function ContractList({ data }: { data: LedgerSnapshot }) {
           <Card>
             <Text style={styles.muted}>Cọc của lái còn chưa trừ</Text>
             <Text style={{ fontSize: 30, fontWeight: '800', color: colors.text }}>{formatVnd(depositLeft)}</Text>
+            {owing > 0 && <Text style={[styles.body, { color: colors.loss, fontWeight: '700' }]}>Lái còn nợ tiền hàng: {formatVnd(owing)}</Text>}
           </Card>
         )}
         {summaries.length === 0 && (
@@ -35,12 +37,12 @@ function ContractList({ data }: { data: LedgerSnapshot }) {
             <Text style={styles.body}>Chưa có hợp đồng nào. Bấm “＋ Nhận cọc” khi lái đặt cọc vườn.</Text>
           </Card>
         )}
-        {summaries.map(({ contract, cuts, delivered, depositLeft }) => (
+        {summaries.map(({ contract, cuts, delivered, depositLeft, owing: left }) => (
           <RowCard
             key={contract.id}
             title={`🤝 ${contract.buyer}`}
             sub={`${gardens.get(contract.garden_id) ?? 'Vườn đã xóa'} · ${cuts.length} đợt · ${CONTRACT_STATUS_LABELS[contract.status]}`}
-            tag={contract.status === 'open' && depositLeft > 0 ? `Cọc còn ${formatVnd(depositLeft)}` : null}
+            tag={left > 0 ? `Lái còn nợ ${formatVnd(left)}` : contract.status === 'open' && depositLeft > 0 ? `Cọc còn ${formatVnd(depositLeft)}` : null}
             right={formatVnd(delivered)}
             rightColor={colors.gain}
             faded={contract.status !== 'open'}

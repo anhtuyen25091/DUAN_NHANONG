@@ -2,7 +2,7 @@
  * Sổ thu chi: dữ liệu nằm trong bộ nhớ, ghi xuống máy (IndexedDB trên web, SQLite trên mobile)
  * qua LedgerStorage. Web và mobile dùng chung class này; mỗi nơi chỉ viết phần lưu trữ.
  */
-import { addMonths, cutKg, cutValue, formatQty, formatQtyGrouped, supplyCost, supplyEntryNote } from './advanced';
+import { addMonths, cutKg, cutOwing, cutPaid, cutValue, formatQty, formatQtyGrouped, supplyCost, supplyEntryNote } from './advanced';
 import { randomUuid, type Deal } from './api';
 import { formatVnd } from './money';
 import {
@@ -184,6 +184,8 @@ export interface NewCut {
   date?: string;
   lines: CutLine[];
   deposit_deduct?: number;
+  /** Tiền lái trả đợt này (ngoài trừ cọc); bỏ trống = trả đủ */
+  paid?: number | null;
   note?: string | null;
 }
 
@@ -1020,6 +1022,7 @@ export class Ledger {
       date: input.date ?? today(this.now()),
       lines,
       deposit_deduct: deduct,
+      paid: this.cleanCutPaid(input.paid, value - deduct),
       transaction_id: null,
       note: input.note?.trim() || null,
       updated_at: at,
@@ -1052,10 +1055,48 @@ export class Ledger {
     const deduct = Math.round(patch.deposit_deduct ?? cut.deposit_deduct);
     this.checkDeduct(contract, deduct, cutValue(lines), cut.id);
     const at = this.stamp();
-    const next: HarvestCut = { ...cut, ...patch, lines, deposit_deduct: deduct, note: patch.note === undefined ? cut.note : patch.note?.trim() || null, updated_at: at };
+    const paid = patch.paid === undefined ? (cut.paid ?? null) : patch.paid;
+    const next: HarvestCut = {
+      ...cut,
+      ...patch,
+      lines,
+      deposit_deduct: deduct,
+      paid: this.cleanCutPaid(paid, cutValue(lines) - deduct),
+      note: patch.note === undefined ? cut.note : patch.note?.trim() || null,
+      updated_at: at,
+    };
     await this.write('harvest_cuts', [next]);
     const entry = cut.transaction_id ? this.alive('transactions', cut.transaction_id) : undefined;
     if (entry) await this.write('transactions', [{ ...entry, amount: cutValue(lines), date: next.date, note: this.cutNote(contract, next), updated_at: at }]);
+  }
+
+  /**
+   * Lái trả thêm tiền hàng còn nợ: chia vào các đợt còn nợ, đợt cũ trước. Trả về số tiền đã ghi
+   * (không vượt tổng còn nợ).
+   */
+  async payContractOwing(contractId: string, amount: number): Promise<number> {
+    const cuts = this.live('harvest_cuts')
+      .filter((c) => c.contract_id === contractId)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.updated_at.localeCompare(b.updated_at));
+    let left = Math.round(amount);
+    const at = this.stamp();
+    const changed: HarvestCut[] = [];
+    for (const cut of cuts) {
+      const owing = cutOwing(cut);
+      if (left <= 0 || owing <= 0) continue;
+      const pay = Math.min(owing, left);
+      changed.push({ ...cut, paid: this.cleanCutPaid(cutPaid(cut) + pay, cutValue(cut.lines) - cut.deposit_deduct), updated_at: at });
+      left -= pay;
+    }
+    if (changed.length) await this.write('harvest_cuts', changed);
+    return Math.round(amount) - left;
+  }
+
+  /** Lái trả đợt này: không âm, không vượt số phải trả; trả đủ thì lưu null (giống đợt ghi trước khi có trường này) */
+  private cleanCutPaid(paid: number | null | undefined, due: number): number | null {
+    if (paid === undefined || paid === null) return null;
+    const value = Math.max(0, Math.min(Math.round(paid), Math.max(0, due)));
+    return value >= due ? null : value;
   }
 
   async removeCut(id: string): Promise<Undo> {

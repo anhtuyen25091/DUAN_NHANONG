@@ -171,6 +171,17 @@ export function cutKg(lines: CutLine[]): number {
   return lines.reduce((sum, l) => sum + l.kg, 0);
 }
 
+/** Tiền lái đã trả cho 1 đợt (ngoài trừ cọc); đợt cũ chưa có trường paid thì coi là trả đủ */
+export function cutPaid(cut: Pick<HarvestCut, 'lines' | 'deposit_deduct' | 'paid'>): number {
+  const due = Math.max(0, cutValue(cut.lines) - cut.deposit_deduct);
+  return cut.paid === undefined || cut.paid === null ? due : Math.min(cut.paid, due);
+}
+
+/** Lái còn nợ của 1 đợt */
+export function cutOwing(cut: Pick<HarvestCut, 'lines' | 'deposit_deduct' | 'paid'>): number {
+  return Math.max(0, cutValue(cut.lines) - cut.deposit_deduct - cutPaid(cut));
+}
+
 export interface ContractSummary {
   contract: HarvestContract;
   cuts: HarvestCut[];
@@ -181,8 +192,10 @@ export interface ContractSummary {
   deducted: number;
   /** Cọc còn lại chưa trừ (0 khi đã kết thúc bằng bỏ cọc / trả cọc) */
   depositLeft: number;
-  /** Tiền lái trả thêm qua các đợt (giá trị hàng − số trừ cọc) */
+  /** Tiền lái đã trả thêm qua các đợt (ngoài phần trừ cọc) */
   paidByCuts: number;
+  /** Lái còn nợ (tiền hàng chưa trả) */
+  owing: number;
 }
 
 /** Tình hình từng hợp đồng: đang cắt trước, đã kết thúc sau */
@@ -193,7 +206,9 @@ export function contractSummaries(data: Pick<LedgerSnapshot, 'harvest_contracts'
       const delivered = cuts.reduce((s, c) => s + cutValue(c.lines), 0);
       const deducted = cuts.reduce((s, c) => s + c.deposit_deduct, 0);
       const left = contract.status === 'forfeited' || contract.status === 'refunded' ? 0 : Math.max(0, contract.deposit - deducted);
-      return { contract, cuts, delivered, kg: cuts.reduce((s, c) => s + cutKg(c.lines), 0), deducted, depositLeft: left, paidByCuts: delivered - deducted };
+      const paidByCuts = cuts.reduce((s, c) => s + cutPaid(c), 0);
+      const owing = cuts.reduce((s, c) => s + cutOwing(c), 0);
+      return { contract, cuts, delivered, kg: cuts.reduce((s, c) => s + cutKg(c.lines), 0), deducted, depositLeft: left, paidByCuts, owing };
     })
     .sort((a, b) => Number(a.contract.status !== 'open') - Number(b.contract.status !== 'open') || b.contract.date.localeCompare(a.contract.date));
 }
@@ -214,10 +229,12 @@ export interface ContractSettlement {
   profit: number;
   /** Phần cọc chưa trừ có thể trừ nốt vào tiền hàng các đợt */
   deductRoom: number;
+  /** Lái còn nợ tiền hàng */
+  owing: number;
 }
 
 export function contractSettlement(summary: ContractSummary, transactions: Transaction[]): ContractSettlement {
-  const { contract, delivered, deducted, paidByCuts } = summary;
+  const { contract, delivered, deducted, paidByCuts, owing } = summary;
   const settle = contract.settle_transaction_id ? transactions.find((t) => t.id === contract.settle_transaction_id) : undefined;
   const leftover = Math.max(0, contract.deposit - deducted);
   const forfeited = contract.status === 'forfeited' ? (settle?.amount ?? 0) : 0;
@@ -231,6 +248,7 @@ export function contractSettlement(summary: ContractSummary, transactions: Trans
     penalty,
     profit: delivered + forfeited - penalty,
     deductRoom: Math.max(0, delivered - deducted),
+    owing,
   };
 }
 

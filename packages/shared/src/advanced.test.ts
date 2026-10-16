@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addMonths, allocatedEntries, contractSettlement, contractSummaries, debtsByParty, debtStatus, dueReminders, interestPaid, loanSchedule, monthlyInterest, debtSummary, seasonRange, seasonsOf, suggestSeasonName, supplyStock, supplyUsedValue } from './advanced';
+import { addMonths, allocatedEntries, contractSettlement, contractSummaries, cutOwing, debtsByParty, debtStatus, dueReminders, interestPaid, loanSchedule, monthlyInterest, debtSummary, seasonRange, seasonsOf, suggestSeasonName, supplyStock, supplyUsedValue } from './advanced';
 import { filterEntries, Ledger, totals, type LedgerMeta, type LedgerStorage } from './ledger';
 import type { SyncRecord } from './types';
 
@@ -380,6 +380,34 @@ describe('Lịch trả nợ vay + nhắc hạn', () => {
       ['Cửa hàng A: hạn trả nợ 5.000.000 đ', '2026-10-10', true],
       ['Agribank: kỳ 1, lãi 750.000 đ', '2026-10-20', false],
     ]);
+  });
+});
+
+describe('Bán cho lái: lái còn nợ', () => {
+  it('đợt trả 1 phần thì lái còn nợ; lái trả thêm chia vào đợt cũ trước; đợt cũ không có paid coi như trả đủ', async () => {
+    const { ledger, a } = await setup();
+    const hd = await ledger.addContract({ garden_id: a.id, buyer: 'Lái Tư', deposit: 50_000_000, date: '2026-08-01' });
+    // Đợt 1: 80 tr, trừ cọc 30 tr, lái mới trả 20 tr → còn nợ 30 tr
+    const c1 = await ledger.addCut({ contract_id: hd.id, date: '2026-08-20', lines: [{ grade: 'A', kg: 1000, price: 80_000 }], deposit_deduct: 30_000_000, paid: 20_000_000 });
+    // Đợt 2: 45 tr, trừ cọc 20 tr, chưa trả → còn nợ 25 tr
+    await ledger.addCut({ contract_id: hd.id, date: '2026-09-20', lines: [{ grade: 'A', kg: 500, price: 90_000 }], deposit_deduct: 20_000_000, paid: 0 });
+    const summary = () => contractSummaries(ledger.getSnapshot())[0];
+    expect(summary()).toMatchObject({ delivered: 125_000_000, paidByCuts: 20_000_000, owing: 55_000_000 });
+    // Lời / lỗ vẫn theo tiền hàng đã giao
+    expect(contractSettlement(summary(), ledger.getSnapshot().transactions)).toMatchObject({ profit: 125_000_000, received: 70_000_000, owing: 55_000_000 });
+
+    // Lái trả thêm 40 tr: trả hết đợt 1 (30 tr) trước, rồi 10 tr cho đợt 2
+    expect(await ledger.payContractOwing(hd.id, 40_000_000)).toBe(40_000_000);
+    expect(summary().cuts.map((c) => cutOwing(c))).toEqual([0, 15_000_000]);
+    // Trả dư: chỉ ghi phần còn nợ
+    expect(await ledger.payContractOwing(hd.id, 99_000_000)).toBe(15_000_000);
+    expect(summary().owing).toBe(0);
+    // Đợt trả đủ lưu null (giống đợt ghi trước khi có trường "lái trả")
+    expect(ledger.getSnapshot().harvest_cuts.find((c) => c.id === c1.id)?.paid).toBeNull();
+
+    // Đợt ghi kiểu cũ (không có paid) = trả đủ; sửa đợt: trả vượt số phải trả thì coi là trả đủ
+    await ledger.updateCut(c1.id, { paid: 999_000_000 });
+    expect(cutOwing(summary().cuts[0])).toBe(0);
   });
 });
 
