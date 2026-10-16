@@ -42,7 +42,7 @@ class Deal extends Model
         });
     }
 
-    /** Mã mới không trùng mã đơn nào và mã phiếu nào (2 loại mã nhập chung 1 ô "Nhập mã") */
+    /** Mã mới không trùng mã đơn, mã phiếu, mã mời doanh nghiệp nào */
     public static function newCode(): string
     {
         do {
@@ -50,7 +50,9 @@ class Deal extends Model
             for ($i = 0; $i < 6; $i++) {
                 $code .= self::CODE_ALPHABET[random_int(0, strlen(self::CODE_ALPHABET) - 1)];
             }
-        } while (self::query()->where('code', $code)->exists() || Purchase::query()->withTrashed()->where('share_code', $code)->exists());
+        } while (self::query()->where('code', $code)->exists()
+            || Purchase::query()->withTrashed()->where('share_code', $code)->exists()
+            || Business::query()->where('invite_code', $code)->exists());
 
         return $code;
     }
@@ -95,9 +97,33 @@ class Deal extends Model
         ])->save();
     }
 
+    /** Chủ doanh nghiệp của đơn (lái con tạo / tham gia): được xem số liệu, tải quyết toán */
+    public function isBusinessOwner(User $user): bool
+    {
+        return $this->business_id !== null && Business::query()->whereKey($this->business_id)->where('owner_id', $user->id)->exists();
+    }
+
     public function isOpenToJoin(): bool
     {
         return $this->seller_id === null || $this->buyer_id === null;
+    }
+
+    /**
+     * Thành viên doanh nghiệp đứng trong đơn (đơn của doanh nghiệp)
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function businessUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'business_user_id');
+    }
+
+    /**
+     * @return BelongsTo<Business, $this>
+     */
+    public function business(): BelongsTo
+    {
+        return $this->belongsTo(Business::class);
     }
 
     /**

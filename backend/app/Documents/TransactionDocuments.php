@@ -2,10 +2,12 @@
 
 namespace App\Documents;
 
+use App\Businesses\BusinessStats;
 use App\Deals\DealSummary;
 use App\Enums\DealEntryKind;
 use App\Enums\DealEntryStatus;
 use App\Enums\PurchaseKind;
+use App\Models\Business;
 use App\Models\Customer;
 use App\Models\Deal;
 use App\Models\DealEntry;
@@ -62,7 +64,7 @@ final class TransactionDocuments
         return new Document(
             title: $purchase->kind->title(),
             subtitle: 'Số: '.$purchase->code().' · Ngày '.self::date($purchase->date),
-            issuer: $this->issuer($user),
+            issuer: $this->issuer($user, $purchase->business),
             info: array_values(array_filter([
                 [$isBuy ? 'Người bán' : 'Người mua', $purchase->customer_name],
                 $purchase->customer_phone ? ['Số điện thoại', $purchase->customer_phone] : null,
@@ -309,12 +311,91 @@ final class TransactionDocuments
     }
 
     /**
+     * Báo cáo cả doanh nghiệp cho chủ: từng lái (mua, bán, còn nợ nông dân, tiền ứng, đang giữ), mặt hàng, chi tiết.
+     */
+    public function businessReport(Business $business, CarbonImmutable $from, CarbonImmutable $to): Document
+    {
+        $summary = BusinessStats::summary($business, $from, $to);
+        $rows = TransactionFeed::forBusiness($business, $from, $to)->sortBy([['date', 'asc'], ['sort', 'asc']])->values();
+        $t = $summary['totals'];
+
+        $tables = [new DocumentTable(
+            heading: 'Theo từng lái (tiền ứng, đang giữ tính đến nay)',
+            columns: [['Lái'], ['Nhóm'], ['Số GD', 'right'], ['Kg mua', 'right'], ['Tiền mua (đ)', 'right'], ['Còn nợ ND (đ)', 'right'], ['Tiền bán (đ)', 'right'], ['Đã ứng (đ)', 'right'], ['Đang giữ (đ)', 'right']],
+            rows: array_map(fn (array $m): array => [
+                $m['name'].($m['role'] === 'owner' ? ' (chủ)' : '').($m['status'] === 'locked' ? ' (đã khóa)' : ''),
+                $m['group_name'] ?? '',
+                (string) $m['totals']['count'],
+                self::kg($m['totals']['buy']['kg']),
+                self::money($m['totals']['buy']['amount']),
+                self::money($m['totals']['buy']['owing']),
+                self::money($m['totals']['sell']['amount']),
+                self::money($m['cash']['advanced'] - $m['cash']['returned']),
+                self::money($m['cash']['holding']),
+            ], $summary['members']),
+            footer: ['Cộng', '', (string) $t['count'], self::kg($t['buy']['kg']), self::money($t['buy']['amount']), self::money($t['buy']['owing']), self::money($t['sell']['amount']), '', self::money($t['holding'])],
+        )];
+
+        foreach (['buy' => 'Mua vào theo mặt hàng', 'sell' => 'Bán ra theo mặt hàng'] as $kind => $heading) {
+            $products = array_values(array_filter($summary['products'], fn (array $p): bool => $p['kind'] === $kind));
+            if ($products) {
+                $tables[] = new DocumentTable(
+                    heading: $heading,
+                    columns: [['Hàng'], ['Kg', 'right'], ['Giá bình quân (đ/kg)', 'right'], ['Tiền hàng (đ)', 'right']],
+                    rows: array_map(fn (array $p): array => [$p['name'], self::kg($p['kg']), $p['kg'] > 0 ? self::money((int) round($p['amount'] / $p['kg'])) : '', self::money($p['amount'])], $products),
+                );
+            }
+        }
+
+        $tables[] = new DocumentTable(
+            heading: 'Chi tiết giao dịch',
+            columns: [['Ngày', 'center'], ['Lái'], ['Số'], ['Khách'], ['Loại'], ['Hàng'], ['Tiền hàng (đ)', 'right'], ['Còn nợ (đ)', 'right']],
+            rows: $rows->map(fn (array $r): array => [
+                self::date($r['date']),
+                $r['member']['name'],
+                $r['code'],
+                $r['counterpart'],
+                ($r['kind'] === 'buy' ? 'Mua' : 'Bán').($r['pending'] ? ' (chờ)' : ''),
+                self::itemsText($r['items']),
+                self::money($r['amount']),
+                $r['owing'] > 0 ? self::money($r['owing']) : '',
+            ])->all(),
+        );
+
+        return new Document(
+            title: 'BÁO CÁO DOANH NGHIỆP',
+            subtitle: 'Từ ngày '.self::date($from).' đến ngày '.self::date($to),
+            issuer: $this->issuer($business->owner, $business),
+            info: [
+                ['Số lái', (string) count($summary['members'])],
+                ['Mua vào', self::kg($t['buy']['kg']).' kg · '.self::vnd($t['buy']['amount']).' · còn nợ nông dân '.self::vnd($t['buy']['owing'])],
+                ['Bán ra', self::kg($t['sell']['kg']).' kg · '.self::vnd($t['sell']['amount'])],
+                ['Tiền các lái đang giữ', self::vnd($t['holding'])],
+            ],
+            tables: $tables,
+            notes: ['Đang giữ = đã ứng − đã nộp lại − đã trả nông dân (phiếu, cọc, đợt cân) + tiền thu khi bán.'],
+            filename: Str::slug('bao cao doanh nghiep '.$from->format('d-m-Y').' '.$to->format('d-m-Y')),
+            landscape: true,
+        );
+    }
+
+    /**
      * Bên lập phiếu: hồ sơ điểm mua (nếu có), không thì tên + SĐT tài khoản.
      *
      * @return array{name: string, lines: list<string>}
      */
-    private function issuer(User $user): array
+    private function issuer(User $user, ?Business $business = null): array
     {
+        // Thành viên doanh nghiệp: in tên doanh nghiệp, kèm ai lập phiếu (nếu không phải chủ)
+        $business ??= $user->membership()->with('business')->first()?->business;
+        if ($business !== null) {
+            return ['name' => $business->name, 'lines' => array_values(array_filter([
+                $business->phone ? 'SĐT: '.$business->phone : null,
+                $business->address ? 'Địa chỉ: '.$business->address : null,
+                $business->owner_id !== $user->id ? 'Người lập: '.$user->name.($user->phone ? ' · '.$user->phone : '') : null,
+            ]))];
+        }
+
         $buyer = $user->buyer;
         $lines = array_values(array_filter([
             ($buyer?->phone ?? $user->phone) ? 'SĐT: '.($buyer?->phone ?? $user->phone) : null,

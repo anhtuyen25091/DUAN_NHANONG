@@ -8,6 +8,7 @@ use App\Documents\PdfRenderer;
 use App\Documents\TransactionDocuments;
 use App\Enums\DealEntryKind;
 use App\Http\Controllers\Controller;
+use App\Models\BusinessMember;
 use App\Models\Customer;
 use App\Models\Deal;
 use App\Models\DealEntry;
@@ -31,7 +32,7 @@ class TransactionController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        [$from, $to] = $this->range($request);
+        [$from, $to] = self::dateRange($request);
         $filters = $request->validate([
             'kind' => ['nullable', Rule::in(['buy', 'sell'])],
             'q' => ['nullable', 'string', 'max:100'],
@@ -50,7 +51,7 @@ class TransactionController extends Controller
     public function purchaseDocument(Request $request, string $purchase): Response
     {
         $purchase = Purchase::withTrashed()->where('uuid', $purchase)->firstOrFail();
-        // Người lập phiếu, hoặc khách được chia sẻ (chỉ xem)
+        // Người lập phiếu, chủ doanh nghiệp của phiếu, hoặc khách được chia sẻ (chỉ xem)
         abort_unless($purchase->canView($request->user()), 404);
 
         return $this->download($request, $this->documents->purchaseReceipt($purchase->load('customer', 'user.buyer')));
@@ -59,14 +60,14 @@ class TransactionController extends Controller
     public function dealEntryDocument(Request $request, DealEntry $entry): Response
     {
         $entry->load('deal.seller', 'deal.buyer', 'deal.product');
-        abort_unless($entry->deal->isParticipant($request->user()) && $entry->kind === DealEntryKind::Cut, 404);
+        abort_unless(($entry->deal->isParticipant($request->user()) || $entry->deal->isBusinessOwner($request->user())) && $entry->kind === DealEntryKind::Cut, 404);
 
         return $this->download($request, $this->documents->dealCutReceipt($entry, $request->user()));
     }
 
     public function dealDocument(Request $request, Deal $deal): Response
     {
-        abort_unless($deal->isParticipant($request->user()), 404);
+        abort_unless($deal->isParticipant($request->user()) || $deal->isBusinessOwner($request->user()), 404);
 
         return $this->download($request, $this->documents->dealStatement($deal->load('entries', 'seller', 'buyer', 'product'), $request->user()));
     }
@@ -74,14 +75,24 @@ class TransactionController extends Controller
     public function customerDocument(Request $request, Customer $customer): Response
     {
         abort_unless($customer->user_id === $request->user()->id, 404);
-        [$from, $to] = $this->range($request);
+        [$from, $to] = self::dateRange($request);
 
         return $this->download($request, $this->documents->customerStatement($request->user(), $customer, $from, $to));
     }
 
+    /** Báo cáo cả doanh nghiệp (chủ): theo từng lái, mặt hàng, tiền ứng / đang giữ, chi tiết */
+    public function businessReportDocument(Request $request): Response
+    {
+        $membership = $request->user()->membership()->with('business')->first();
+        abort_unless($membership?->role === BusinessMember::OWNER, 403, 'Chỉ chủ doanh nghiệp xem được báo cáo này.');
+        [$from, $to] = self::dateRange($request);
+
+        return $this->download($request, $this->documents->businessReport($membership->business, $from, $to));
+    }
+
     public function reportDocument(Request $request): Response
     {
-        [$from, $to] = $this->range($request);
+        [$from, $to] = self::dateRange($request);
 
         return $this->download($request, $this->documents->report($request->user(), $from, $to));
     }
@@ -91,7 +102,7 @@ class TransactionController extends Controller
      *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}
      */
-    private function range(Request $request): array
+    public static function dateRange(Request $request): array
     {
         $data = $request->validate([
             'from' => ['nullable', 'date_format:Y-m-d'],

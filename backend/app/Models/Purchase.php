@@ -197,7 +197,21 @@ class Purchase extends Model
 
     public function canView(User $user): bool
     {
-        return $this->user_id === $user->id || $this->viewers()->whereKey($user->id)->exists();
+        return $this->user_id === $user->id || $this->isBusinessOwner($user) || $this->viewers()->whereKey($user->id)->exists();
+    }
+
+    /** Chủ doanh nghiệp của phiếu (phiếu lái con lập): xem, tải giấy tờ, thống kê */
+    public function isBusinessOwner(User $user): bool
+    {
+        return $this->business_id !== null && Business::query()->whereKey($this->business_id)->where('owner_id', $user->id)->exists();
+    }
+
+    /**
+     * @return BelongsTo<Business, $this>
+     */
+    public function business(): BelongsTo
+    {
+        return $this->belongsTo(Business::class);
     }
 
     /**

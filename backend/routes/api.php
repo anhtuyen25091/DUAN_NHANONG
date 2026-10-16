@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BusinessController;
 use App\Http\Controllers\Api\V1\BuyerController;
 use App\Http\Controllers\Api\V1\CatalogController;
 use App\Http\Controllers\Api\V1\CustomerController;
@@ -102,12 +103,31 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/received-purchases', [PurchaseController::class, 'received'])->name('received-purchases.index');
         Route::get('/received-purchases/{purchase}', [PurchaseController::class, 'showReceived'])->name('received-purchases.show');
         Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+
+        // Doanh nghiệp thu mua: chủ + lái con
+        Route::get('/business', [BusinessController::class, 'show'])->name('business.show');
+        Route::post('/business', [BusinessController::class, 'store'])->name('business.store');
+        Route::patch('/business', [BusinessController::class, 'update'])->name('business.update');
+        Route::post('/business/members', [BusinessController::class, 'createMember'])->middleware('throttle:deal-join')->name('business.members.store');
+        Route::patch('/business/members/{user}', [BusinessController::class, 'updateMember'])->name('business.members.update');
+        Route::delete('/business/members/{user}', [BusinessController::class, 'removeMember'])->name('business.members.destroy');
+        Route::post('/business/invite', [BusinessController::class, 'invite'])->name('business.invite');
+        Route::delete('/business/invite', [BusinessController::class, 'revokeInvite'])->name('business.invite.revoke');
+        Route::post('/business/join', [BusinessController::class, 'join'])->middleware('throttle:deal-join')->name('business.join');
+        Route::post('/business/leave', [BusinessController::class, 'leave'])->name('business.leave');
+        Route::get('/business/summary', [BusinessController::class, 'summary'])->name('business.summary');
+        Route::get('/business/transactions', [BusinessController::class, 'transactions'])->name('business.transactions');
+        Route::get('/business/deals', [BusinessController::class, 'deals'])->name('business.deals');
+        Route::get('/business/advances', [BusinessController::class, 'advances'])->name('business.advances.index');
+        Route::post('/business/advances', [BusinessController::class, 'storeAdvance'])->name('business.advances.store');
+        Route::delete('/business/advances/{advance}', [BusinessController::class, 'destroyAdvance'])->name('business.advances.destroy');
         Route::middleware('throttle:documents')->prefix('documents')->name('documents.')->group(function () {
             Route::get('/purchases/{purchase}', [TransactionController::class, 'purchaseDocument'])->name('purchase');
             Route::get('/deal-entries/{entry}', [TransactionController::class, 'dealEntryDocument'])->name('deal-entry');
             Route::get('/deals/{deal}', [TransactionController::class, 'dealDocument'])->name('deal');
             Route::get('/customers/{customer}', [TransactionController::class, 'customerDocument'])->name('customer');
             Route::get('/report', [TransactionController::class, 'reportDocument'])->name('report');
+            Route::get('/business-report', [TransactionController::class, 'businessReportDocument'])->name('business-report');
         });
     });
 });

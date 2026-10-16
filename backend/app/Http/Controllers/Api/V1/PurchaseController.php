@@ -29,10 +29,11 @@ class PurchaseController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
+        $businessId = $this->businessIdFor($user);
         $data = $this->validated($request);
 
-        $purchase = DB::transaction(function () use ($user, $data): Purchase {
-            $customer = $this->customerFor($user, $data);
+        $purchase = DB::transaction(function () use ($user, $data, $businessId): Purchase {
+            $customer = $this->customerFor($user, $data, $businessId);
             $purchase = new Purchase([
                 'kind' => $data['kind'] ?? PurchaseKind::Buy->value,
                 'customer_name' => $customer?->name ?? $data['customer_name'],
@@ -43,6 +44,8 @@ class PurchaseController extends Controller
                 'note' => $data['note'] ?? null,
             ]);
             $purchase->user_id = $user->id;
+            // Lái con của doanh nghiệp lập phiếu: phiếu thuộc doanh nghiệp (chủ thấy, thống kê)
+            $purchase->business_id = $businessId;
             $purchase->customer_id = $customer?->id;
             $purchase->save();
 
@@ -54,6 +57,10 @@ class PurchaseController extends Controller
 
     public function show(Request $request, Purchase $purchase): JsonResponse
     {
+        // Chủ doanh nghiệp xem phiếu lái con lập: chỉ xem (có lịch sử sửa), không sửa / chia sẻ thay lái
+        if ($purchase->user_id !== $request->user()->id && $purchase->isBusinessOwner($request->user())) {
+            return response()->json(['data' => [...self::present($purchase->load('customer', 'user')), 'can_edit' => false, 'history' => $purchase->history(), 'shared_version' => $purchase->shared_version]]);
+        }
         $this->authorizeOwner($request, $purchase);
 
         return response()->json(['data' => self::present($purchase->load('customer'), withSharing: true)]);
@@ -151,7 +158,7 @@ class PurchaseController extends Controller
 
         DB::transaction(function () use ($request, $purchase, $data): void {
             if (! empty($data['customer']) || ! empty($data['customer_name'])) {
-                $customer = $this->customerFor($request->user(), $data);
+                $customer = $this->customerFor($request->user(), $data, $purchase->business_id);
                 $purchase->customer_id = $customer?->id;
                 $purchase->customer_name = $customer?->name ?? $data['customer_name'] ?? $purchase->customer_name;
                 $purchase->customer_phone = $customer?->phone ?? ($data['customer_phone'] ?? null);
@@ -180,6 +187,9 @@ class PurchaseController extends Controller
             ...collect(TransactionFeed::fromPurchase($p))->except('sort')->all(),
             'number' => $p->number,
             'version' => $p->version,
+            'can_edit' => true,
+            'created_by' => ['id' => $p->user_id, 'name' => $p->user?->name],
+            'business' => $p->business_id ? $p->business?->name : null,
             // Dòng hàng đầy đủ (cân, trừ bì, tịnh) để sửa phiếu
             'lines' => $p->lines,
             'customer_address' => $p->customer?->address,
@@ -315,10 +325,12 @@ class PurchaseController extends Controller
      *
      * @param  array<string, mixed>  $data
      */
-    private function customerFor(User $user, array $data): ?Customer
+    private function customerFor(User $user, array $data, ?int $businessId = null): ?Customer
     {
+        // Doanh nghiệp: dùng chung sổ khách cả doanh nghiệp (nông dân bán cho 2 lái vẫn là 1 khách)
+        $scope = fn ($q) => $businessId ? $q->where('business_id', $businessId) : $q->where('user_id', $user->id);
         if (! empty($data['customer'])) {
-            $customer = Customer::query()->where('user_id', $user->id)->where('uuid', $data['customer'])->first();
+            $customer = Customer::query()->where($scope)->where('uuid', $data['customer'])->first();
             if ($customer === null) {
                 throw ValidationException::withMessages(['customer' => 'Không tìm thấy khách này.']);
             }
@@ -332,7 +344,7 @@ class PurchaseController extends Controller
         }
         $phone = trim((string) ($data['customer_phone'] ?? '')) ?: null;
 
-        $existing = Customer::query()->where('user_id', $user->id)
+        $existing = Customer::query()->where($scope)
             ->when($phone, fn ($q) => $q->where('phone', $phone), fn ($q) => $q->where('name', $name)->whereNull('phone'))
             ->first();
 
@@ -341,9 +353,19 @@ class PurchaseController extends Controller
         }
         $customer = new Customer(['name' => $name, 'phone' => $phone]);
         $customer->user_id = $user->id;
+        $customer->business_id = $businessId;
         $customer->save();
 
         return $customer;
+    }
+
+    /** Doanh nghiệp của người lập phiếu; tài khoản bị chủ khóa thì không lập phiếu được */
+    private function businessIdFor(User $user): ?int
+    {
+        $membership = $user->membership()->first();
+        abort_if($membership !== null && ! $membership->isActive(), 403, 'Tài khoản đã bị chủ doanh nghiệp khóa, chưa lập phiếu được. Hãy liên hệ chủ.');
+
+        return $membership?->business_id;
     }
 
     private function authorizeOwner(Request $request, Purchase $purchase): void

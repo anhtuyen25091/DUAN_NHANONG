@@ -59,6 +59,24 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
+     * Thuộc doanh nghiệp nào (chủ hoặc lái con); mỗi tài khoản tối đa 1 doanh nghiệp
+     *
+     * @return HasOne<BusinessMember, $this>
+     */
+    public function membership(): HasOne
+    {
+        return $this->hasOne(BusinessMember::class);
+    }
+
+    /** Doanh nghiệp đang tham gia và còn dùng được (không bị khóa); null = làm riêng */
+    public function activeMembership(): ?BusinessMember
+    {
+        $membership = $this->membership()->with('business')->first();
+
+        return $membership?->isActive() ? $membership : null;
+    }
+
+    /**
      * Khu vực của tôi (để gợi ý giá + dịch vụ quanh đó); null nếu chưa chọn.
      *
      * @return array{province: string, province_name: ?string, lat: float, lng: float, label: ?string, radius: int}|null

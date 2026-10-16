@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\BusinessMember;
 use App\Models\Customer;
 use App\Models\Purchase;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,10 +19,19 @@ class CustomerController extends Controller
     public function index(Request $request): JsonResponse
     {
         $q = trim((string) ($request->validate(['q' => ['nullable', 'string', 'max:100']])['q'] ?? ''));
+        $user = $request->user();
+        $membership = $user->membership()->first();
         $customers = Customer::query()
-            ->where('user_id', $request->user()->id)
+            ->where(fn (Builder $w) => match (true) {
+                // Chủ doanh nghiệp: sổ khách cả doanh nghiệp
+                $membership?->role === BusinessMember::OWNER => $w->where('business_id', $membership->business_id)->orWhere('user_id', $user->id),
+                // Lái con: khách mình thêm, hoặc khách đã có phiếu với mình
+                $membership !== null => $w->where('user_id', $user->id)->orWhere(fn (Builder $b) => $b->where('business_id', $membership->business_id)->whereHas('purchases', fn (Builder $p) => $p->where('user_id', $user->id))),
+                default => $w->where('user_id', $user->id),
+            })
             ->when($q !== '', fn (Builder $query) => $query->where(fn (Builder $w) => $w->where('name', 'like', "%{$q}%")->orWhere('phone', 'like', "%{$q}%")))
-            ->with('purchases')
+            // Lái con chỉ cộng các phiếu của chính mình với khách đó
+            ->with(['purchases' => fn ($q) => $membership !== null && $membership->role !== BusinessMember::OWNER ? $q->where('user_id', $user->id) : $q])
             ->orderBy('name')
             ->limit(500)
             ->get();
@@ -93,6 +103,8 @@ class CustomerController extends Controller
 
     private function authorizeOwner(Request $request, Customer $customer): void
     {
-        abort_unless($customer->user_id === $request->user()->id, 404);
+        $user = $request->user();
+        $ownsBusiness = $customer->business_id !== null && $user->membership()->where('business_id', $customer->business_id)->where('role', BusinessMember::OWNER)->exists();
+        abort_unless($customer->user_id === $user->id || $ownsBusiness, 404);
     }
 }

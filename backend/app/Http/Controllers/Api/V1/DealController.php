@@ -54,7 +54,10 @@ class DealController extends Controller
         $user = $request->user();
         $data = $request->validated();
 
-        $deal = DB::transaction(function () use ($user, $data): Deal {
+        $membership = $user->membership()->first();
+        abort_if($membership !== null && ! $membership->isActive(), 403, 'Tài khoản đã bị chủ doanh nghiệp khóa, chưa tạo đơn được. Hãy liên hệ chủ.');
+
+        $deal = DB::transaction(function () use ($user, $data, $membership): Deal {
             $isBuyer = $data['role'] === 'buyer';
             $deal = new Deal([
                 'title' => $data['title'],
@@ -64,6 +67,9 @@ class DealController extends Controller
                 $isBuyer ? 'seller_name' : 'buyer_name' => $data['counterpart_name'] ?? null,
             ]);
             $deal->created_by = $user->id;
+            // Lái con của doanh nghiệp tạo đơn: đơn thuộc doanh nghiệp (chủ xem số liệu, thống kê)
+            $deal->business_id = $membership?->business_id;
+            $deal->business_user_id = $membership ? $user->id : null;
             $deal->{$isBuyer ? 'buyer_id' : 'seller_id'} = $user->id;
             $deal->status = DealStatus::Open;
             $deal->save();
@@ -156,6 +162,12 @@ class DealController extends Controller
                 throw ValidationException::withMessages(['code' => 'Đơn này đã đủ 2 bên.']);
             }
             $deal->{$deal->seller_id === null ? 'seller_id' : 'buyer_id'} = $user->id;
+            // Lái con tham gia đơn của người khác: đơn thuộc doanh nghiệp của lái (nếu đơn chưa thuộc doanh nghiệp nào)
+            $membership = $user->activeMembership();
+            if ($deal->business_id === null && $membership !== null) {
+                $deal->business_id = $membership->business_id;
+                $deal->business_user_id = $user->id;
+            }
             $deal->save();
             $deal->recordActivity($user, 'đã tham gia đơn');
 

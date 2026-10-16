@@ -5,6 +5,7 @@ namespace App\Transactions;
 use App\Enums\DealEntryKind;
 use App\Enums\DealEntryStatus;
 use App\Enums\DealStatus;
+use App\Models\Business;
 use App\Models\Deal;
 use App\Models\DealEntry;
 use App\Models\Purchase;
@@ -32,6 +33,52 @@ final class TransactionFeed
             $rows = $rows->merge(self::dealCuts($user, $from, $to));
         }
 
+        return self::filter($rows, $filters);
+    }
+
+    /**
+     * Sổ giao dịch cả doanh nghiệp (chủ xem): phiếu và đợt cân của mọi lái, mỗi dòng kèm lái nào làm.
+     * member: chỉ 1 lái (id tài khoản).
+     *
+     * @param  array{kind?: string|null, q?: string|null, customer?: string|null, member?: int|string|null}  $filters
+     * @return Collection<int, array<string, mixed>>
+     */
+    public static function forBusiness(Business $business, CarbonImmutable $from, CarbonImmutable $to, array $filters = []): Collection
+    {
+        $member = isset($filters['member']) ? (int) $filters['member'] : null;
+        $rows = self::purchaseQuery($from, $to, $filters)
+            ->with('user')
+            ->where('business_id', $business->id)
+            ->when($member, fn (Builder $q, int $id) => $q->where('user_id', $id))
+            ->get()
+            ->toBase()
+            ->map(fn (Purchase $p): array => [...self::fromPurchase($p), 'member' => ['id' => $p->user_id, 'name' => $p->user->name]]);
+
+        if (empty($filters['customer'])) {
+            $rows = $rows->merge(self::dealCutQuery($from, $to)
+                ->with('deal.businessUser')
+                ->whereHas('deal', fn (Builder $q) => $q->where('business_id', $business->id)
+                    ->where('status', '!=', DealStatus::Cancelled)
+                    ->when($member, fn (Builder $w, int $id) => $w->where('business_user_id', $id)))
+                ->get()
+                ->toBase()
+                ->filter(fn (DealEntry $e): bool => $e->deal->businessUser !== null)
+                ->map(fn (DealEntry $e): array => [
+                    ...self::fromDealCut($e, $e->deal->businessUser),
+                    'member' => ['id' => $e->deal->business_user_id, 'name' => $e->deal->businessUser->name],
+                ]));
+        }
+
+        return self::filter($rows, $filters);
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, array<string, mixed>>
+     */
+    private static function filter(Collection $rows, array $filters): Collection
+    {
         $kind = $filters['kind'] ?? null;
         $q = mb_strtolower(trim((string) ($filters['q'] ?? '')));
 
@@ -66,16 +113,25 @@ final class TransactionFeed
      */
     private static function purchases(User $user, CarbonImmutable $from, CarbonImmutable $to, array $filters): Collection
     {
-        return Purchase::query()
-            ->with('customer')
+        return self::purchaseQuery($from, $to, $filters)
             ->where('user_id', $user->id)
-            ->where('date', '>=', $from->toDateString())
-            // < ngày hôm sau: đúng cả khi cột ngày lưu kèm giờ (SQLite)
-            ->where('date', '<', $to->addDay()->toDateString())
-            ->when($filters['customer'] ?? null, fn (Builder $q, string $uuid) => $q->whereHas('customer', fn (Builder $c) => $c->where('uuid', $uuid)))
             ->get()
             ->toBase()
             ->map(fn (Purchase $p): array => self::fromPurchase($p));
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Purchase>
+     */
+    private static function purchaseQuery(CarbonImmutable $from, CarbonImmutable $to, array $filters): Builder
+    {
+        return Purchase::query()
+            ->with('customer')
+            ->where('date', '>=', $from->toDateString())
+            // < ngày hôm sau: đúng cả khi cột ngày lưu kèm giờ (SQLite)
+            ->where('date', '<', $to->addDay()->toDateString())
+            ->when($filters['customer'] ?? null, fn (Builder $q, string $uuid) => $q->whereHas('customer', fn (Builder $c) => $c->where('uuid', $uuid)));
     }
 
     /**
@@ -109,18 +165,26 @@ final class TransactionFeed
      */
     private static function dealCuts(User $user, CarbonImmutable $from, CarbonImmutable $to): Collection
     {
+        return self::dealCutQuery($from, $to)
+            // Đơn đã hủy không còn là giao dịch
+            ->whereHas('deal', fn (Builder $q) => $q->forUser($user)->where('status', '!=', DealStatus::Cancelled))
+            ->get()
+            ->toBase()
+            ->map(fn (DealEntry $e): array => self::fromDealCut($e, $user));
+    }
+
+    /**
+     * @return Builder<DealEntry>
+     */
+    private static function dealCutQuery(CarbonImmutable $from, CarbonImmutable $to): Builder
+    {
         return DealEntry::query()
             ->with(['deal.seller', 'deal.buyer', 'deal.product'])
             ->where('kind', DealEntryKind::Cut)
             ->whereIn('status', [DealEntryStatus::Confirmed, DealEntryStatus::Pending])
             ->where('date', '>=', $from->toDateString())
             // < ngày hôm sau: đúng cả khi cột ngày lưu kèm giờ (SQLite)
-            ->where('date', '<', $to->addDay()->toDateString())
-            // Đơn đã hủy không còn là giao dịch
-            ->whereHas('deal', fn (Builder $q) => $q->forUser($user)->where('status', '!=', DealStatus::Cancelled))
-            ->get()
-            ->toBase()
-            ->map(fn (DealEntry $e): array => self::fromDealCut($e, $user));
+            ->where('date', '<', $to->addDay()->toDateString());
     }
 
     /**
