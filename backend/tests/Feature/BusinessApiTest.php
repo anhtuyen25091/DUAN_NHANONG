@@ -82,7 +82,10 @@ class BusinessApiTest extends TestCase
 
         // Lái khác mua của cùng nông dân (cùng SĐT): chung 1 khách của doanh nghiệp, nhưng không thấy phiếu của Tèo
         Sanctum::actingAs($ti);
-        $this->postJson(route('api.v1.purchases.store'), $this->purchase(['lines' => [['name' => 'Hồ tiêu', 'kg' => 100, 'price' => 140000]]]))->assertCreated();
+        // Số phiếu đánh chung cả doanh nghiệp: không trùng số của lái khác
+        $this->postJson(route('api.v1.purchases.store'), $this->purchase(['lines' => [['name' => 'Hồ tiêu', 'kg' => 100, 'price' => 140000]]]))
+            ->assertCreated()
+            ->assertJsonPath('data.code', 'PM-000002');
         $this->assertSame(1, Customer::query()->count());
         $this->getJson(route('api.v1.purchases.show', $p['id']))->assertNotFound();
         $this->getJson(route('api.v1.transactions.index'))->assertJsonCount(1, 'data');

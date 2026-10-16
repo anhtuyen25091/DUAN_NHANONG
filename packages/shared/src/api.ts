@@ -2,6 +2,7 @@
  * Kiểu dữ liệu và client gọi API /api/v1 của backend, dùng chung cho web và mobile.
  */
 import type { BuyerProfile, BuyerProfileInput, BuyerReport, BuyerStatus, LocalPriceFilters, LocalPrices, MyLocation, Place } from './local';
+import type { AdvanceInput, Business, BusinessAdvance, BusinessDeal, BusinessInput, BusinessMemberInfo, BusinessSummary, MemberCash, MemberInput } from './business';
 import { documentPath, type CustomerInput, type DocumentFormat, type DocumentTarget, type Purchase, type PurchaseInput, type ReceivedPurchase, type TradeCustomer, type TradeFilters, type TradeList } from './trade';
 
 export type CategoryType = 'nong_san' | 'phan_bon' | 'thuoc_bvtv';
@@ -487,6 +488,27 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
       const filename = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? `giay-to.${format}`;
       return { data: await response.arrayBuffer(), filename, mime: response.headers.get('Content-Type') ?? 'application/octet-stream' };
     },
+
+    // ---- Doanh nghiệp thu mua (chủ + lái con) ----
+    business: (token: string) => request<{ data: Business | null }>('GET', '/business', { token }).then((r) => r.data),
+    createBusiness: (token: string, input: BusinessInput) => request<{ data: Business }>('POST', '/business', { token, body: input }).then((r) => r.data),
+    updateBusiness: (token: string, input: BusinessInput) => request<{ data: Business }>('PATCH', '/business', { token, body: input }).then((r) => r.data),
+    createMember: (token: string, input: MemberInput) => request<{ data: BusinessMemberInfo }>('POST', '/business/members', { token, body: input }).then((r) => r.data),
+    updateMember: (token: string, id: number, input: { group_name?: string | null; status?: 'active' | 'locked'; password?: string }) =>
+      request<{ data: BusinessMemberInfo }>('PATCH', `/business/members/${id}`, { token, body: input }).then((r) => r.data),
+    removeMember: (token: string, id: number) => request<void>('DELETE', `/business/members/${id}`, { token }),
+    businessInvite: (token: string) => request<{ data: Business }>('POST', '/business/invite', { token }).then((r) => r.data),
+    revokeBusinessInvite: (token: string) => request<{ data: Business }>('DELETE', '/business/invite', { token }).then((r) => r.data),
+    joinBusiness: (token: string, code: string) => request<{ data: Business }>('POST', '/business/join', { token, body: { code } }).then((r) => r.data),
+    leaveBusiness: (token: string) => request<void>('POST', '/business/leave', { token }),
+    businessSummary: (token: string, range: { from?: string; to?: string } = {}) =>
+      request<{ data: BusinessSummary; meta: { from: string; to: string } }>('GET', '/business/summary', { token, query: range }),
+    businessTransactions: (token: string, filters: TradeFilters & { member?: number } = {}) => request<TradeList>('GET', '/business/transactions', { token, query: filters }),
+    businessDeals: (token: string) => request<{ data: BusinessDeal[] }>('GET', '/business/deals', { token }).then((r) => r.data),
+    businessAdvances: (token: string, member?: number) =>
+      request<{ data: BusinessAdvance[]; cash: MemberCash | null }>('GET', '/business/advances', { token, query: { member } }),
+    createAdvance: (token: string, input: AdvanceInput) => request<{ data: BusinessAdvance; cash: MemberCash }>('POST', '/business/advances', { token, body: input }),
+    deleteAdvance: (token: string, id: string) => request<void>('DELETE', `/business/advances/${id}`, { token }),
 
     shops: (filters: ShopFilters = {}) => request<ShopPage>('GET', '/shops', { query: filters }),
     provinces: () => request<{ data: Province[] }>('GET', '/provinces').then((r) => r.data),

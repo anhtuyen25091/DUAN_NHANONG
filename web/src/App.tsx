@@ -13,6 +13,7 @@ import { ShopSubmit } from './pages/ShopSubmit'
 const LedgerRoutes = lazy(() => import('./pages/ledger/LedgerRoutes'))
 const DealRoutes = lazy(() => import('./pages/deals/DealRoutes'))
 const TradeRoutes = lazy(() => import('./pages/trade/TradeRoutes'))
+const BusinessPage = lazy(() => import('./pages/business/BusinessPage'))
 
 export default function App() {
   const { path, query } = useRoute()
@@ -22,7 +23,7 @@ export default function App() {
   useEffect(() => {
     document.title = awaiting > 0 ? `(${awaiting}) Nhà Nông` : 'Nhà Nông'
   }, [awaiting])
-  const section = path[0] === 'diem-ban' ? 'shops' : path[0] === 'so' ? 'ledger' : path[0] === 'don' || path[0] === 'giao-dich' ? 'deals' : 'prices'
+  const section = path[0] === 'diem-ban' ? 'shops' : path[0] === 'so' ? 'ledger' : path[0] === 'don' || path[0] === 'giao-dich' || path[0] === 'doanh-nghiep' ? 'deals' : 'prices'
 
   return (
     <>
@@ -62,6 +63,10 @@ export default function App() {
         ) : path[0] === 'giao-dich' ? (
           <Suspense fallback={<p className="muted center">Đang mở…</p>}>
             <TradeRoutes path={path} query={query} />
+          </Suspense>
+        ) : path[0] === 'doanh-nghiep' ? (
+          <Suspense fallback={<p className="muted center">Đang mở…</p>}>
+            <BusinessPage query={query} />
           </Suspense>
         ) : path[0] === 'gia-quanh-toi' ? (
           <LocalPrices query={query} />

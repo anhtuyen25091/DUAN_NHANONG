@@ -4,9 +4,7 @@ import {
   formatDateTime,
   formatKg,
   formatVnd,
-  itemsText,
   kgInputText,
-  monthStart,
   parseKgText,
   purchaseShareText,
   purchaseTotals,
@@ -19,8 +17,6 @@ import {
   type PurchaseLineInput,
   type TradeCustomer,
   type TradeKind,
-  type TradeRow,
-  type TradeTotals,
 } from '@nhanong/shared'
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../../api'
@@ -32,6 +28,8 @@ import { Status } from '../../components/Status'
 import { go, href, replaceQuery, useAsync } from '../../hooks'
 import { showToast } from '../../ledger/toast'
 import { MoneyField, QtyField } from '../ledger/fields'
+import { RangeFields, TotalsCard, TradeRowCard } from './parts'
+import { useRange } from './useRange'
 
 /**
  * #/giao-dich/...: sổ giao dịch của điểm thu mua / thương lái (tải riêng).
@@ -78,6 +76,9 @@ function TradeHome({ token, query }: { token: string; query: URLSearchParams }) 
         <a className="button" href={href('giao-dich/moi', { loai: 'sell' })}>
           ＋ Phiếu bán
         </a>
+        <a className="button" href={href('doanh-nghiep')}>
+          🏢 Doanh nghiệp
+        </a>
       </div>
       <nav className="segmented" aria-label="Mục">
         {(
@@ -95,22 +96,6 @@ function TradeHome({ token, query }: { token: string; query: URLSearchParams }) 
       {tab === 'so' && <TradeList token={token} />}
       {tab === 'khach' && <CustomerList token={token} />}
       {tab === 'bao-cao' && <TradeReport token={token} />}
-    </div>
-  )
-}
-
-/** Khoảng ngày: mặc định đầu tháng → hôm nay */
-function useRange() {
-  const [from, setFrom] = useState(monthStart(today()))
-  const [to, setTo] = useState(today())
-  return { from, to, setFrom, setTo }
-}
-
-function RangeFields({ range }: { range: ReturnType<typeof useRange> }) {
-  return (
-    <div className="range-fields">
-      <DateField label="Từ ngày" value={range.from} onChange={range.setFrom} max={range.to} />
-      <DateField label="Đến ngày" value={range.to} onChange={range.setTo} min={range.from} max={today()} />
     </div>
   )
 }
@@ -150,56 +135,6 @@ function TradeList({ token }: { token: string }) {
         </>
       )}
     </>
-  )
-}
-
-function TotalsCard({ totals }: { totals: TradeTotals }) {
-  return (
-    <section className="card">
-      <dl className="deal-totals">
-        <div>
-          <dt>Mua vào ({formatKg(totals.buy.kg)} kg)</dt>
-          <dd>{formatVnd(totals.buy.amount)}</dd>
-        </div>
-        {totals.buy.owing > 0 && (
-          <div>
-            <dt>Còn nợ khách</dt>
-            <dd className="out">{formatVnd(totals.buy.owing)}</dd>
-          </div>
-        )}
-        <div>
-          <dt>Bán ra ({formatKg(totals.sell.kg)} kg)</dt>
-          <dd>{formatVnd(totals.sell.amount)}</dd>
-        </div>
-        {totals.sell.owing > 0 && (
-          <div>
-            <dt>Khách còn nợ mình</dt>
-            <dd className="in">{formatVnd(totals.sell.owing)}</dd>
-          </div>
-        )}
-      </dl>
-      <p className="small muted">{totals.count} giao dịch</p>
-    </section>
-  )
-}
-
-function TradeRowCard({ row: r }: { row: TradeRow }) {
-  const link = r.source === 'deal' && r.deal ? href(`don/${r.deal}`) : href(`giao-dich/phieu/${r.id}`)
-  return (
-    <a className="card garden-row trade-row" href={link}>
-      <span className="garden-name">
-        {r.kind === 'buy' ? '🛒' : '📦'} {r.counterpart}
-        <span className="small muted">
-          {' '}
-          · {formatDate(r.date, true)} · {r.code}
-        </span>
-        <br />
-        <span className="small">{itemsText(r.items)}</span>
-        {r.owing > 0 && <span className="tag overdue">{r.kind === 'buy' ? 'Còn nợ khách' : 'Khách nợ'} {formatVnd(r.owing)}</span>}
-        {r.pending && <span className="tag">Chờ bên kia xác nhận</span>}
-      </span>
-      <span className="profit">{formatVnd(r.amount)}</span>
-    </a>
   )
 }
 
@@ -566,12 +501,18 @@ function PurchaseView({ token, id }: { token: string; id: string }) {
 
   return (
     <div className="ledger">
-      <a className="back" href={href('giao-dich')}>
-        ‹ Sổ giao dịch
+      <a className="back" href={p.can_edit === false ? href('doanh-nghiep', { tab: 'so' }) : href('giao-dich')}>
+        ‹ {p.can_edit === false ? 'Doanh nghiệp' : 'Sổ giao dịch'}
       </a>
       <h1>
         {p.kind === 'buy' ? '🛒 Phiếu mua' : '📦 Phiếu bán'} {p.code}
       </h1>
+      {p.business && (
+        <p className="small muted">
+          🏢 {p.business}
+          {p.created_by?.name && ` · lái lập phiếu: ${p.created_by.name}`}
+        </p>
+      )}
       <p className="muted">
         {formatDate(p.date)} · {p.kind === 'buy' ? 'mua của' : 'bán cho'}{' '}
         {p.customer ? <a href={href(`giao-dich/khach/${p.customer}`)}>{p.counterpart}</a> : <b>{p.counterpart}</b>}
@@ -628,7 +569,7 @@ function PurchaseView({ token, id }: { token: string; id: string }) {
           )}
         </dl>
         {p.note && <p className="small muted">Ghi chú: {p.note}</p>}
-        {p.owing > 0 && (
+        {p.owing > 0 && p.can_edit !== false && (
           <button type="button" onClick={addPayment}>
             💵 Ghi tiền trả thêm
           </button>
@@ -637,8 +578,11 @@ function PurchaseView({ token, id }: { token: string; id: string }) {
       <section className="card">
         <PrintButtons token={token} target={{ type: 'purchase', id: p.id }} label="In phiếu / gửi khách (có chỗ ký 2 bên, số tiền bằng chữ)" />
       </section>
-      <ShareCard token={token} purchase={p} onChange={setPurchase} />
+      {p.can_edit !== false && <ShareCard token={token} purchase={p} onChange={setPurchase} />}
       {p.history && p.history.length > 1 && <HistoryCard history={p.history} sharedVersion={p.shared_version ?? null} />}
+      {p.can_edit === false ? (
+        <p className="small muted">Phiếu do lái lập: chủ chỉ xem. Lái sửa phiếu thì mọi lần sửa đều được ghi lại ở lịch sử.</p>
+      ) : (
       <div className="btn-row">
         <a className="button" href={href(`giao-dich/phieu/${p.id}/sua`)}>
           Sửa phiếu
@@ -656,6 +600,7 @@ function PurchaseView({ token, id }: { token: string; id: string }) {
           Xóa phiếu
         </button>
       </div>
+      )}
     </div>
   )
 }

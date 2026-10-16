@@ -84,6 +84,8 @@ export interface TradeRow {
   /** Đợt cân chưa được bên kia xác nhận */
   pending: boolean;
   note: string | null;
+  /** Sổ cả doanh nghiệp: lái nào làm */
+  member?: { id: number; name: string };
 }
 
 export interface Purchase extends TradeRow {
@@ -93,6 +95,11 @@ export interface Purchase extends TradeRow {
   customer_address: string | null;
   /** Bản thứ mấy (mỗi lần sửa nội dung / ghi thêm tiền trả là 1 bản mới) */
   version: number;
+  /** false: chủ doanh nghiệp xem phiếu lái con lập (chỉ xem) */
+  can_edit?: boolean;
+  created_by?: { id: number; name: string | null };
+  /** Tên doanh nghiệp nếu phiếu thuộc doanh nghiệp */
+  business?: string | null;
   /** Chỉ có khi xem 1 phiếu của mình: mã chia sẻ, ai đang xem, tài khoản trùng SĐT khách (chưa gửi), lịch sử */
   share_code?: string | null;
   /** Bản lúc chia sẻ lần đầu; null = chưa chia sẻ */
@@ -162,7 +169,8 @@ export type DocumentTarget =
   | { type: 'deal-entry'; id: string }
   | { type: 'deal'; id: string }
   | { type: 'customer'; id: string; from?: string; to?: string }
-  | { type: 'report'; from?: string; to?: string };
+  | { type: 'report'; from?: string; to?: string }
+  | { type: 'business-report'; from?: string; to?: string };
 
 export type DocumentFormat = 'pdf' | 'docx';
 
@@ -171,8 +179,9 @@ export const DOCUMENT_FORMAT_LABELS: Record<DocumentFormat, string> = { pdf: 'PD
 /** Đường dẫn API của giấy tờ (không gồm /api/v1) */
 export function documentPath(target: DocumentTarget, format: DocumentFormat): string {
   const params = new URLSearchParams({ format });
-  if ((target.type === 'customer' || target.type === 'report') && target.from) params.set('from', target.from);
-  if ((target.type === 'customer' || target.type === 'report') && target.to) params.set('to', target.to);
+  if ((target.type === 'customer' || target.type === 'report' || target.type === 'business-report') && target.from) params.set('from', target.from);
+  if ((target.type === 'customer' || target.type === 'report' || target.type === 'business-report') && target.to) params.set('to', target.to);
+  if (target.type === 'business-report') return `/documents/business-report?${params.toString()}`;
   const path = target.type === 'report' ? '/documents/report' : `/documents/${target.type === 'purchase' ? 'purchases' : target.type === 'deal' ? 'deals' : target.type === 'customer' ? 'customers' : 'deal-entries'}/${encodeURIComponent(target.id)}`;
   return `${path}?${params.toString()}`;
 }

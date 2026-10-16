@@ -44,8 +44,12 @@ class Purchase extends Model
     {
         static::creating(function (Purchase $purchase): void {
             $purchase->uuid ??= (string) Str::uuid();
-            // Số phiếu kế tiếp của người dùng (kể cả phiếu đã xóa, để số in ra không bị trùng)
-            $purchase->number ??= (int) self::withTrashed()->where('user_id', $purchase->user_id)->where('kind', $purchase->kind)->max('number') + 1;
+            // Số phiếu kế tiếp (kể cả phiếu đã xóa, để số in ra không bị trùng): doanh nghiệp đánh số chung cho mọi lái,
+            // làm riêng thì đánh số theo tài khoản
+            $purchase->number ??= (int) self::withTrashed()
+                ->when($purchase->business_id, fn ($q, $id) => $q->where('business_id', $id), fn ($q) => $q->where('user_id', $purchase->user_id)->whereNull('business_id'))
+                ->where('kind', $purchase->kind)
+                ->max('number') + 1;
         });
 
         static::saving(function (Purchase $purchase): void {

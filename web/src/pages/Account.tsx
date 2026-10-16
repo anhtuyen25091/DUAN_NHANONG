@@ -99,6 +99,9 @@ function SignedIn() {
       <p>
         <a href={href('gia-quanh-toi')}>📍 Khu vực của tôi &amp; giá quanh tôi ›</a>
       </p>
+      <p>
+        <a href={href('doanh-nghiep')}>🏢 Doanh nghiệp thu mua (chủ + các lái đi mua giùm) ›</a>
+      </p>
       <button type="button" onClick={logout}>
         Đăng xuất
       </button>
