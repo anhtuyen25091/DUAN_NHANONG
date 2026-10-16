@@ -164,6 +164,37 @@ class BusinessApiTest extends TestCase
         $this->getJson(route('api.v1.purchases.show', $id))->assertOk();
     }
 
+    public function test_owner_is_notified_of_buyer_deals_and_purchases(): void
+    {
+        $teo = $this->member('Lái Tèo', '0911000001');
+        $branch = User::factory()->create(['name' => 'Chi nhánh Tân Phú']);
+        $since = now()->subMinute()->toIso8601String();
+
+        // Lái tạo đơn bán cho chi nhánh, chi nhánh tham gia rồi đồng ý cọc; lái lập phiếu rồi sửa
+        Sanctum::actingAs($teo);
+        $deal = $this->postJson(route('api.v1.deals.store'), ['role' => 'seller', 'title' => 'Cà phê lô 1', 'counterpart_name' => 'Chi nhánh Tân Phú'])->json('data');
+        $this->getJson(route('api.v1.business.activity'))->assertJsonCount(0, 'data');
+
+        Sanctum::actingAs($this->owner);
+        $this->getJson(route('api.v1.business.activity', ['since' => $since]))
+            ->assertJsonPath('data.0.type', 'deal')
+            ->assertJsonPath('data.0.title', 'Đơn "Cà phê lô 1" · lái Lái Tèo')
+            ->assertJsonPath('data.0.text', 'Lái Tèo tạo đơn "Cà phê lô 1" (bán cho Chi nhánh Tân Phú)');
+
+        $this->travel(1)->minutes();
+        Sanctum::actingAs($branch);
+        $this->postJson(route('api.v1.deals.join'), ['code' => $deal['code']])->assertOk();
+        Sanctum::actingAs($teo);
+        $p = $this->postJson(route('api.v1.purchases.store'), $this->purchase())->json('data');
+        $this->travel(1)->minutes();
+        $this->patchJson(route('api.v1.purchases.update', $p['id']), ['paid' => 1_000_000])->assertOk();
+
+        Sanctum::actingAs($this->owner);
+        $items = collect($this->getJson(route('api.v1.business.activity', ['since' => $since]))->json('data'));
+        $this->assertSame('Chi nhánh Tân Phú đã tham gia đơn', $items->firstWhere('type', 'deal')['text']);
+        $this->assertSame('Lái Tèo sửa phiếu PM-000001: Đã trả: 0 đ → 1.000.000 đ', $items->firstWhere('type', 'purchase')['text']);
+    }
+
     private function member(string $name, string $phone): User
     {
         $this->postJson(route('api.v1.business.members.store'), ['name' => $name, 'phone' => $phone, 'password' => 'secret1'])->assertCreated();

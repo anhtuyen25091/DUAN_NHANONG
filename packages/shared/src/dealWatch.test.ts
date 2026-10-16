@@ -102,3 +102,35 @@ describe('DealWatcher: phiếu được gửi cho mình', () => {
     expect(since).toEqual([undefined, '2026-10-16T10:00:00+07:00', '2026-10-16T10:01:00+07:00', '2026-10-16T10:05:00+07:00']);
   });
 });
+
+describe('DealWatcher: chủ doanh nghiệp', () => {
+  it('lần đầu chỉ ghi nhận; sau đó báo việc của lái (phiếu mở phiếu, đơn mở mục đơn chung)', async () => {
+    const responses = [
+      [{ type: 'deal' as const, id: 'd1', title: 'Đơn "Cà phê lô 1" · lái Lái Tèo', text: 'Lái Tèo tạo đơn', at: '2026-10-16T10:00:00+07:00' }],
+      [
+        { type: 'deal' as const, id: 'd1', title: 'Đơn "Cà phê lô 1" · lái Lái Tèo', text: 'Chi nhánh Tân Phú đã tham gia đơn', at: '2026-10-16T10:02:00+07:00' },
+        { type: 'purchase' as const, id: 'p1', title: 'Phiếu PM-000003 · lái Lái Tèo', text: 'Lái Tèo lập phiếu PM-000003 mua của Chú Năm: 93.000.000 đ', at: '2026-10-16T10:03:00+07:00' },
+      ],
+    ];
+    const since: Array<string | undefined> = [];
+    let store: Record<string, string> = { a: '2026-10-15T08:00:00+07:00' };
+    const watcher = new DealWatcher(
+      {
+        deals: async () => [],
+        businessActivity: async (_t: string, s?: string) => {
+          since.push(s);
+          return responses.shift() ?? [];
+        },
+      },
+      { getToken: () => 'tok', loadSeen: () => store, saveSeen: (s) => (store = s) },
+    );
+    await watcher.poll();
+    expect(watcher.getState().notices).toEqual([]);
+    await watcher.poll();
+    expect(watcher.getState().notices.map((n) => [n.businessDealUuid ?? n.businessPurchaseId, n.text])).toEqual([
+      ['d1', 'Chi nhánh Tân Phú đã tham gia đơn'],
+      ['p1', 'Lái Tèo lập phiếu PM-000003 mua của Chú Năm: 93.000.000 đ'],
+    ]);
+    expect(since).toEqual([undefined, '2026-10-16T10:00:00+07:00']);
+  });
+});

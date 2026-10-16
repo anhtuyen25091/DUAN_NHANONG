@@ -4,13 +4,17 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Businesses\BusinessStats;
 use App\Deals\DealSummary;
+use App\Documents\TransactionDocuments;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\BusinessAdvance;
 use App\Models\BusinessMember;
 use App\Models\Deal;
+use App\Models\Purchase;
+use App\Models\PurchaseVersion;
 use App\Models\User;
 use App\Transactions\TransactionFeed;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -200,6 +204,72 @@ class BusinessController extends Controller
             'data' => $rows->map(fn (array $r): array => collect($r)->except('sort')->all())->values(),
             'meta' => ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'totals' => TransactionFeed::totals($rows)],
         ]);
+    }
+
+    /**
+     * Việc mới của các lái để báo chủ (app hỏi 8 giây 1 lần, ?since=ISO): đơn chung có hoạt động mới
+     * (của lái hoặc bên kia), phiếu lái vừa lập / sửa / xóa. Không phải chủ thì trả rỗng (để app hỏi chung không lỗi).
+     */
+    public function activity(Request $request): JsonResponse
+    {
+        $membership = $request->user()->membership()->with('business')->first();
+        if ($membership?->role !== BusinessMember::OWNER) {
+            return response()->json(['data' => []]);
+        }
+        $business = $membership->business;
+        $ownerId = $request->user()->id;
+        $since = $request->validate(['since' => ['nullable', 'date']])['since'] ?? null;
+        $since = $since ? CarbonImmutable::parse($since)->setTimezone(config('app.timezone')) : now()->subDays(2);
+
+        $deals = Deal::query()
+            ->where('business_id', $business->id)
+            ->where(fn ($q) => $q->where('last_activity_at', '>=', $since)->orWhere(fn ($w) => $w->whereNull('last_activity_at')->where('created_at', '>=', $since)))
+            ->with(['businessUser', 'seller', 'buyer'])
+            ->limit(100)
+            ->get()
+            ->map(function (Deal $d) use ($ownerId): ?array {
+                $member = $d->businessUser?->name ?? 'Lái';
+                $isBuyer = $d->buyer_id === $d->business_user_id;
+                if ($d->last_activity_at === null) {
+                    $text = "{$member} tạo đơn \"{$d->title}\" (".($isBuyer ? 'mua của ' : 'bán cho ').TransactionFeed::counterpart($d, $isBuyer).')';
+                    $at = $d->created_at;
+                } elseif ($d->last_activity_by !== $ownerId) {
+                    $text = $d->last_activity;
+                    $at = $d->last_activity_at;
+                } else {
+                    return null;
+                }
+
+                return ['type' => 'deal', 'id' => $d->uuid, 'title' => "Đơn \"{$d->title}\" · lái {$member}", 'text' => $text, 'at' => $at->toIso8601String()];
+            });
+
+        $purchases = Purchase::query()
+            ->withTrashed()
+            ->where('business_id', $business->id)
+            ->where('user_id', '!=', $ownerId)
+            ->where('updated_at', '>=', $since)
+            ->with(['user', 'versions'])
+            ->limit(100)
+            ->get()
+            ->map(function (Purchase $p): array {
+                $member = $p->user->name;
+                $code = $p->code();
+                $latest = $p->versions->sortByDesc('version')->first();
+                if ($p->deleted_at !== null) {
+                    [$text, $at] = ["{$member} đã xóa phiếu {$code}", $p->deleted_at];
+                } elseif ($latest && $latest->version > 1) {
+                    $previous = $p->versions->firstWhere('version', $latest->version - 1);
+                    $changes = $previous ? array_slice(PurchaseVersion::changes($previous->data, $latest->data), 0, 2) : [];
+                    [$text, $at] = ["{$member} sửa phiếu {$code}".($changes ? ': '.implode('; ', $changes) : ''), $latest->created_at];
+                } else {
+                    $text = "{$member} lập phiếu {$code} ".($p->kind->value === 'buy' ? 'mua của ' : 'bán cho ').$p->customer_name.': '.TransactionDocuments::vnd($p->amount);
+                    $at = $p->created_at;
+                }
+
+                return ['type' => 'purchase', 'id' => $p->uuid, 'title' => "Phiếu {$code} · lái {$member}", 'text' => $text, 'at' => $at->toIso8601String()];
+            });
+
+        return response()->json(['data' => $deals->filter()->merge($purchases)->sortBy('at')->values()]);
     }
 
     /** Đơn chung của các lái (chủ xem số liệu, tải quyết toán) */

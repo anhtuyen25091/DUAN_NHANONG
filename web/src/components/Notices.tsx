@@ -1,3 +1,4 @@
+import type { DealNotice } from '@nhanong/shared'
 import { useEffect } from 'react'
 import { dealWatcher, useDealWatch } from '../dealWatch'
 import { href } from '../hooks'
@@ -28,7 +29,7 @@ export function Notices() {
                 <b>{n.title}</b>
                 <span>{n.text}</span>
               </span>
-              <a className="button small-btn primary" href={href(n.purchaseId ? `giao-dich/nhan/${n.purchaseId}` : `don/${n.dealUuid}`)} onClick={() => dealWatcher.dismiss(n.id)}>
+              <a className="button small-btn primary" href={noticeHref(n)} onClick={() => dealWatcher.dismiss(n.id)}>
                 Xem
               </a>
               <button type="button" className="notice-close" aria-label="Đóng" onClick={() => dealWatcher.dismiss(n.id)}>
@@ -56,4 +57,12 @@ export function Notices() {
       )}
     </>
   )
+}
+
+/** Bấm "Xem": đơn của mình, phiếu được gửi cho mình, hoặc (chủ doanh nghiệp) phiếu / đơn chung của lái */
+function noticeHref(n: DealNotice): string {
+  if (n.businessDealUuid) return href('doanh-nghiep', { tab: 'don' })
+  if (n.businessPurchaseId) return href(`giao-dich/phieu/${n.businessPurchaseId}`)
+  if (n.purchaseId) return href(`giao-dich/nhan/${n.purchaseId}`)
+  return href(`don/${n.dealUuid}`)
 }

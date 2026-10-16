@@ -11,6 +11,37 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026: Chủ doanh nghiệp nhận thông báo việc của lái ✅
+
+**Vấn đề:** Lái Tèo (`0900000021`) tạo / xử lý đơn mua bán với Chi nhánh Tân Phú. Chi nhánh nhận thông báo, nhưng chủ (`0900000020`) thì không, vì chủ không đứng trong đơn.
+
+**Đã làm**
+- `GET /business/activity?since=` (chỉ chủ; người khác nhận danh sách rỗng để app hỏi chung không lỗi). Mỗi việc mới của các lái gồm:
+  - **Đơn chung của lái:**
+    - hoạt động mới nhất của đơn, của lái hay của bên kia ("Chi nhánh Tân Phú đồng ý Cọc 30.000.000 đ")
+    - đơn vừa tạo chưa có hoạt động: "Lái Tèo tạo đơn "…" (bán cho Chi nhánh Tân Phú)"
+  - **Phiếu của lái:** "Lái Tèo lập phiếu PM-000003 mua của …: 27.900.000 đ" / "sửa phiếu …: <đổi gì>" / "đã xóa phiếu …".
+- `DealWatcher` hỏi thêm phần này trong cùng vòng 8 giây.
+  - Thông báo có `businessDealUuid` (mở mục "Đơn chung" của doanh nghiệp, vì chủ không mở trang đơn của lái) hoặc `businessPurchaseId` (mở phiếu, chế độ chỉ xem).
+  - Lần đầu theo dõi từng loại (phiếu được gửi, việc của lái) trên 1 máy chỉ ghi nhận, không báo dồn việc cũ. Có khóa đánh dấu riêng nên lần sau vẫn báo đủ.
+- Web: nút "Xem" trên thông báo mở đúng chỗ; tab đang ẩn thì hiện thông báo của trình duyệt.
+- App: băng thông báo mở `/business?tab=deals` hoặc màn phiếu.
+
+**Kiểm tra**
+- Backend: thêm 1 test (tạo đơn, chi nhánh tham gia, lái sửa phiếu → chủ thấy đúng câu; lái gọi thì rỗng); 152 test pass.
+- Shared: thêm 1 test cho bộ theo dõi của chủ; 101 test pass. Typecheck web + app sạch, lint web sạch.
+- Bấm thử trên Chrome. Chủ đang mở web:
+  - Tèo tạo đơn bán cho Chi nhánh Tân Phú: sau 6,8 giây chủ thấy thông báo.
+  - Chi nhánh tham gia rồi đồng ý cọc: sau 7,9 giây chủ thấy "Chi nhánh Tân Phú đồng ý Cọc 30.000.000 đ".
+  - Tèo lập phiếu: sau 7,9 giây chủ thấy.
+  - Bấm "Xem": phiếu mở trang phiếu (chỉ xem); đơn mở mục Đơn chung.
+
+**Lưu ý**
+- Mỗi đơn chỉ báo hoạt động **mới nhất** trong mỗi vòng 8 giây. Ví dụ tham gia đơn rồi đồng ý cọc ngay trong 8 giây thì chỉ báo "đồng ý cọc", giống cách báo cho 2 bên trong đơn.
+- Chỉ báo khi web / app đang mở (thông báo đẩy khi app đóng: mục 9 "Việc còn lại").
+
+---
+
 ## 16/10/2026: Doanh nghiệp thu mua: chủ + các lái con đi mua giùm ✅
 
 **Yêu cầu:** chủ một doanh nghiệp thu mua vừa và nhỏ, có 3–4 nhóm lái đi thu mua lẻ. Chủ tạo tài khoản chính, phân tài khoản con cho các lái mua giùm, và vẫn thống kê được chi tiết.
@@ -83,7 +114,7 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ### Còn tồn
 - Chưa thử trên điện thoại thật.
-- Chủ chưa nhận thông báo khi lái lập phiếu (có thể nối vào bộ theo dõi 8 giây như đơn / phiếu).
+- ~~Chủ chưa nhận thông báo khi lái lập phiếu~~ → đã làm, xem mục "Chủ doanh nghiệp nhận thông báo việc của lái".
 - Lái tự trả tiền riêng khi chưa được ứng thì "đang giữ" bị âm (đã ghi chú trên màn hình).
 - Dữ liệu demo: xem bảng tài khoản thử (`0900000020` chủ, `0900000021` / `0900000022` lái).
 

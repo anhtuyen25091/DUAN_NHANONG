@@ -2,7 +2,7 @@
  * Kiểu dữ liệu và client gọi API /api/v1 của backend, dùng chung cho web và mobile.
  */
 import type { BuyerProfile, BuyerProfileInput, BuyerReport, BuyerStatus, LocalPriceFilters, LocalPrices, MyLocation, Place } from './local';
-import type { AdvanceInput, Business, BusinessAdvance, BusinessDeal, BusinessInput, BusinessMemberInfo, BusinessSummary, MemberCash, MemberInput } from './business';
+import type { AdvanceInput, Business, BusinessActivity, BusinessAdvance, BusinessDeal, BusinessInput, BusinessMemberInfo, BusinessSummary, MemberCash, MemberInput } from './business';
 import { documentPath, type CustomerInput, type DocumentFormat, type DocumentTarget, type Purchase, type PurchaseInput, type ReceivedPurchase, type TradeCustomer, type TradeFilters, type TradeList } from './trade';
 
 export type CategoryType = 'nong_san' | 'phan_bon' | 'thuoc_bvtv';
@@ -504,6 +504,9 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
     businessSummary: (token: string, range: { from?: string; to?: string } = {}) =>
       request<{ data: BusinessSummary; meta: { from: string; to: string } }>('GET', '/business/summary', { token, query: range }),
     businessTransactions: (token: string, filters: TradeFilters & { member?: number } = {}) => request<TradeList>('GET', '/business/transactions', { token, query: filters }),
+    /** Chủ doanh nghiệp: việc mới của các lái từ thời điểm since (không phải chủ: rỗng) */
+    businessActivity: (token: string, since?: string) =>
+      request<{ data: BusinessActivity[] }>('GET', '/business/activity', { token, query: since ? { since } : {} }).then((r) => r.data),
     businessDeals: (token: string) => request<{ data: BusinessDeal[] }>('GET', '/business/deals', { token }).then((r) => r.data),
     businessAdvances: (token: string, member?: number) =>
       request<{ data: BusinessAdvance[]; cash: MemberCash | null }>('GET', '/business/advances', { token, query: { member } }),

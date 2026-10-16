@@ -41,7 +41,9 @@ export function DealNotices() {
             accessibilityLabel={`${n.title}: ${n.text}. Bấm để xem`}
             onPress={() => {
               dealWatcher.dismiss(n.id);
-              if (n.purchaseId) router.push({ pathname: '/trade/received/[id]', params: { id: n.purchaseId } });
+              if (n.businessDealUuid) router.push({ pathname: '/business', params: { tab: 'deals' } });
+              else if (n.businessPurchaseId) router.push({ pathname: '/trade/[id]', params: { id: n.businessPurchaseId } });
+              else if (n.purchaseId) router.push({ pathname: '/trade/received/[id]', params: { id: n.purchaseId } });
               else if (n.dealUuid) router.push({ pathname: '/deals/[id]', params: { id: n.dealUuid } });
             }}
             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 }}

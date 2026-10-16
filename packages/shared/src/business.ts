@@ -96,6 +96,16 @@ export interface BusinessDeal {
   updated_at: string | null;
 }
 
+/** Việc mới của 1 lái con để báo chủ: đơn chung có hoạt động mới, phiếu vừa lập / sửa / xóa */
+export interface BusinessActivity {
+  type: 'deal' | 'purchase';
+  /** uuid đơn hoặc uuid phiếu */
+  id: string;
+  title: string;
+  text: string;
+  at: string;
+}
+
 /** Lời nhắn mời lái vào doanh nghiệp bằng mã */
 export function businessInviteText(business: Pick<Business, 'name'>, code: string): string {
   return `Mời bạn vào doanh nghiệp "${business.name}" trên app Nhà Nông để ghi phiếu thu mua. Mở app → Tài khoản → Doanh nghiệp → Nhập mã mời: ${code}`;

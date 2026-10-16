@@ -118,6 +118,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/business/summary', [BusinessController::class, 'summary'])->name('business.summary');
         Route::get('/business/transactions', [BusinessController::class, 'transactions'])->name('business.transactions');
         Route::get('/business/deals', [BusinessController::class, 'deals'])->name('business.deals');
+        Route::get('/business/activity', [BusinessController::class, 'activity'])->name('business.activity');
         Route::get('/business/advances', [BusinessController::class, 'advances'])->name('business.advances.index');
         Route::post('/business/advances', [BusinessController::class, 'storeAdvance'])->name('business.advances.store');
         Route::delete('/business/advances/{advance}', [BusinessController::class, 'destroyAdvance'])->name('business.advances.destroy');

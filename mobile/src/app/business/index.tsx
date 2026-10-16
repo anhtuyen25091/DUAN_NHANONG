@@ -14,7 +14,7 @@ import {
   type MemberCash,
   type TradeKind,
 } from '@nhanong/shared';
-import { router, Stack, useFocusEffect } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native';
 import { DealsSignIn } from '../../components/deals';
@@ -49,8 +49,10 @@ const errorText = (err: unknown) => (err instanceof ApiError ? (Object.values(er
  */
 export default function BusinessScreen() {
   const auth = useAuth();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const loaded = useAsync(() => (auth ? api.business(auth.token) : Promise.resolve(null)), [auth?.token]);
-  const [tab, setTab] = useState<Tab>('overview');
+  // ?tab=deals: mở từ thông báo đơn chung của lái
+  const [tab, setTab] = useState<Tab>(OWNER_TABS.some(([t]) => t === params.tab) ? (params.tab as Tab) : 'overview');
   const [member, setMember] = useState<number | undefined>(undefined);
   const { refetch } = loaded;
   useFocusEffect(

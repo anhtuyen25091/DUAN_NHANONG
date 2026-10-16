@@ -3,6 +3,7 @@
  * - đếm số mục bên kia ghi đang chờ mình xác nhận (hiện số trên menu / tab "Đơn")
  * - báo "Chú Ba đồng ý Đợt cân …" khi BÊN KIA vừa làm gì (việc của chính mình thì không báo)
  * - báo "Lái Tư gửi phiếu PM-000012 cho bạn", "Lái Tư sửa phiếu …", "… đã xóa phiếu …"
+ * - chủ doanh nghiệp: báo việc của các lái con ("Lái Tèo lập phiếu …", đơn chung của lái có hoạt động mới)
  * - báo trang đơn / phiếu đang mở tải lại ngay khi nó đổi.
  * Lần đầu chạy trên máy (chưa có gì đã xem) chỉ ghi nhận, không báo dồn các việc cũ.
  */
@@ -12,8 +13,12 @@ export interface DealNotice {
   id: string;
   /** Thông báo về đơn mua bán: mở đơn này */
   dealUuid?: string;
-  /** Thông báo về phiếu được gửi cho mình: mở phiếu này */
+  /** Thông báo về phiếu được gửi cho mình: mở phiếu này (trang phiếu được gửi) */
   purchaseId?: string;
+  /** Chủ doanh nghiệp: phiếu lái con lập / sửa / xóa (mở trang phiếu, chế độ chỉ xem) */
+  businessPurchaseId?: string;
+  /** Chủ doanh nghiệp: đơn chung của lái con (chủ không mở trang đơn được, mở mục đơn chung của doanh nghiệp) */
+  businessDealUuid?: string;
   title: string;
   text: string;
   at: string;
@@ -35,11 +40,12 @@ export class DealWatcher {
   private updatedAt = new Map<string, string>();
   private since: string | null = null;
   private purchaseSince: string | null = null;
+  private businessSince: string | null = null;
   private running = false;
-  private api: Pick<Api, 'deals'> & Partial<Pick<Api, 'receivedPurchases'>>;
+  private api: Pick<Api, 'deals'> & Partial<Pick<Api, 'receivedPurchases' | 'businessActivity'>>;
   private options: { getToken: () => string | null; loadSeen: () => Seen; saveSeen: (seen: Seen) => void; maxNotices?: number };
 
-  constructor(api: Pick<Api, 'deals'> & Partial<Pick<Api, 'receivedPurchases'>>, options: DealWatcher['options']) {
+  constructor(api: Pick<Api, 'deals'> & Partial<Pick<Api, 'receivedPurchases' | 'businessActivity'>>, options: DealWatcher['options']) {
     this.api = api;
     this.options = options;
   }
@@ -67,6 +73,7 @@ export class DealWatcher {
     this.updatedAt.clear();
     this.since = null;
     this.purchaseSince = null;
+    this.businessSince = null;
     this.set({ awaiting: 0, notices: [] });
   }
 
@@ -100,7 +107,8 @@ export class DealWatcher {
         if (!this.since || deal.updated_at > this.since) this.since = deal.updated_at;
       }
 
-      await this.pollPurchases(token, seen, firstRun, notices);
+      await this.pollPurchases(token, seen, notices);
+      await this.pollBusiness(token, seen, notices);
 
       this.options.saveSeen(seen);
       const awaiting = [...this.awaitingByDeal.values()].reduce((s, n) => s + n, 0);
@@ -114,8 +122,9 @@ export class DealWatcher {
   }
 
   /** Phiếu được gửi cho mình: báo khi được gửi vào app, bị sửa, bị xóa (lỗi thì bỏ qua, không làm hỏng phần đơn) */
-  private async pollPurchases(token: string, seen: Seen, firstRun: boolean, notices: DealNotice[]) {
+  private async pollPurchases(token: string, seen: Seen, notices: DealNotice[]) {
     if (!this.api.receivedPurchases) return;
+    const firstRun = DealWatcher.firstRunOf(seen, 'p:');
     let purchases;
     try {
       purchases = await this.api.receivedPurchases(token, this.purchaseSince ?? undefined);
@@ -136,6 +145,46 @@ export class DealWatcher {
         if (at && (!this.purchaseSince || at > this.purchaseSince)) this.purchaseSince = at;
       }
     }
+  }
+
+  /** Chủ doanh nghiệp: việc mới của các lái (máy không phải chủ thì server trả rỗng) */
+  private async pollBusiness(token: string, seen: Seen, notices: DealNotice[]) {
+    if (!this.api.businessActivity) return;
+    const firstRun = DealWatcher.firstRunOf(seen, 'b:');
+    let items;
+    try {
+      items = await this.api.businessActivity(token, this.businessSince ?? undefined);
+    } catch {
+      return;
+    }
+    for (const item of items) {
+      const key = `b:${item.type}:${item.id}`;
+      if (!seen[key] || item.at > seen[key]) {
+        if (!firstRun) {
+          notices.push({
+            id: `${key}|${item.at}`,
+            ...(item.type === 'purchase' ? { businessPurchaseId: item.id } : { businessDealUuid: item.id }),
+            title: item.title,
+            text: item.text,
+            at: item.at,
+          });
+          if (item.type === 'purchase') this.changeListeners.forEach((l) => l(item.id));
+        }
+        seen[key] = item.at;
+      }
+      if (!this.businessSince || item.at > this.businessSince) this.businessSince = item.at;
+    }
+  }
+
+  /**
+   * Lần đầu theo dõi 1 loại (trên máy này): chỉ ghi nhận, không báo dồn việc cũ.
+   * Đánh dấu "đã theo dõi" bằng 1 khoá riêng để lần sau báo được cả khi chưa có việc nào.
+   */
+  private static firstRunOf(seen: Seen, prefix: string): boolean {
+    const marker = `${prefix}watching`;
+    if (seen[marker]) return false;
+    seen[marker] = new Date().toISOString();
+    return true;
   }
 
   private set(state: DealWatchState) {
