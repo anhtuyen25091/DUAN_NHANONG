@@ -16,7 +16,7 @@ use RuntimeException;
  * Dữ liệu demo cho "Giá quanh tôi": điểm mua đã duyệt quanh Buôn Ma Thuột (cà phê, tiêu, sầu riêng, chanh dây, phân bón),
  * Gia Lai (chanh dây) và Cần Thơ (lúa, phân bón), giá 3 ngày gần đây; 1 điểm chờ duyệt và 1 giá chờ duyệt để thử trang admin.
  *
- * Chỉ chạy trên máy dev: php artisan db:seed --class=LocalPriceDemoSeeder (chạy lại thì cập nhật, không trùng).
+ * Chỉ chạy trên máy dev: php artisan db:seed --class=LocalPriceDemoSeeder (chạy lại không tạo trùng, không đè giá đã có).
  * Tài khoản điểm mua: 09000001xx, mật khẩu: nhanong-demo
  */
 class LocalPriceDemoSeeder extends Seeder
@@ -71,7 +71,7 @@ class LocalPriceDemoSeeder extends Seeder
 
         // Giá lạ chờ duyệt
         $tuHung = Buyer::query()->where('name', 'Thương lái Tư Hùng')->firstOrFail();
-        PriceReport::query()->updateOrCreate(
+        PriceReport::query()->firstOrCreate(
             ['buyer_id' => $tuHung->id, 'product_id' => $products['ho-tieu'], 'date' => now()->subDay()->toDateString()],
             ['price' => 210000, 'unit' => 'kg', 'province_code' => 'dak-lak', 'lat' => $tuHung->lat, 'lng' => $tuHung->lng,
                 'status' => ReportStatus::NeedsReview, 'reference_price' => 140000, 'review_reason' => 'Lệch 50% so với giá các điểm mua khác trong 50 km (140.000 đ)'],
@@ -91,9 +91,10 @@ class LocalPriceDemoSeeder extends Seeder
         ]);
     }
 
+    /** Chỉ tạo khi chưa có: chạy lại không đè lên giá người dùng đã tự đăng thử trên web / app */
     private function report(Buyer $buyer, int $productId, string $unit, string $date, int $price): void
     {
-        PriceReport::query()->updateOrCreate(
+        PriceReport::query()->firstOrCreate(
             ['buyer_id' => $buyer->id, 'product_id' => $productId, 'date' => $date],
             ['price' => $price, 'unit' => $unit, 'province_code' => $buyer->province_code, 'lat' => $buyer->lat, 'lng' => $buyer->lng, 'status' => ReportStatus::Published],
         );
