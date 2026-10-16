@@ -18,16 +18,23 @@ class ShopController extends Controller
 {
     private const PER_PAGE = 30;
 
+    /** Xem trên bản đồ: lấy tối đa chừng này điểm 1 lần */
+    private const MAP_LIMIT = 500;
+
     /** Khi tìm quanh vị trí, mặc định trong bán kính này (km) */
     private const DEFAULT_RADIUS = 30;
 
     /**
      * Danh sách điểm bán; có lat/lng thì lọc theo bán kính và sắp theo khoảng cách.
+     * map=1: chỉ điểm có tọa độ, tối đa 500 điểm / trang (để chấm lên bản đồ).
      */
     public function index(ShopIndexRequest $request): JsonResponse
     {
+        $forMap = $request->boolean('map');
+        $perPage = $forMap ? self::MAP_LIMIT : self::PER_PAGE;
         $query = Shop::query()
             ->active()
+            ->when($forMap, fn (Builder $query) => $query->whereNotNull('lat')->whereNotNull('lng'))
             ->when($request->validated('type'), fn (Builder $query, string $type) => $query->ofType(ShopType::from($type)))
             ->when($request->validated('province'), fn (Builder $query, string $code) => $query->where('province_code', $code))
             ->when($request->validated('q'), function (Builder $query, string $search): void {
@@ -41,7 +48,7 @@ class ShopController extends Controller
         $lat = $request->validated('lat');
 
         if ($lat === null) {
-            $paginator = $query->orderByDesc('is_verified')->orderBy('name')->paginate(self::PER_PAGE, page: $page);
+            $paginator = $query->orderByDesc('is_verified')->orderBy('name')->paginate($perPage, page: $page);
 
             return response()->json([
                 'data' => ShopResource::collection($paginator->items()),
@@ -60,11 +67,11 @@ class ShopController extends Controller
             ->sortBy('distance_km')
             ->values();
 
-        $items = $shops->forPage($page, self::PER_PAGE)->values();
+        $items = $shops->forPage($page, $perPage)->values();
 
         return response()->json([
             'data' => ShopResource::collection($items),
-            'meta' => ['page' => $page, 'has_more' => $shops->count() > $page * self::PER_PAGE, 'total' => $shops->count(), 'radius_km' => $radius],
+            'meta' => ['page' => $page, 'has_more' => $shops->count() > $page * $perPage, 'total' => $shops->count(), 'radius_km' => $radius],
         ]);
     }
 

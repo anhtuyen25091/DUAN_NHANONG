@@ -11,6 +11,43 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026 (tối): Bản đồ điểm bán (web + app) ✅
+
+### Đã làm
+- Trang Điểm bán có nút chuyển **📋 Danh sách / 🗺 Bản đồ**, dùng chung bộ lọc (loại, tỉnh, tìm chữ, gần tôi). Web ghi vào URL (`#/diem-ban?xem=ban-do`).
+- Trên bản đồ:
+  - Mỗi điểm là 1 chấm, màu theo loại: thu mua xanh lá, phân bón cam, thuốc BVTV tím; có chú thích màu.
+  - Bấm chấm: tên, loại, địa chỉ, mặt hàng, nút **Gọi / Chỉ đường / Báo sai**.
+  - Đang xem "Gần tôi" thì có chấm vị trí của mình và vòng bán kính.
+  - Bản đồ tự canh cho thấy hết các điểm.
+- `GET /shops?map=1`: chỉ trả điểm có tọa độ, tối đa 500 điểm 1 lần.
+- Web dùng Leaflet 1.9.4 (thêm vào `web/package.json`; chỉ tải khi mở bản đồ).
+- App dùng `react-native-webview` (Expo Go có sẵn) chạy Leaflet:
+  - Trang bản đồ tạo ở `mobile/src/lib/shopMapHtml.ts`.
+  - Bấm nút trong ô thông tin thì báo về app để gọi / mở chỉ đường / mở form báo sai.
+- Ô bản đồ: cài ở 1 chỗ (`packages/shared/src/map.ts`).
+  - Mặc định dùng máy chủ OSM France (không cần khóa).
+  - Máy này không vào được `tile.openstreetmap.org`; CARTO giờ đòi API key.
+  - Đổi nguồn bằng biến môi trường: web `VITE_MAP_TILE_URL` / `VITE_MAP_TILE_ATTRIBUTION`, app `EXPO_PUBLIC_MAP_TILE_URL` / `EXPO_PUBLIC_MAP_TILE_ATTRIBUTION`.
+
+### Kiểm tra
+- Backend: thêm 1 test (`map=1` lấy hết 1 lần, bỏ điểm không tọa độ). Pint sạch.
+- Typecheck web + app, lint web sạch, bundle app build được.
+- Bấm thử trên Chrome (web):
+  - 42 chấm; bấm chấm ra thông tin đúng.
+  - Chọn Đắk Lắk còn 8 chấm.
+  - Quay lại danh sách vẫn giữ lọc tỉnh.
+- App: mở trang bản đồ (HTML của WebView) trên Chrome, giả cầu nối WebView:
+  - Có chấm và vòng bán kính.
+  - Tên có ký tự lạ hiện an toàn.
+  - Bấm Chỉ đường / Gọi gửi đúng lệnh về app.
+- Chưa thử trên điện thoại thật.
+
+### Còn tồn
+- **Trước khi phát hành phải đổi nguồn ô bản đồ:** máy chủ OSM France chỉ hợp để chạy thử / ít người dùng. Nên chọn nhà cung cấp có khóa, ưu tiên bản đồ Việt Nam có giấy phép, thể hiện đúng Hoàng Sa, Trường Sa.
+
+---
+
 ## 16/10/2026 (tối): Chủ doanh nghiệp mở đơn chung của lái (chỉ xem) ✅
 
 ### Đã làm
@@ -947,7 +984,7 @@ gunzip -c exports/nhanong-gia-….sql.gz | mysql --default-character-set=utf8mb4
 | 8 | Cập nhật tức thì (WebSocket) | Hiện hỏi server 8 giây / lần |
 | 9 | Link mã đơn / phiếu mở thẳng app | Cần build riêng có scheme / app link |
 | 10 | Quên mật khẩu | Cần OTP qua SMS (trả phí); lái con thì chủ đặt lại được |
-| 11 | Bản đồ điểm bán | Hiện danh sách + chỉ đường |
+| 11 | ~~Bản đồ điểm bán~~ | ✅ Đã làm 16/10 (khi phát hành cần nhà cung cấp ô bản đồ riêng) |
 | 12 | Ghi chú giọng nói, chụp ảnh hóa đơn | |
 | 13 | ~~Đợt cắt bán cho lái: "lái còn nợ"~~ | ✅ Đã làm 16/10 |
 | 14 | ~~App tự gửi sổ khi có mạng lại; hỏi lại khi đổi tài khoản trên máy đang có sổ~~ | ✅ Đã làm 16/10 |

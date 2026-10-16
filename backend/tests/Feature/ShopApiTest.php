@@ -52,6 +52,20 @@ class ShopApiTest extends TestCase
         $this->assertEqualsWithDelta(20, $response->json('data.1.distance_km'), 1);
     }
 
+    public function test_map_mode_returns_only_shops_with_coordinates_in_one_page(): void
+    {
+        Shop::factory()->count(35)->create(['lat' => 12.68, 'lng' => 108.05]);
+        Shop::factory()->create(['name' => 'Không tọa độ', 'lat' => null, 'lng' => null]);
+
+        // Danh sách thường: 30 điểm / trang, có cả điểm không tọa độ
+        $this->getJson(route('api.v1.shops.index'))->assertJsonCount(30, 'data')->assertJsonPath('meta.total', 36);
+        // Bản đồ: lấy hết 1 lần, bỏ điểm không có tọa độ
+        $this->getJson(route('api.v1.shops.index', ['map' => 1]))
+            ->assertJsonCount(35, 'data')
+            ->assertJsonPath('meta.has_more', false)
+            ->assertJsonPath('meta.total', 35);
+    }
+
     public function test_provinces_with_counts(): void
     {
         Shop::factory()->count(2)->create(['province_code' => 'an-giang']);

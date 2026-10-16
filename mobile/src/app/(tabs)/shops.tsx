@@ -3,6 +3,7 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Linking, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { ShopMap } from '../../components/ShopMap';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { colors, font } from '../../lib/theme';
@@ -21,6 +22,7 @@ export default function ShopsScreen() {
   const [locating, setLocating] = useState<string | null>(null);
   const [more, setMore] = useState<{ shops: Shop[]; page: number; hasMore: boolean } | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [onMap, setOnMap] = useState(false);
 
   // Gõ xong 0,4 giây mới tìm
   useEffect(() => {
@@ -32,8 +34,9 @@ export default function ShopsScreen() {
   const provinces = useAsync(() => api.provinces(), []);
   const first = useAsync(() => {
     setMore(null);
-    return api.shops(filters);
-  }, [type, province, q, position?.lat, position?.lng]);
+    // Đang xem bản đồ thì bản đồ tự tải (lấy nhiều điểm 1 lần), danh sách không cần tải
+    return onMap ? Promise.resolve(null) : api.shops(filters);
+  }, [type, province, q, position?.lat, position?.lng, onMap]);
 
   const nearMe = async () => {
     if (position) return setPosition(null);
@@ -50,7 +53,7 @@ export default function ShopsScreen() {
   };
 
   const loadMore = async () => {
-    if (first.state.status !== 'ok' || loadingMore) return;
+    if (first.state.status !== 'ok' || !first.state.data || loadingMore) return;
     const hasMore = more ? more.hasMore : first.state.data.meta.has_more;
     if (!hasMore) return;
     const page = (more?.page ?? 1) + 1;
@@ -65,11 +68,16 @@ export default function ShopsScreen() {
     }
   };
 
-  const meta = first.state.status === 'ok' ? first.state.data.meta : null;
-  const shops = first.state.status === 'ok' ? [...first.state.data.data, ...(more?.shops ?? [])] : [];
+  const page = first.state.status === 'ok' ? first.state.data : null;
+  const meta = page?.meta ?? null;
+  const shops = page ? [...page.data, ...(more?.shops ?? [])] : [];
 
-  const header = (
-    <View style={{ gap: 10, marginBottom: 12 }}>
+  const controls = (
+    <>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Chip label="📋 Danh sách" active={!onMap} onPress={() => setOnMap(false)} />
+        <Chip label="🗺 Bản đồ" active={onMap} onPress={() => setOnMap(true)} />
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
         <Chip label="Tất cả" active={type === ''} onPress={() => setType('')} />
         {TYPES.map((t) => (
@@ -95,6 +103,21 @@ export default function ShopsScreen() {
             ))}
         </ScrollView>
       )}
+    </>
+  );
+
+  if (onMap) {
+    return (
+      <View style={{ flex: 1, padding: 16, gap: 10 }}>
+        {controls}
+        <ShopMap filters={filters} position={position} />
+      </View>
+    );
+  }
+
+  const header = (
+    <View style={{ gap: 10, marginBottom: 12 }}>
+      {controls}
       <Status state={first.state} retry={first.reload} />
       {meta && (
         <Text style={styles.muted}>

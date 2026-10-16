@@ -28,6 +28,8 @@ class ShopIndexRequest extends FormRequest
             'lng' => ['nullable', 'required_with:lat', 'numeric', 'between:-180,180'],
             'radius' => ['nullable', 'integer', 'min:1', 'max:200'],
             'page' => ['nullable', 'integer', 'min:1'],
+            // Xem trên bản đồ: chỉ điểm có tọa độ, lấy nhiều 1 lần
+            'map' => ['nullable', 'boolean'],
         ];
     }
 }

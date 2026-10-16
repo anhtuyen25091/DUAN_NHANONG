@@ -282,6 +282,8 @@ export interface ShopFilters {
   lng?: number;
   radius?: number;
   page?: number;
+  /** 1: xem trên bản đồ (chỉ điểm có tọa độ, tối đa 500 điểm / trang) */
+  map?: 1;
 }
 
 export interface ShopPage {

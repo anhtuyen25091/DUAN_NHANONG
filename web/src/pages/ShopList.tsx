@@ -1,8 +1,11 @@
 import { directionsUrl, formatDistance, SHOP_TYPE_LABELS, telHref, type Shop, type ShopPage, type ShopType } from '@nhanong/shared'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { api } from '../api'
 import { Status } from '../components/Status'
 import { href, replaceQuery, useAsync } from '../hooks'
+
+// Leaflet chỉ tải khi mở bản đồ
+const ShopMap = lazy(() => import('./ShopMap'))
 
 const TYPES = Object.keys(SHOP_TYPE_LABELS) as ShopType[]
 
@@ -12,13 +15,15 @@ export function ShopList({ query }: { query: URLSearchParams }) {
   const type = TYPES.find((t) => t === query.get('type'))
   const province = query.get('province') ?? ''
   const q = query.get('q') ?? ''
+  const onMap = query.get('xem') === 'ban-do'
   const [search, setSearch] = useState(q)
   const [position, setPosition] = useState<Position | null>(null)
   const [locating, setLocating] = useState<string | null>(null)
   const [more, setMore] = useState<{ shops: Shop[]; page: number; hasMore: boolean } | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  const setFilter = (next: { type?: string; province?: string; q?: string }) => replaceQuery('diem-ban', { type, province, q, ...next })
+  const setFilter = (next: { type?: string; province?: string; q?: string; xem?: string }) =>
+    replaceQuery('diem-ban', { type, province, q, xem: onMap ? 'ban-do' : undefined, ...next })
 
   // Gõ xong 0,4 giây mới tìm, đỡ gọi server liên tục
   useEffect(() => {
@@ -31,8 +36,9 @@ export function ShopList({ query }: { query: URLSearchParams }) {
   const filters = { type, q, ...(position ? position : { province }) }
   const [first, retry] = useAsync(() => {
     setMore(null)
-    return api.shops(filters)
-  }, [type, province, q, position?.lat, position?.lng])
+    // Đang xem bản đồ thì bản đồ tự tải (lấy nhiều điểm 1 lần), danh sách không cần tải
+    return onMap ? Promise.resolve(null) : api.shops(filters)
+  }, [type, province, q, position?.lat, position?.lng, onMap])
 
   const nearMe = () => {
     if (position) return setPosition(null)
@@ -61,8 +67,9 @@ export function ShopList({ query }: { query: URLSearchParams }) {
 
   const [provinces] = useAsync(() => api.provinces(), [])
 
-  const shops = first.status === 'ok' ? [...first.data.data, ...(more?.shops ?? [])] : []
-  const hasMore = first.status === 'ok' && (more ? more.hasMore : first.data.meta.has_more)
+  const page = first.status === 'ok' ? first.data : null
+  const shops = page ? [...page.data, ...(more?.shops ?? [])] : []
+  const hasMore = !!page && (more ? more.hasMore : page.meta.has_more)
 
   return (
     <>
@@ -103,16 +110,32 @@ export function ShopList({ query }: { query: URLSearchParams }) {
         )}
       </div>
 
-      {locating && <p className="muted small">{locating}</p>}
-      <Status state={first} retry={retry} />
+      <nav className="segmented" aria-label="Cách xem">
+        <button type="button" className={!onMap ? 'active' : ''} aria-pressed={!onMap} onClick={() => setFilter({ xem: '' })}>
+          📋 Danh sách
+        </button>
+        <button type="button" className={onMap ? 'active' : ''} aria-pressed={onMap} onClick={() => setFilter({ xem: 'ban-do' })}>
+          🗺 Bản đồ
+        </button>
+      </nav>
 
-      {first.status === 'ok' && (
+      {locating && <p className="muted small">{locating}</p>}
+
+      {onMap && (
+        <Suspense fallback={<p className="muted">Đang mở bản đồ…</p>}>
+          <ShopMap filters={filters} position={position} />
+        </Suspense>
+      )}
+
+      {!onMap && <Status state={first} retry={retry} />}
+
+      {page && (
         <p className="muted small">
-          {first.data.meta.total} điểm{position && first.data.meta.radius_km ? ` trong vòng ${first.data.meta.radius_km} km` : ''}
+          {page.meta.total} điểm{position && page.meta.radius_km ? ` trong vòng ${page.meta.radius_km} km` : ''}
         </p>
       )}
 
-      {first.status === 'ok' && shops.length === 0 && (
+      {page && shops.length === 0 && (
         <div className="notice">
           Chưa có điểm nào phù hợp. Bạn biết một đại lý hay điểm thu mua? <a href={href('diem-ban/de-xuat')}>Thêm điểm</a> để mọi người cùng biết.
         </div>
@@ -122,8 +145,8 @@ export function ShopList({ query }: { query: URLSearchParams }) {
         <ShopCard key={shop.id} shop={shop} />
       ))}
 
-      {hasMore && first.status === 'ok' && (
-        <button type="button" className="wide" disabled={loadingMore} onClick={() => loadMore(first.data)}>
+      {hasMore && page && (
+        <button type="button" className="wide" disabled={loadingMore} onClick={() => loadMore(page)}>
           {loadingMore ? 'Đang tải…' : 'Xem thêm'}
         </button>
       )}

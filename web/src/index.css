@@ -1971,3 +1971,38 @@ button.linklike.danger {
 .switch-choices p {
   margin: 0 0 8px;
 }
+
+/* Bản đồ điểm bán */
+.shop-map {
+  height: min(65vh, 560px);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  margin: 8px 0;
+  z-index: 0;
+}
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+.map-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+.leaflet-popup-content {
+  font-size: 15px;
+  line-height: 1.45;
+}
+.leaflet-popup-content .map-popup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.leaflet-popup-content .map-popup-actions .button {
+  padding: 6px 10px;
+  min-height: 0;
+}

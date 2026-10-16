@@ -10,3 +10,4 @@ export * from './money';
 export * from './sync';
 export * from './trade';
 export * from './types';
+export * from './map';
