@@ -107,6 +107,7 @@ function SignedIn() {
         onPress={() => router.push('/buyer')}
       />
       <Button label="📍 Khu vực của tôi & giá quanh tôi" variant="outline" onPress={() => router.push('/local-prices')} />
+      <Button label="🏢 Doanh nghiệp thu mua (chủ + các lái)" variant="outline" onPress={() => router.push('/business')} />
       <Button label="Đăng xuất" variant="outline" onPress={logout} disabled={busy} />
     </Card>
   );

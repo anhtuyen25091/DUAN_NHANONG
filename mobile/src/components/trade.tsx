@@ -29,16 +29,21 @@ export function TradeTotalsCard({ totals }: { totals: TradeTotals }) {
 }
 
 /** 1 giao dịch: phiếu → mở phiếu; đợt cân → mở đơn mua bán */
-export function TradeRowCard({ row: r }: { row: TradeRow }) {
+/** onDeal: chủ doanh nghiệp không mở được trang đơn của lái, làm việc khác thay (sang mục đơn chung) */
+export function TradeRowCard({ row: r, onDeal }: { row: TradeRow; onDeal?: () => void }) {
   const tag = r.owing > 0 ? `${r.kind === 'buy' ? 'Còn nợ khách' : 'Khách nợ'} ${formatVnd(r.owing)}` : r.pending ? 'Chờ bên kia xác nhận' : null;
   return (
     <RowCard
       title={`${r.kind === 'buy' ? '🛒' : '📦'} ${r.counterpart}`}
-      sub={`${formatDate(r.date, true)} · ${r.code}\n${itemsText(r.items)}`}
+      sub={`${formatDate(r.date, true)} · ${r.code}${r.member ? ` · lái ${r.member.name}` : ''}\n${itemsText(r.items)}`}
       right={formatVnd(r.amount)}
       tag={tag}
       onPress={() =>
-        r.source === 'deal' && r.deal ? router.push({ pathname: '/deals/[id]', params: { id: r.deal } }) : router.push({ pathname: '/trade/[id]', params: { id: r.id } })
+        r.source === 'deal' && r.deal
+          ? onDeal
+            ? onDeal()
+            : router.push({ pathname: '/deals/[id]', params: { id: r.deal } })
+          : router.push({ pathname: '/trade/[id]', params: { id: r.id } })
       }
     />
   );

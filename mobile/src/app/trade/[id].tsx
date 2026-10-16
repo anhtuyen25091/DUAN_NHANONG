@@ -50,6 +50,12 @@ function PurchaseView({ token, initial }: { token: string; initial: Purchase }) 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: `${p.kind === 'buy' ? 'Phiếu mua' : 'Phiếu bán'} ${p.code}` }} />
+      {p.business ? (
+        <Text style={styles.muted}>
+          🏢 {p.business}
+          {p.created_by?.name ? ` · lái lập phiếu: ${p.created_by.name}` : ''}
+        </Text>
+      ) : null}
       <Text style={styles.muted}>
         {formatDate(p.date)} · {p.kind === 'buy' ? 'mua của' : 'bán cho'}
       </Text>
@@ -71,7 +77,7 @@ function PurchaseView({ token, initial }: { token: string; initial: Purchase }) 
         {p.owing > 0 && <Row label={p.kind === 'buy' ? 'Còn nợ khách' : 'Khách còn nợ'} value={formatVnd(p.owing)} bold color={colors.loss} />}
         {p.note ? <Text style={[styles.muted, { marginTop: 6 }]}>Ghi chú: {p.note}</Text> : null}
       </Card>
-      {p.owing > 0 && (
+      {p.owing > 0 && p.can_edit !== false && (
         <Card>
           <MoneyField label="Trả thêm" value={extra} onChange={setExtra} />
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -87,21 +93,25 @@ function PurchaseView({ token, initial }: { token: string; initial: Purchase }) 
       <Card>
         <PrintButtons token={token} target={{ type: 'purchase', id: p.id }} label="Gửi phiếu cho khách (có chỗ ký 2 bên, số tiền bằng chữ)" />
       </Card>
-      <PurchaseShare token={token} purchase={p} onChange={setP} />
+      {p.can_edit !== false && <PurchaseShare token={token} purchase={p} onChange={setP} />}
       {p.history && p.history.length > 1 && <PurchaseHistory history={p.history} sharedVersion={p.shared_version ?? null} />}
-      <View style={{ gap: 8 }}>
-        <Button label="Sửa phiếu" variant="outline" onPress={() => router.push({ pathname: '/trade/form', params: { id: p.id } })} />
-        <Button
-          label="Xóa phiếu"
-          variant="danger"
-          onPress={async () => {
-            if (!(await confirmAsync(`Xóa phiếu ${p.code}?`, 'Phiếu sẽ bị xóa khỏi sổ giao dịch.'))) return;
-            await api.deletePurchase(token, p.id);
-            showToast({ message: `Đã xóa phiếu ${p.code}` });
-            router.back();
-          }}
-        />
-      </View>
+      {p.can_edit === false ? (
+        <Text style={styles.muted}>Phiếu do lái lập: chủ chỉ xem. Lái sửa phiếu thì mọi lần sửa đều được ghi lại ở lịch sử.</Text>
+      ) : (
+        <View style={{ gap: 8 }}>
+          <Button label="Sửa phiếu" variant="outline" onPress={() => router.push({ pathname: '/trade/form', params: { id: p.id } })} />
+          <Button
+            label="Xóa phiếu"
+            variant="danger"
+            onPress={async () => {
+              if (!(await confirmAsync(`Xóa phiếu ${p.code}?`, 'Phiếu sẽ bị xóa khỏi sổ giao dịch.'))) return;
+              await api.deletePurchase(token, p.id);
+              showToast({ message: `Đã xóa phiếu ${p.code}` });
+              router.back();
+            }}
+          />
+        </View>
+      )}
     </ScrollView>
   );
 }

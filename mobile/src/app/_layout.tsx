@@ -81,6 +81,7 @@ export default function RootLayout() {
         <Stack.Screen name="trade/[id]" options={{ title: 'Phiếu' }} />
         <Stack.Screen name="trade/customer/[id]" options={{ title: 'Khách hàng' }} />
         <Stack.Screen name="trade/received/[id]" options={{ title: '📄 Phiếu được gửi' }} />
+        <Stack.Screen name="business/index" options={{ title: '🏢 Doanh nghiệp' }} />
       </Stack>
       <ToastHost />
       <DealNotices />

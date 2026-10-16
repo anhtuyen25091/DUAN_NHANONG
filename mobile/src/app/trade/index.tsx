@@ -32,6 +32,9 @@ export default function TradeScreen() {
           <Button label="＋ Phiếu bán" variant="outline" onPress={() => router.push({ pathname: '/trade/form', params: { kind: 'sell' } })} />
         </View>
       </View>
+      <View style={{ marginBottom: 12 }}>
+        <Button label="🏢 Doanh nghiệp (chủ + các lái)" variant="outline" onPress={() => router.push('/business')} />
+      </View>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
         <Chip label="Giao dịch" active={tab === 'so'} onPress={() => setTab('so')} />
         <Chip label="Khách hàng" active={tab === 'khach'} onPress={() => setTab('khach')} />

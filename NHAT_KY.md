@@ -11,6 +11,84 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026: Doanh nghiệp thu mua: chủ + các lái con đi mua giùm ✅
+
+**Yêu cầu:** chủ một doanh nghiệp thu mua vừa và nhỏ, có 3–4 nhóm lái đi thu mua lẻ. Chủ tạo tài khoản chính, phân tài khoản con cho các lái mua giùm, và vẫn thống kê được chi tiết.
+
+**Bạn đã chọn:**
+- **Tạo tài khoản con:** cả 2 cách: chủ tạo thẳng (tên, SĐT, mật khẩu ban đầu, nhóm), hoặc gửi mã mời cho người đã có tài khoản.
+- **Quyền của lái:** ghi phiếu, chỉ thấy của mình; chủ thấy tất cả.
+- **Tiền ứng:** có, đối chiếu tiền từng lái đang giữ.
+- **Đơn mua bán chung 2 bên:** gộp cả đơn chung của lái vào doanh nghiệp.
+
+### Backend
+- **Migration** `create_businesses_tables`:
+  - `businesses`: tên, SĐT, địa chỉ (in trên phiếu), mã mời
+  - `business_members`: mỗi tài khoản tối đa 1 doanh nghiệp; vai trò chủ / lái; nhóm; đang dùng / bị khóa; chủ có tạo tài khoản này không
+  - `business_advances`: chủ ứng tiền / lái nộp lại
+  - `business_id` cho `purchases`, `customers`, `deals`; thêm `deals.business_user_id` (lái đứng trong đơn)
+- **Lái con:**
+  - Lập phiếu hoặc tạo / tham gia đơn chung thì tự thuộc doanh nghiệp.
+  - Sổ khách dùng chung cả doanh nghiệp: 1 nông dân bán cho 2 lái vẫn là 1 khách. Lái chỉ thấy khách của mình và chỉ cộng phiếu của mình.
+  - **Số phiếu đánh chung cả doanh nghiệp** (PM-000001, PM-000002… không trùng giữa các lái).
+  - Bị khóa thì không lập phiếu / đơn mới (403) và bị đăng xuất.
+- **Chủ:**
+  - Xem phiếu của lái ở chế độ chỉ xem, có lịch sử sửa. Lái vẫn tự sửa phiếu của mình; mọi lần sửa đều được ghi lại.
+  - Tải phiếu, phiếu cân, quyết toán đơn của lái.
+  - Đổi nhóm, khóa / mở khóa, đặt lại mật khẩu (chỉ tài khoản chủ đã tạo), gỡ lái. Gỡ thì phiếu / đơn / tiền ứng cũ vẫn ở lại doanh nghiệp.
+- **Tiền lái đang giữ** (`App\Businesses\BusinessStats::cash`, tính đến nay) = đã ứng − đã nộp lại − đã trả ra + đã thu vào.
+  - Đã trả ra: phiếu mua; trong đơn chung (lái là bên mua): cọc, trả lúc cân, các lần trả.
+  - Đã thu vào: phiếu bán; trong đơn chung (lái là bên bán): các khoản tương tự.
+  - Bỏ mục bị báo sai và đơn đã hủy.
+- **Thống kê:** `BusinessStats::summary` và `TransactionFeed::forBusiness`: từng lái (mua, bán, còn nợ người bán, tiền đang giữ), cả doanh nghiệp, theo mặt hàng; sổ cả doanh nghiệp lọc theo lái.
+- **Giấy tờ:**
+  - Phiếu do lái lập in **tên doanh nghiệp + "Người lập: Lái Tèo · SĐT"**.
+  - **Báo cáo doanh nghiệp** (PDF / Word, trang ngang): theo từng lái (nhóm, số giao dịch, kg, tiền mua, còn nợ, tiền bán, đã ứng, đang giữ), theo mặt hàng, chi tiết có cột lái.
+- **API** `/business`:
+  - `show`, `store`, `update`
+  - `members` (thêm / sửa / gỡ), `invite`, `join`, `leave`
+  - `summary`, `transactions?member=`, `deals`, `advances`
+  - `/documents/business-report`
+- **Mã:** mã mời không trùng mã đơn / mã phiếu.
+
+### Web + app
+- **Trang "🏢 Doanh nghiệp"** (web `#/doanh-nghiep`, app `/business`). Lối vào: Tài khoản, Sổ giao dịch.
+  - **Chưa có doanh nghiệp:** nhập mã mời (lái), hoặc tạo doanh nghiệp (chủ).
+  - **Chủ** có 6 tab:
+    - Tổng quan: khoảng ngày; tổng; từng lái (bấm vào ra giao dịch của lái); theo mặt hàng; in báo cáo
+    - Lái: tạo tài khoản, mã mời, đổi nhóm, đặt lại mật khẩu, khóa, gỡ
+    - Tiền ứng: ghi ứng / nộp lại; thấy ngay lái đó đang giữ bao nhiêu
+    - Giao dịch: lọc lái, mua / bán
+    - Đơn chung: số liệu, gửi quyết toán
+    - Thông tin
+  - **Lái:** thẻ "Tiền đang giữ" (đã ứng, đã nộp, đã trả, đã thu), các lần ứng / nộp lại, nút lập phiếu, rời doanh nghiệp.
+- **Phiếu:** hiện "🏢 doanh nghiệp · lái lập phiếu"; chủ xem thì ẩn sửa / xóa / chia sẻ / ghi tiền trả.
+- Web: tách phần dùng chung của sổ giao dịch ra `pages/trade/parts.tsx` và `useRange.ts`.
+
+### Kiểm tra
+- Backend: thêm `BusinessApiTest` (4 test). 151 test pass, Pint sạch.
+  - tạo tài khoản lái → lái đăng nhập; SĐT đã có tài khoản thì báo dùng mã mời; mã mời
+  - lái lập phiếu: thuộc doanh nghiệp, số phiếu chung, khách chung, lái khác không thấy; chủ xem chỉ xem, sổ cả doanh nghiệp lọc theo lái, phiếu in tên doanh nghiệp + người lập
+  - tiền đang giữ: 200 − 90 − 20 − 10 + 5 = 85 tr, sau khi nộp lại 80 tr còn 5 tr; đợt bị báo sai không tính
+  - khóa lái thì không lập phiếu / đơn; gỡ lái thì dữ liệu vẫn ở lại
+- Shared 100 test pass. Typecheck web + app sạch, lint web sạch. App bundle 1737 module.
+- Bấm thử trên Chrome (web):
+  1. tạo doanh nghiệp, tạo tài khoản 2 lái kèm nhóm, tạo mã mời
+  2. 2 lái đăng nhập, lập phiếu
+  3. chủ ứng 200 tr cho Tèo → "Lái Tèo đang giữ 50.000.000 đ" (đã trả 150 tr)
+  4. tổng quan từng lái, tải báo cáo PDF (đúng số)
+  5. chủ mở phiếu của Tèo: chỉ xem
+  6. Tèo thấy tiền đang giữ
+- Bản web của app: tổng quan, tab Lái, màn của lái.
+
+### Còn tồn
+- Chưa thử trên điện thoại thật.
+- Chủ chưa nhận thông báo khi lái lập phiếu (có thể nối vào bộ theo dõi 8 giây như đơn / phiếu).
+- Lái tự trả tiền riêng khi chưa được ứng thì "đang giữ" bị âm (đã ghi chú trên màn hình).
+- Dữ liệu demo: xem bảng tài khoản thử (`0900000020` chủ, `0900000021` / `0900000022` lái).
+
+---
+
 ## 16/10/2026: Thông báo cho khách khi phiếu được gửi / sửa / xóa ✅
 
 **Đã làm**
@@ -613,6 +691,9 @@ Các link chỉ mở được khi các server đang chạy (xem "Cách chạy l�
 | 0900000001 | Chú Ba (nông dân) | tài khoản thường (xem giá 30 ngày), nhập mã tham gia đơn, nối sổ |
 | 0900000002 | Lái Tư (thương lái) | có gói 1 năm, tạo đơn mua / bán, gộp lô |
 | 0900000003 | Chi nhánh Tân Phú | có gói, tham gia đơn bán của lái |
+| 0900000020 | Anh Hai (chủ DN) | chủ doanh nghiệp "Công ty Nông sản Hai Lúa" |
+| 0900000021 | Lái Tèo | lái con (Nhóm Krông Pắc), được ứng 200 tr, có 1 phiếu mua |
+| 0900000022 | Lái Tí | lái con (Nhóm Ea Kar), có 1 phiếu mua |
 | admin@nhanong.local (email) | Quản trị | vào /admin |
 
 ```bash
