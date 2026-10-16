@@ -11,6 +11,50 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026 (tối): Dừng giữa chừng, việc làm tiếp ⏸️
+
+Đã xong và đã push trong buổi tối: mục 13 (lái còn nợ), 14 (tự gửi sổ khi có mạng lại + hỏi khi đổi tài khoản), 15 (chủ mở đơn của lái, chỉ xem), 11 (bản đồ điểm bán).
+
+### Mục 12: ghi chú giọng nói + ảnh hóa đơn (CHƯA LÀM, mới tìm hiểu, chưa sửa code)
+Cách làm dự kiến:
+- **Ảnh không để trong bản ghi sổ.** Server giới hạn mỗi bản ghi 20 KB (`LedgerSyncController`), nên ảnh lưu riêng:
+  - `Transaction.photo_id?: string | null` (thêm vào `NewEntry`; `addEntry` chỉ ghi khi có ảnh, để không đổi bản ghi cũ).
+  - Trên máy:
+    - web: IndexedDB riêng `nhanong-photos`, mỗi ảnh là `{ id, blob, uploaded }`
+    - app: thư mục `Paths.document/receipts/{id}.jpg`, danh sách ảnh đã gửi ghi trong `uploaded.json` (dùng `File` / `Paths` của expo-file-system như `PrintButtons.tsx`)
+  - Nén ảnh trước khi lưu (cạnh dài khoảng 1280 px, JPEG khoảng 0,7):
+    - web: canvas
+    - app: `expo-image-picker` + `expo-image-manipulator` (đều có trong Expo Go; cài bằng `npx expo install`)
+- **Backend:**
+  - `PUT /sync/photos/{uuid}` (multipart `photo`, ảnh tối đa 2 MB) và `GET /sync/photos/{uuid}`, chỉ chủ sổ.
+  - Lưu ở disk local `receipts/{user_id}/{uuid}.jpg`.
+  - Xóa sổ trên mạng thì xóa luôn thư mục ảnh.
+- **Đồng bộ ảnh:**
+  - `SyncEngine` thêm tùy chọn `afterSync(token)` cho từng nền tảng: gửi ảnh chưa gửi (có khoản đang dùng), tải ảnh còn thiếu.
+  - Hàm dùng chung `photosToSync(snapshot, local)` trả `{ upload, download }`, có test vitest.
+- **API shared:**
+  - `uploadReceiptPhoto(token, id, FormData)`: web gắn Blob; app gắn `{ uri, name, type }`.
+  - `receiptPhoto(token, id)`: trả ArrayBuffer, giống `downloadDocument`.
+- **Giao diện** (web `pages/ledger/AddEntry.tsx`, app `app/ledger/add.tsx`):
+  - Nút "📷 Chụp hóa đơn" / "Chọn ảnh"; web dùng `<input type="file" accept="image/*" capture="environment">`.
+  - Có ảnh thu nhỏ và nút xóa ảnh; danh sách khoản có dấu 📷.
+- **Giọng nói:**
+  - web: Web Speech API (`webkitSpeechRecognition`, `lang = 'vi-VN'`), nút "🎤 Nói" cạnh ô ghi chú; trình duyệt không hỗ trợ thì ẩn nút.
+  - app: Expo Go chưa có nhận giọng nói, nên dùng micro của bàn phím. Thêm nút "🎤 Nói" để đặt con trỏ vào ô ghi chú, kèm dòng nhắc "bấm 🎤 trên bàn phím".
+- Có thể cho admin xem ảnh trong "Sổ thu chi đồng bộ" (ghi nhật ký xem).
+
+### Ghi chú môi trường
+- Metro đang chạy lại: `REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.15 npx expo start --go --lan --port 8081 --clear`. Đã thêm `react-native-webview`.
+- Web cần restart Vite sau mỗi lần sửa (xem các mục trên).
+- Trước khi phát hành: đổi nguồn ô bản đồ (xem mục Bản đồ điểm bán).
+
+### Việc còn lại khác
+- Thanh toán (để sau theo yêu cầu).
+- Build EAS / VPS: chờ tài khoản Expo và VPS.
+- Thử trên điện thoại thật: bản đồ điểm bán (WebView), hỏi khi đổi tài khoản, lái còn nợ.
+
+---
+
 ## 16/10/2026 (tối): Bản đồ điểm bán (web + app) ✅
 
 ### Đã làm
@@ -985,7 +1029,7 @@ gunzip -c exports/nhanong-gia-….sql.gz | mysql --default-character-set=utf8mb4
 | 9 | Link mã đơn / phiếu mở thẳng app | Cần build riêng có scheme / app link |
 | 10 | Quên mật khẩu | Cần OTP qua SMS (trả phí); lái con thì chủ đặt lại được |
 | 11 | ~~Bản đồ điểm bán~~ | ✅ Đã làm 16/10 (khi phát hành cần nhà cung cấp ô bản đồ riêng) |
-| 12 | Ghi chú giọng nói, chụp ảnh hóa đơn | |
+| 12 | Ghi chú giọng nói, chụp ảnh hóa đơn | Đang làm dở: xem mục "Dừng giữa chừng" 16/10 tối |
 | 13 | ~~Đợt cắt bán cho lái: "lái còn nợ"~~ | ✅ Đã làm 16/10 |
 | 14 | ~~App tự gửi sổ khi có mạng lại; hỏi lại khi đổi tài khoản trên máy đang có sổ~~ | ✅ Đã làm 16/10 |
 | 15 | ~~Chủ doanh nghiệp mở thẳng trang đơn chung của lái~~ | ✅ Đã làm 16/10 |
