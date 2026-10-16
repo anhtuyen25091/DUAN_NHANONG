@@ -131,7 +131,8 @@ main {
 }
 
 .tabs button.active,
-.segmented button.active {
+.segmented button.active,
+button.choice.active {
   background: var(--primary);
   border-color: var(--primary);
   color: var(--surface);
@@ -1380,6 +1381,14 @@ ul.deal-lines {
   align-items: center;
   gap: 8px;
   margin-top: 10px;
+}
+
+/* Hàng nút chọn nhanh (Trừ cọc / Trả đủ…) ngay trên ô nhập tiếp theo: chừa khoảng trống */
+.btn-row + label,
+.btn-row + .notice,
+.actions + label,
+.actions + p {
+  margin-top: 14px;
 }
 
 /* Hàng nút hành động ngay trên hàng tab: tách ra cho khỏi dính, dễ phân biệt nút bấm với tab */

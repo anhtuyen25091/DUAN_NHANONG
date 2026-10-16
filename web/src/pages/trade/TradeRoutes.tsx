@@ -460,10 +460,10 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
         </div>
         <MoneyField label={kind === 'buy' ? 'Đã trả khách' : 'Khách đã trả'} value={paid} onChange={setPaid} />
         <div className="btn-row">
-          <button type="button" onClick={() => setPaid(totals.amount)}>
+          <button type="button" className={`choice${paid > 0 && paid === totals.amount ? ' active' : ''}`} aria-pressed={paid > 0 && paid === totals.amount} onClick={() => setPaid(totals.amount)}>
             Trả đủ
           </button>
-          <button type="button" onClick={() => setPaid(0)}>
+          <button type="button" className={`choice${paid === 0 ? ' active' : ''}`} aria-pressed={paid === 0} onClick={() => setPaid(0)}>
             Chưa trả
           </button>
         </div>

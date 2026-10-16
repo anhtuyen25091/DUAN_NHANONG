@@ -503,10 +503,10 @@ export function CutForm({ ledger, data, contractId, id }: { ledger: Ledger; data
       <MoneyField label={`Trừ cọc đợt này (cọc còn ${formatVnd(summary.contract.deposit - summary.deducted + (cut?.deposit_deduct ?? 0))})`} value={deduct} onChange={setDeduct} />
       {canDeduct > 0 && (
         <div className="actions">
-          <button type="button" onClick={() => setDeduct(canDeduct)}>
+          <button type="button" className={`choice${deduct > 0 && deduct === canDeduct ? ' active' : ''}`} aria-pressed={deduct > 0 && deduct === canDeduct} onClick={() => setDeduct(canDeduct)}>
             Trừ {formatVnd(canDeduct)}
           </button>
-          <button type="button" onClick={() => setDeduct(0)}>
+          <button type="button" className={`choice${deduct === 0 ? ' active' : ''}`} aria-pressed={deduct === 0} onClick={() => setDeduct(0)}>
             Không trừ
           </button>
         </div>

@@ -126,10 +126,10 @@ function EntryFormInner({ token, deal, kind, entryUuid }: { token: string; deal:
             <>
               <MoneyField label={`Trừ cọc (cọc còn ${formatVnd(depositLeft)})`} value={deduct} onChange={(v) => setDeduct(Math.min(v, depositLeft, value))} />
               <div className="btn-row">
-                <button type="button" onClick={() => setDeduct(Math.min(depositLeft, value))}>
+                <button type="button" className={`choice${deduct > 0 && deduct === Math.min(depositLeft, value) ? ' active' : ''}`} aria-pressed={deduct > 0 && deduct === Math.min(depositLeft, value)} onClick={() => setDeduct(Math.min(depositLeft, value))}>
                   Trừ {formatVnd(Math.min(depositLeft, value))}
                 </button>
-                <button type="button" onClick={() => setDeduct(0)}>
+                <button type="button" className={`choice${deduct === 0 ? ' active' : ''}`} aria-pressed={deduct === 0} onClick={() => setDeduct(0)}>
                   Không trừ
                 </button>
               </div>
@@ -137,10 +137,10 @@ function EntryFormInner({ token, deal, kind, entryUuid }: { token: string; deal:
           )}
           <MoneyField label="Tiền trả ngay lúc cân" value={paidNow} onChange={(v) => setPaid(Math.min(v, Math.max(0, value - deduct)))} />
           <div className="btn-row">
-            <button type="button" onClick={() => setPaid(Math.max(0, value - deduct))}>
+            <button type="button" className={`choice${paidNow > 0 && paidNow === Math.max(0, value - deduct) ? ' active' : ''}`} aria-pressed={paidNow > 0 && paidNow === Math.max(0, value - deduct)} onClick={() => setPaid(Math.max(0, value - deduct))}>
               Trả đủ {formatVnd(Math.max(0, value - deduct))}
             </button>
-            <button type="button" onClick={() => setPaid(0)}>
+            <button type="button" className={`choice${paidNow === 0 ? ' active' : ''}`} aria-pressed={paidNow === 0} onClick={() => setPaid(0)}>
               Chưa trả
             </button>
           </div>
