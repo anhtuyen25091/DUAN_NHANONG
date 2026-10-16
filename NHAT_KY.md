@@ -11,6 +11,31 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026 (tối): Chủ doanh nghiệp mở đơn chung của lái (chỉ xem) ✅
+
+### Đã làm
+- `GET /deals/{uuid}`: chủ doanh nghiệp (không phải 1 bên của đơn) xem được đơn của lái mình.
+  - Số liệu nhìn từ phía lái, gồm cả chi phí riêng của lái.
+  - Trả thêm `read_only: true` và `viewing_as` (tên lái).
+  - Ghi mục / sửa / kết thúc đơn vẫn chỉ 2 bên làm được (chủ gọi thì 404).
+- Trang đơn (web + app) khi chỉ xem:
+  - Dòng "👁 Chỉ xem: đơn do Lái Tèo làm".
+  - Câu chữ theo tên lái: "Lái Tèo mua của…", "Lái Tèo còn phải trả…", "Lái Tèo ghi".
+  - Ẩn các nút ghi mục, đồng ý / báo sai, mã mời, gộp lô, nối sổ, kết thúc / hủy / xóa đơn.
+  - Vẫn tải / gửi được bảng quyết toán và phiếu cân.
+  - Nút quay lại về Doanh nghiệp → Đơn chung.
+- Các chỗ dẫn vào đơn:
+  - mục Đơn chung có nút "👁 Mở đơn (chỉ xem)"
+  - bấm đợt cân trong Giao dịch của doanh nghiệp
+  - bấm "Xem" ở thông báo việc của lái
+
+### Kiểm tra
+- Backend: thêm 1 test (chủ xem được, thấy cả chi phí riêng, không ghi / sửa được; lái xem thì không phải chỉ xem; người ngoài 404). **160 test pass**, Pint sạch.
+- Typecheck web + app, lint web sạch, bundle app build được.
+- Bấm thử trên Chrome bằng `0900000020`: mở đơn "Vườn sâu riêng N234" của Lái Tèo, không còn nút ghi / sửa, quay lại đúng mục Đơn chung.
+
+---
+
 ## 16/10/2026 (tối): Lái còn nợ ở đợt cắt; tự gửi sổ khi có mạng lại; hỏi khi đổi tài khoản ✅
 
 ### Bán cho lái: lái còn nợ (web + app)
@@ -926,7 +951,7 @@ gunzip -c exports/nhanong-gia-….sql.gz | mysql --default-character-set=utf8mb4
 | 12 | Ghi chú giọng nói, chụp ảnh hóa đơn | |
 | 13 | ~~Đợt cắt bán cho lái: "lái còn nợ"~~ | ✅ Đã làm 16/10 |
 | 14 | ~~App tự gửi sổ khi có mạng lại; hỏi lại khi đổi tài khoản trên máy đang có sổ~~ | ✅ Đã làm 16/10 |
-| 15 | Chủ doanh nghiệp mở thẳng trang đơn chung của lái | Hiện xem số liệu + tải quyết toán |
+| 15 | ~~Chủ doanh nghiệp mở thẳng trang đơn chung của lái~~ | ✅ Đã làm 16/10 |
 
 ### C. Phát hành (cần bạn chuẩn bị)
 | # | Việc | Cần |

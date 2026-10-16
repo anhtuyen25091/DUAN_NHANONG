@@ -39,21 +39,38 @@ export function DealDetail({ token, uuid }: { token: string; uuid: string }) {
       showToast({ message: (err as Error).message })
     }
   }
-  const open = deal.status === 'open'
+  // Chủ doanh nghiệp xem đơn của lái: chỉ xem, ẩn mọi nút ghi / sửa
+  const readOnly = !!deal.read_only
+  const open = deal.status === 'open' && !readOnly
   const c = deal.summary.confirmed
   const p = deal.summary.with_pending
   const entries = [...(deal.entries ?? [])].sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at))
 
   return (
     <div className="ledger">
-      <a className="back" href={href('don')}>
-        ‹ Đơn mua bán
-      </a>
+      {readOnly ? (
+        <a className="back" href={href('doanh-nghiep', { tab: 'don' })}>
+          ‹ Doanh nghiệp
+        </a>
+      ) : (
+        <a className="back" href={href('don')}>
+          ‹ Đơn mua bán
+        </a>
+      )}
+      {readOnly && (
+        <div className="notice">
+          👁 Chỉ xem: đơn do <b>{deal.viewing_as}</b> làm. Chỉ người làm đơn mới ghi / xác nhận được.
+        </div>
+      )}
       <h1>
         {deal.my_role === 'buyer' ? '🛒' : '🌳'} {deal.title}
       </h1>
       <p className="muted">
-        {deal.my_role === 'buyer' ? 'Mình là bên mua · mua của ' : 'Mình là bên bán · bán cho '}
+        {readOnly
+          ? `${deal.viewing_as} ${deal.my_role === 'buyer' ? 'mua của ' : 'bán cho '}`
+          : deal.my_role === 'buyer'
+            ? 'Mình là bên mua · mua của '
+            : 'Mình là bên bán · bán cho '}
         <b>{counterpartName(deal)}</b>
         {deal.status !== 'open' && ` · ${deal.status === 'done' ? 'Đã xong' : 'Đã hủy'}`}
       </p>
@@ -65,7 +82,7 @@ export function DealDetail({ token, uuid }: { token: string; uuid: string }) {
         </p>
       )}
 
-      {!deal.joined && <ShareCode deal={deal} />}
+      {!deal.joined && !readOnly && <ShareCode deal={deal} />}
 
       <section className={`card profit-card ${c.balance > 0 && deal.my_role === 'buyer' ? 'loss' : 'gain'}`}>
         <p className="small muted">Đã 2 bên xác nhận</p>
@@ -95,7 +112,7 @@ export function DealDetail({ token, uuid }: { token: string; uuid: string }) {
         )}
       </section>
 
-      {deal.summary.awaiting_me > 0 && <div className="notice upgrade">🔔 Có {deal.summary.awaiting_me} mục bên kia vừa ghi, chờ bạn xác nhận (ở dưới).</div>}
+      {deal.summary.awaiting_me > 0 && !readOnly && <div className="notice upgrade">🔔 Có {deal.summary.awaiting_me} mục bên kia vừa ghi, chờ bạn xác nhận (ở dưới).</div>}
 
       {open && (
         <div className="btn-row deal-add">
@@ -115,47 +132,51 @@ export function DealDetail({ token, uuid }: { token: string; uuid: string }) {
         ))}
       </div>
 
-      {deal.my_role === 'seller' && <LotCard deal={deal} token={token} onDeal={setDeal} />}
+      {deal.my_role === 'seller' && !readOnly && <LotCard deal={deal} token={token} onDeal={setDeal} />}
 
-      <LedgerLinkCard deal={deal} />
+      {!readOnly && <LedgerLinkCard deal={deal} />}
 
       <section className="card">
         <PrintButtons token={token} target={{ type: 'deal', id: deal.uuid }} label="Bảng quyết toán đơn (mọi đợt cân, cọc, tiền đã trả, còn lại) để gửi bên kia" />
       </section>
 
-      <section className="card">
-        <h2>Đơn</h2>
-        <div className="btn-row">
-          {open ? (
-            <>
-              <button type="button" onClick={() => run(() => api.updateDeal(token, deal.uuid, { status: 'done' }), `Đã kết thúc đơn, ${counterpartName(deal)} sẽ nhận thông báo`)}>
-                Kết thúc đơn
-              </button>
-              <button type="button" className="danger-outline" onClick={() => window.confirm('Hủy đơn này?') && run(() => api.updateDeal(token, deal.uuid, { status: 'cancelled' }), 'Đã hủy đơn')}>
-                Hủy đơn
-              </button>
-            </>
-          ) : (
-            <button type="button" onClick={() => run(() => api.updateDeal(token, deal.uuid, { status: 'open' }), 'Đã mở lại đơn')}>
-              Mở lại đơn
-            </button>
-          )}
-          {deal.is_creator && !deal.joined && (
-            <button
-              type="button"
-              className="danger-outline"
-              onClick={async () => {
-                if (!window.confirm('Xóa hẳn đơn này?')) return
-                await api.deleteDeal(token, deal.uuid)
-                go('don')
-              }}
-            >
-              Xóa đơn
-            </button>
-          )}
-        </div>
+      {readOnly ? (
         <p className="small muted">Mã đơn: {deal.code}</p>
-      </section>
+      ) : (
+        <section className="card">
+          <h2>Đơn</h2>
+          <div className="btn-row">
+            {open ? (
+              <>
+                <button type="button" onClick={() => run(() => api.updateDeal(token, deal.uuid, { status: 'done' }), `Đã kết thúc đơn, ${counterpartName(deal)} sẽ nhận thông báo`)}>
+                  Kết thúc đơn
+                </button>
+                <button type="button" className="danger-outline" onClick={() => window.confirm('Hủy đơn này?') && run(() => api.updateDeal(token, deal.uuid, { status: 'cancelled' }), 'Đã hủy đơn')}>
+                  Hủy đơn
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => run(() => api.updateDeal(token, deal.uuid, { status: 'open' }), 'Đã mở lại đơn')}>
+                Mở lại đơn
+              </button>
+            )}
+            {deal.is_creator && !deal.joined && (
+              <button
+                type="button"
+                className="danger-outline"
+                onClick={async () => {
+                  if (!window.confirm('Xóa hẳn đơn này?')) return
+                  await api.deleteDeal(token, deal.uuid)
+                  go('don')
+                }}
+              >
+                Xóa đơn
+              </button>
+            )}
+          </div>
+          <p className="small muted">Mã đơn: {deal.code}</p>
+        </section>
+      )}
     </div>
   )
 }
@@ -198,7 +219,7 @@ function EntryCard({
   onDeal: (d: Deal) => void
   run: (action: () => Promise<Deal>, message?: string) => Promise<void>
 }) {
-  const open = deal.status === 'open'
+  const open = deal.status === 'open' && !deal.read_only
   const canRespond = open && !e.mine && (e.status === 'pending' || e.status === 'disputed')
   const dispute = async () => {
     const reason = window.prompt('Sai chỗ nào? (ví dụ: Loại A là 1.250 kg)')
@@ -216,7 +237,7 @@ function EntryCard({
       <div className="deal-entry-head">
         <b>{KIND_LABEL[e.kind]}</b>
         <span className="small muted">
-          {formatDate(e.date)} · {e.mine ? 'mình ghi' : `${e.created_by_name ?? 'bên kia'} ghi`}
+          {formatDate(e.date)} · {e.mine && !deal.read_only ? 'mình ghi' : `${e.created_by_name ?? 'bên kia'} ghi`}
         </span>
         <span className="tag">{STATUS_LABEL[e.status]}</span>
       </div>

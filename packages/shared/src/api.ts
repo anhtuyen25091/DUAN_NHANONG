@@ -145,6 +145,10 @@ export interface Deal {
   note: string | null;
   my_role: DealRole;
   is_creator: boolean;
+  /** Chủ doanh nghiệp đang xem đơn của lái (nhìn từ phía lái, không ghi / sửa được) */
+  read_only?: boolean;
+  /** Tên lái khi chủ đang xem */
+  viewing_as?: string | null;
   /** Bên kia đã tham gia */
   joined: boolean;
   seller_name: string | null;

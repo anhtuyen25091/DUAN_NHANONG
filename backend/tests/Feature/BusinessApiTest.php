@@ -195,6 +195,37 @@ class BusinessApiTest extends TestCase
         $this->assertSame('Lái Tèo sửa phiếu PM-000001: Đã trả: 0 đ → 1.000.000 đ', $items->firstWhere('type', 'purchase')['text']);
     }
 
+    public function test_owner_opens_buyer_deal_read_only(): void
+    {
+        $teo = $this->member('Lái Tèo', '0911000001');
+        $outsider = User::factory()->create();
+
+        Sanctum::actingAs($teo);
+        $deal = $this->postJson(route('api.v1.deals.store'), ['role' => 'buyer', 'title' => 'Sầu riêng vườn Út', 'counterpart_name' => 'Chú Út'])->json('data');
+        $this->postJson(route('api.v1.deals.entries.store', $deal['uuid']), ['kind' => 'cut', 'date' => '2026-10-16', 'lines' => [['grade' => 'Loại A', 'kg' => 1000, 'price' => 80000]]])->assertCreated();
+        $this->postJson(route('api.v1.deals.entries.store', $deal['uuid']), ['kind' => 'cost', 'date' => '2026-10-16', 'amount' => 500_000, 'note' => 'Tiền xe'])->assertCreated();
+
+        // Chủ xem được, nhìn từ phía lái (kể cả chi phí riêng của lái), đánh dấu chỉ xem
+        Sanctum::actingAs($this->owner);
+        $this->getJson(route('api.v1.deals.show', $deal['uuid']))
+            ->assertOk()
+            ->assertJsonPath('data.read_only', true)
+            ->assertJsonPath('data.viewing_as', 'Lái Tèo')
+            ->assertJsonPath('data.my_role', 'buyer')
+            ->assertJsonPath('data.is_creator', false)
+            ->assertJsonCount(2, 'data.entries');
+
+        // Nhưng không ghi / sửa được gì
+        $this->postJson(route('api.v1.deals.entries.store', $deal['uuid']), ['kind' => 'payment', 'date' => '2026-10-16', 'amount' => 1000])->assertNotFound();
+        $this->patchJson(route('api.v1.deals.update', $deal['uuid']), ['title' => 'Đổi tên'])->assertNotFound();
+
+        // Lái tự xem thì không phải chỉ xem; người ngoài không xem được
+        Sanctum::actingAs($teo);
+        $this->getJson(route('api.v1.deals.show', $deal['uuid']))->assertJsonPath('data.read_only', false)->assertJsonPath('data.viewing_as', null);
+        Sanctum::actingAs($outsider);
+        $this->getJson(route('api.v1.deals.show', $deal['uuid']))->assertNotFound();
+    }
+
     private function member(string $name, string $phone): User
     {
         $this->postJson(route('api.v1.business.members.store'), ['name' => $name, 'phone' => $phone, 'password' => 'secret1'])->assertCreated();

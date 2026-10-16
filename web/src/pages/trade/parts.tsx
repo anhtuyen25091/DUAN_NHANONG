@@ -44,9 +44,9 @@ export function TotalsCard({ totals }: { totals: TradeTotals }) {
   )
 }
 
-/** dealLink: chủ doanh nghiệp không mở được trang đơn của lái, dẫn sang chỗ khác (danh sách đơn của doanh nghiệp) */
-export function TradeRowCard({ row: r, dealLink }: { row: TradeRow; dealLink?: string }) {
-  const link = r.source === 'deal' && r.deal ? (dealLink ?? href(`don/${r.deal}`)) : href(`giao-dich/phieu/${r.id}`)
+/** 1 giao dịch: phiếu → mở phiếu; đợt cân → mở đơn mua bán (chủ doanh nghiệp mở đơn của lái ở chế độ chỉ xem) */
+export function TradeRowCard({ row: r }: { row: TradeRow }) {
+  const link = r.source === 'deal' && r.deal ? href(`don/${r.deal}`) : href(`giao-dich/phieu/${r.id}`)
   return (
     <a className="card garden-row trade-row" href={link}>
       <span className="garden-name">

@@ -61,7 +61,7 @@ export function Notices() {
 
 /** Bấm "Xem": đơn của mình, phiếu được gửi cho mình, hoặc (chủ doanh nghiệp) phiếu / đơn chung của lái */
 function noticeHref(n: DealNotice): string {
-  if (n.businessDealUuid) return href('doanh-nghiep', { tab: 'don' })
+  if (n.businessDealUuid) return href(`don/${n.businessDealUuid}`)
   if (n.businessPurchaseId) return href(`giao-dich/phieu/${n.businessPurchaseId}`)
   if (n.purchaseId) return href(`giao-dich/nhan/${n.purchaseId}`)
   return href(`don/${n.dealUuid}`)

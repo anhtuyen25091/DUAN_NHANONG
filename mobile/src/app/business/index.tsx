@@ -84,7 +84,7 @@ export default function BusinessScreen() {
       {tab === 'overview' && <Overview token={auth.token} onMember={(id) => open('trades', id)} />}
       {tab === 'members' && <Members token={auth.token} business={business} onChange={loaded.refetch} onOpen={open} />}
       {tab === 'advances' && <Advances key={`a${member}`} token={auth.token} business={business} initialMember={member} />}
-      {tab === 'trades' && <Trades key={`t${member}`} token={auth.token} business={business} initialMember={member} onDeal={() => open('deals')} />}
+      {tab === 'trades' && <Trades key={`t${member}`} token={auth.token} business={business} initialMember={member} />}
       {tab === 'deals' && <Deals token={auth.token} />}
       {tab === 'info' && <BusinessForm token={auth.token} business={business} onSaved={loaded.refetch} />}
     </ScrollView>
@@ -519,7 +519,7 @@ function Advances({ token, business, initialMember }: { token: string; business:
   );
 }
 
-function Trades({ token, business, initialMember, onDeal }: { token: string; business: Business; initialMember?: number; onDeal: () => void }) {
+function Trades({ token, business, initialMember }: { token: string; business: Business; initialMember?: number }) {
   const range = useRange();
   const [member, setMember] = useState<number | undefined>(initialMember);
   const [kind, setKind] = useState<TradeKind | ''>('');
@@ -546,7 +546,7 @@ function Trades({ token, business, initialMember, onDeal }: { token: string; bus
           <TradeTotalsCard totals={rows.state.data.meta.totals} />
           {rows.state.data.data.length === 0 && <Text style={styles.muted}>Chưa có giao dịch.</Text>}
           {rows.state.data.data.map((r) => (
-            <TradeRowCard key={r.id} row={r} onDeal={onDeal} />
+            <TradeRowCard key={r.id} row={r} />
           ))}
         </>
       )}
@@ -558,7 +558,7 @@ function Deals({ token }: { token: string }) {
   const deals = useAsync(() => api.businessDeals(token), [token]);
   return (
     <View>
-      <Text style={[styles.muted, { marginBottom: 8 }]}>Đơn chung các lái làm với nông dân (cọc, nhiều đợt cân). Chủ xem số liệu và gửi bảng quyết toán; lái là người ghi / xác nhận trong đơn.</Text>
+      <Text style={[styles.muted, { marginBottom: 8 }]}>Đơn chung các lái làm với nông dân (cọc, nhiều đợt cân). Chủ mở xem được từng đơn (chỉ xem) và gửi bảng quyết toán; lái là người ghi / xác nhận trong đơn.</Text>
       <Status state={deals.state} retry={deals.reload} />
       {deals.state.status === 'ok' && deals.state.data.length === 0 && <Text style={styles.muted}>Chưa có đơn chung.</Text>}
       {deals.state.status === 'ok' &&
@@ -577,6 +577,7 @@ function Deals({ token }: { token: string }) {
             <Text style={[styles.body, { fontWeight: '700' }]}>
               {d.totals.balance >= 0 ? 'Bên mua còn phải trả' : 'Bên bán nhận dư'} {formatVnd(Math.abs(d.totals.balance))}
             </Text>
+            <Button label="👁 Mở đơn (chỉ xem)" variant="outline" onPress={() => router.push({ pathname: '/deals/[id]', params: { id: d.uuid } })} />
             <PrintButtons token={token} target={{ type: 'deal', id: d.uuid }} />
           </Card>
         ))}

@@ -641,7 +641,7 @@ function BusinessTrades({ token, business, initialMember }: { token: string; bus
           {state.data.data.length === 0 && <p className="muted">Chưa có giao dịch.</p>}
           <div className="garden-list">
             {state.data.data.map((r) => (
-              <TradeRowCard key={r.id} row={r} dealLink={href('doanh-nghiep', { tab: 'don' })} />
+              <TradeRowCard key={r.id} row={r} />
             ))}
           </div>
         </>
@@ -654,7 +654,7 @@ function BusinessDeals({ token }: { token: string }) {
   const [state, retry] = useAsync(() => api.businessDeals(token), [token])
   return (
     <>
-      <p className="small muted">Đơn chung các lái làm với nông dân (cọc, nhiều đợt cân). Chủ xem số liệu và tải bảng quyết toán; lái là người ghi / xác nhận trong đơn.</p>
+      <p className="small muted">Đơn chung các lái làm với nông dân (cọc, nhiều đợt cân). Chủ mở xem được từng đơn (chỉ xem) và tải bảng quyết toán; lái là người ghi / xác nhận trong đơn.</p>
       <Status state={state} retry={retry} />
       {state.status === 'ok' && state.data.length === 0 && <p className="muted">Chưa có đơn chung.</p>}
       {state.status === 'ok' &&
@@ -686,6 +686,11 @@ function BusinessDeals({ token }: { token: string }) {
                 <dd>{formatVnd(Math.abs(d.totals.balance))}</dd>
               </div>
             </dl>
+            <p>
+              <a className="button" href={href(`don/${d.uuid}`)}>
+                👁 Mở đơn (chỉ xem)
+              </a>
+            </p>
             <PrintButtons token={token} target={{ type: 'deal', id: d.uuid }} label="" />
           </section>
         ))}

@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Deals\DealSummary;
 use App\Models\Deal;
 use App\Models\DealEntry;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,12 +19,16 @@ class DealResource extends JsonResource
     /** Danh sách: không kèm từng mục */
     public bool $withEntries = true;
 
+    /** Chủ doanh nghiệp xem đơn của lái: nhìn từ phía lái này, chỉ xem */
+    public ?User $viewAs = null;
+
     /**
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
-        $viewer = $request->user();
+        $viewer = $this->viewAs ?? $request->user();
+        $readOnly = $this->viewAs !== null;
         $role = $this->roleOf($viewer);
         $other = $role === 'seller' ? $this->buyer : $this->seller;
         $visible = $this->entries->filter(fn (DealEntry $e): bool => $e->kind->isShared() || $e->created_by === $viewer->id)->values();
@@ -38,7 +43,9 @@ class DealResource extends JsonResource
             'closed_at' => $this->closed_at?->toIso8601String(),
             'note' => $this->note,
             'my_role' => $role,
-            'is_creator' => $this->created_by === $viewer->id,
+            'is_creator' => ! $readOnly && $this->created_by === $viewer->id,
+            'read_only' => $readOnly,
+            'viewing_as' => $readOnly ? $viewer->name : null,
             'joined' => ! $this->isOpenToJoin(),
             'seller_name' => $this->seller?->name ?? $this->seller_name,
             'buyer_name' => $this->buyer?->name ?? $this->buyer_name,

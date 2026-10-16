@@ -87,8 +87,19 @@ class DealController extends Controller
         return response()->json(['data' => $this->present($deal, $request)], 201);
     }
 
+    /**
+     * Xem đơn. Chủ doanh nghiệp xem được đơn của lái mình (chỉ xem, nhìn từ phía lái); không sửa / ghi gì được.
+     */
     public function show(Request $request, Deal $deal): JsonResponse
     {
+        $user = $request->user();
+        if (! $deal->isParticipant($user) && $deal->isBusinessOwner($user)) {
+            $resource = new DealResource($deal->fresh([...self::WITH, 'businessUser', 'creator']));
+            $resource->viewAs = $deal->businessUser ?? $deal->creator;
+            abort_if($resource->viewAs === null, 404);
+
+            return response()->json(['data' => $resource->resolve($request)]);
+        }
         $this->authorizeParticipant($request, $deal);
 
         return response()->json(['data' => $this->present($deal, $request)]);

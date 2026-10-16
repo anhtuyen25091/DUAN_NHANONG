@@ -28,9 +28,8 @@ export function TradeTotalsCard({ totals }: { totals: TradeTotals }) {
   );
 }
 
-/** 1 giao dịch: phiếu → mở phiếu; đợt cân → mở đơn mua bán */
-/** onDeal: chủ doanh nghiệp không mở được trang đơn của lái, làm việc khác thay (sang mục đơn chung) */
-export function TradeRowCard({ row: r, onDeal }: { row: TradeRow; onDeal?: () => void }) {
+/** 1 giao dịch: phiếu → mở phiếu; đợt cân → mở đơn mua bán (chủ doanh nghiệp mở đơn của lái ở chế độ chỉ xem) */
+export function TradeRowCard({ row: r }: { row: TradeRow }) {
   const tag = r.owing > 0 ? `${r.kind === 'buy' ? 'Còn nợ khách' : 'Khách nợ'} ${formatVnd(r.owing)}` : r.pending ? 'Chờ bên kia xác nhận' : null;
   return (
     <RowCard
@@ -39,11 +38,7 @@ export function TradeRowCard({ row: r, onDeal }: { row: TradeRow; onDeal?: () =>
       right={formatVnd(r.amount)}
       tag={tag}
       onPress={() =>
-        r.source === 'deal' && r.deal
-          ? onDeal
-            ? onDeal()
-            : router.push({ pathname: '/deals/[id]', params: { id: r.deal } })
-          : router.push({ pathname: '/trade/[id]', params: { id: r.id } })
+        r.source === 'deal' && r.deal ? router.push({ pathname: '/deals/[id]', params: { id: r.deal } }) : router.push({ pathname: '/trade/[id]', params: { id: r.id } })
       }
     />
   );

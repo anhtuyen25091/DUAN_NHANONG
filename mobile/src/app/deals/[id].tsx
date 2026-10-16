@@ -84,7 +84,9 @@ function DealDetail({ token, id }: { token: string; id: string }) {
     }
   };
 
-  const open = deal.status === 'open';
+  // Chủ doanh nghiệp xem đơn của lái: chỉ xem, ẩn mọi nút ghi / sửa
+  const readOnly = !!deal.read_only;
+  const open = deal.status === 'open' && !readOnly;
   const c = deal.summary.confirmed;
   const p = deal.summary.with_pending;
   const entries = [...(deal.entries ?? [])].sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at));
@@ -108,11 +110,16 @@ function DealDetail({ token, id }: { token: string; id: string }) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[colors.primary]} tintColor={colors.primary} />}
     >
       <Stack.Screen options={{ title: `${deal.my_role === 'buyer' ? '🛒' : '🌳'} ${deal.title}` }} />
+      {readOnly && <Notice text={`👁 Chỉ xem: đơn do ${deal.viewing_as} làm. Chỉ người làm đơn mới ghi / xác nhận được.`} />}
       <Text style={{ fontSize: font.title, fontWeight: '700', color: colors.text }}>
         {deal.my_role === 'buyer' ? '🛒' : '🌳'} {deal.title}
       </Text>
       <Text style={[styles.body, { marginBottom: 8 }]}>
-        {deal.my_role === 'buyer' ? 'Mình là bên mua · mua của ' : 'Mình là bên bán · bán cho '}
+        {readOnly
+          ? `${deal.viewing_as} ${deal.my_role === 'buyer' ? 'mua của ' : 'bán cho '}`
+          : deal.my_role === 'buyer'
+            ? 'Mình là bên mua · mua của '
+            : 'Mình là bên bán · bán cho '}
         <Text style={{ fontWeight: '700' }}>{counterpartName(deal)}</Text>
         {deal.status !== 'open' && ` · ${deal.status === 'done' ? 'Đã xong' : 'Đã hủy'}`}
       </Text>
@@ -122,7 +129,7 @@ function DealDetail({ token, id }: { token: string; id: string }) {
         </View>
       )}
 
-      {!deal.joined && <ShareCode deal={deal} />}
+      {!deal.joined && !readOnly && <ShareCode deal={deal} />}
 
       <Card style={{ borderLeftWidth: 6, borderLeftColor: owing ? colors.loss : colors.gain }}>
         <Text style={styles.muted}>Đã 2 bên xác nhận</Text>
@@ -136,7 +143,7 @@ function DealDetail({ token, id }: { token: string; id: string }) {
         )}
       </Card>
 
-      {deal.summary.awaiting_me > 0 && <Notice text={`🔔 Có ${deal.summary.awaiting_me} mục bên kia vừa ghi, chờ bạn xác nhận (ở dưới).`} />}
+      {deal.summary.awaiting_me > 0 && !readOnly && <Notice text={`🔔 Có ${deal.summary.awaiting_me} mục bên kia vừa ghi, chờ bạn xác nhận (ở dưới).`} />}
 
       {open && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
@@ -154,33 +161,37 @@ function DealDetail({ token, id }: { token: string; id: string }) {
         <EntryCard key={e.uuid} deal={deal} entry={e} token={token} run={run} />
       ))}
 
-      {deal.my_role === 'seller' && <LotCard deal={deal} token={token} run={run} />}
+      {deal.my_role === 'seller' && !readOnly && <LotCard deal={deal} token={token} run={run} />}
 
-      <LedgerLinkCard deal={deal} />
+      {!readOnly && <LedgerLinkCard deal={deal} />}
 
       <Card>
         <PrintButtons token={token} target={{ type: 'deal', id: deal.uuid }} label="Gửi bảng quyết toán đơn (mọi đợt cân, cọc, tiền đã trả, còn lại) cho bên kia" />
       </Card>
 
-      <Card style={{ gap: 8 }}>
-        <Text style={heading}>Đơn</Text>
-        {open ? (
-          <>
-            <Button label="✅ Kết thúc đơn" variant="outline" onPress={() => void run(() => api.updateDeal(token, deal.uuid, { status: 'done' }), 'Đã kết thúc đơn')} />
-            <Button
-              label="Hủy đơn"
-              variant="danger"
-              onPress={async () => {
-                if (await confirmAsync('Hủy đơn này?', `Đơn "${deal.title}" sẽ chuyển sang Đã hủy.`, 'Hủy đơn')) await run(() => api.updateDeal(token, deal.uuid, { status: 'cancelled' }), 'Đã hủy đơn');
-              }}
-            />
-          </>
-        ) : (
-          <Button label="Mở lại đơn" variant="outline" onPress={() => void run(() => api.updateDeal(token, deal.uuid, { status: 'open' }), 'Đã mở lại đơn')} />
-        )}
-        {deal.is_creator && !deal.joined && <Button label="Xóa đơn" variant="danger" onPress={remove} />}
+      {readOnly ? (
         <Text style={styles.muted}>Mã đơn: {deal.code}</Text>
-      </Card>
+      ) : (
+        <Card style={{ gap: 8 }}>
+          <Text style={heading}>Đơn</Text>
+          {open ? (
+            <>
+              <Button label="✅ Kết thúc đơn" variant="outline" onPress={() => void run(() => api.updateDeal(token, deal.uuid, { status: 'done' }), 'Đã kết thúc đơn')} />
+              <Button
+                label="Hủy đơn"
+                variant="danger"
+                onPress={async () => {
+                  if (await confirmAsync('Hủy đơn này?', `Đơn "${deal.title}" sẽ chuyển sang Đã hủy.`, 'Hủy đơn')) await run(() => api.updateDeal(token, deal.uuid, { status: 'cancelled' }), 'Đã hủy đơn');
+                }}
+              />
+            </>
+          ) : (
+            <Button label="Mở lại đơn" variant="outline" onPress={() => void run(() => api.updateDeal(token, deal.uuid, { status: 'open' }), 'Đã mở lại đơn')} />
+          )}
+          {deal.is_creator && !deal.joined && <Button label="Xóa đơn" variant="danger" onPress={remove} />}
+          <Text style={styles.muted}>Mã đơn: {deal.code}</Text>
+        </Card>
+      )}
     </ScrollView>
   );
 }
@@ -249,7 +260,7 @@ const STATUS_COLOR: Record<DealEntry['status'], string> = { pending: colors.loss
 function EntryCard({ deal, entry: e, token, run }: { deal: Deal; entry: DealEntry; token: string; run: Run }) {
   const [disputing, setDisputing] = useState(false);
   const [reason, setReason] = useState('');
-  const open = deal.status === 'open';
+  const open = deal.status === 'open' && !deal.read_only;
   const canRespond = open && !e.mine && (e.status === 'pending' || e.status === 'disputed');
 
   const sendDispute = async () => {
@@ -269,7 +280,7 @@ function EntryCard({ deal, entry: e, token, run }: { deal: Deal; entry: DealEntr
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 4 }}>
         <Text style={{ fontSize: font.body, fontWeight: '700', color: colors.text }}>{KIND_LABEL[e.kind]}</Text>
         <Text style={styles.muted}>
-          {formatDate(e.date)} · {e.mine ? 'mình ghi' : `${e.created_by_name ?? 'bên kia'} ghi`}
+          {formatDate(e.date)} · {e.mine && !deal.read_only ? 'mình ghi' : `${e.created_by_name ?? 'bên kia'} ghi`}
         </Text>
       </View>
       <View style={{ marginTop: 4 }}>

@@ -13,6 +13,9 @@ export function balanceText(deal: Deal, totals: DealTotals): string {
   const buyerOwes = balance > 0
   const iAmBuyer = deal.my_role === 'buyer'
   const amount = formatVnd(Math.abs(balance))
-  if (buyerOwes) return iAmBuyer ? `Mình còn phải trả ${amount}` : `Bên mua còn nợ mình ${amount}`
-  return iAmBuyer ? `Bên bán còn nợ lại mình ${amount}` : `Mình nhận dư ${amount}, cần trả lại`
+  // Chủ doanh nghiệp xem đơn của lái: nói theo tên lái thay cho "mình"
+  const Me = deal.read_only ? (deal.viewing_as ?? 'Lái') : 'Mình'
+  const me = deal.read_only ? Me : 'mình'
+  if (buyerOwes) return iAmBuyer ? `${Me} còn phải trả ${amount}` : `Bên mua còn nợ ${me} ${amount}`
+  return iAmBuyer ? `Bên bán còn nợ lại ${me} ${amount}` : `${Me} nhận dư ${amount}, cần trả lại`
 }
