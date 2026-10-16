@@ -109,6 +109,16 @@ class Deal extends Model
     }
 
     /**
+     * Người tạo đơn
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
      * Thành viên doanh nghiệp đứng trong đơn (đơn của doanh nghiệp)
      *
      * @return BelongsTo<User, $this>

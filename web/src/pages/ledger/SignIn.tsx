@@ -1,4 +1,4 @@
-import { ApiError, type LedgerSnapshot } from '@nhanong/shared'
+import { CLOUD_PRIVACY_NOTE, ApiError, type LedgerSnapshot } from '@nhanong/shared'
 import { useState, type FormEvent } from 'react'
 import { api } from '../../api'
 import { setAuth, useAuth } from '../../auth'
@@ -58,6 +58,7 @@ export function SignIn({ data }: { data: LedgerSnapshot }) {
         Dùng số điện thoại để đăng nhập. Đổi máy hoặc mất máy chỉ cần đăng nhập lại là có đủ sổ.
         {hasData && ' Sổ đang có trên máy này sẽ được gửi lên tài khoản.'}
       </p>
+      <p className="muted small">🔒 {CLOUD_PRIVACY_NOTE}</p>
 
       {signedIn && !account && (
         <div className="notice">

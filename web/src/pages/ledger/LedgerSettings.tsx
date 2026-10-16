@@ -1,4 +1,4 @@
-import { formatVnd, SYNC_STATUS_LABELS, totals, type Ledger, type LedgerSnapshot } from '@nhanong/shared'
+import { CLOUD_PRIVACY_NOTE, formatVnd, SYNC_STATUS_LABELS, totals, type Ledger, type LedgerSnapshot } from '@nhanong/shared'
 import { useState } from 'react'
 import { go, href } from '../../hooks'
 import { getAuth } from '../../auth'
@@ -148,6 +148,7 @@ function StoragePlace({ data }: { data: LedgerSnapshot }) {
         Tài khoản: <b>{account.name}</b>
         {account.phone && ` · ${account.phone}`}
       </p>
+      <p className="small muted">🔒 {CLOUD_PRIVACY_NOTE}</p>
       <p className="small muted">
         {SYNC_STATUS_LABELS[status]}
         {data.meta.last_synced_at && ` · Lần cuối: ${new Date(data.meta.last_synced_at).toLocaleString('vi-VN')}`}

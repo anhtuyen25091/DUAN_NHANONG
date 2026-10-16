@@ -1,4 +1,4 @@
-import { ApiError, type LedgerSnapshot } from '@nhanong/shared';
+import { CLOUD_PRIVACY_NOTE, ApiError, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, type TextInputProps } from 'react-native';
@@ -92,6 +92,7 @@ function SignInForm({ data }: { data: LedgerSnapshot }) {
         Dùng số điện thoại để đăng nhập. Đổi máy hoặc mất máy chỉ cần đăng nhập lại là có đủ sổ.
         {hasData ? ' Sổ đang có trên máy này sẽ được gửi lên tài khoản.' : ''}
       </Text>
+      <Text style={[styles.muted, { marginBottom: 6 }]}>🔒 {CLOUD_PRIVACY_NOTE}</Text>
       {signedIn && !account && (
         <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary, gap: 10 }}>
           <Text style={styles.body}>

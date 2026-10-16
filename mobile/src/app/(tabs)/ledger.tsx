@@ -1,4 +1,4 @@
-import { allocatedEntries, contractSummaries, debtStatus, debtSummary, dueReminders, filterEntries, formatDate, formatVnd, interestPaid, supplyStock, today, totals, type Ledger, type LedgerSnapshot, type StorageMode, workerBalances } from '@nhanong/shared';
+import { CLOUD_PRIVACY_NOTE, allocatedEntries, contractSummaries, debtStatus, debtSummary, dueReminders, filterEntries, formatDate, formatVnd, interestPaid, supplyStock, today, totals, type Ledger, type LedgerSnapshot, type StorageMode, workerBalances } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
@@ -247,7 +247,7 @@ function ChooseMode({ ledger }: { ledger: Ledger }) {
       <ModeCard
         icon="☁️"
         title="Lưu cả trên mạng (đổi máy không mất)"
-        text="Đăng nhập bằng số điện thoại. Sổ vẫn dùng được khi mất mạng, có mạng lại sẽ tự gửi lên."
+        text={`Đăng nhập bằng số điện thoại. Sổ vẫn dùng được khi mất mạng, có mạng lại sẽ tự gửi lên. ${CLOUD_PRIVACY_NOTE}`}
         onPress={() => router.push('/ledger/sign-in')}
       />
     </View>

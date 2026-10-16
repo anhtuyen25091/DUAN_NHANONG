@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users;
 
+use App\Filament\Resources\LedgerAccounts\LedgerAccountResource;
 use App\Filament\Resources\Users\Pages\ManageUsers;
 use App\Models\Plan;
 use App\Models\User;
@@ -15,6 +16,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -75,6 +77,10 @@ class UserResource extends Resource
                     ->date('d/m/Y')
                     ->placeholder('—')
                     ->sortable(),
+                IconColumn::make('cloud_ledger')
+                    ->label('Lưu trên mạng')
+                    ->state(fn (User $record): bool => $record->ledger_records_exists ?? false)
+                    ->boolean(),
                 TextColumn::make('created_at')
                     ->label('Đăng ký lúc')
                     ->dateTime('d/m/Y H:i')
@@ -90,7 +96,14 @@ class UserResource extends Resource
                         false: fn (Builder $query) => $query->where(fn (Builder $q) => $q->whereNull('premium_until')->orWhere('premium_until', '<=', now())),
                     ),
             ])
+            ->modifyQueryUsing(fn (Builder $query) => $query->withExists('ledgerRecords'))
             ->recordActions([
+                Action::make('viewLedger')
+                    ->label('Xem sổ')
+                    ->icon(Heroicon::OutlinedBookOpen)
+                    ->color('gray')
+                    ->visible(fn (User $record): bool => (bool) ($record->ledger_records_exists ?? false))
+                    ->url(fn (User $record): string => LedgerAccountResource::getUrl('view', ['record' => $record])),
                 Action::make('activatePlan')
                     ->label(fn (User $record): string => $record->hasPremium() ? 'Gia hạn gói' : 'Kích hoạt gói')
                     ->icon(Heroicon::OutlinedStar)

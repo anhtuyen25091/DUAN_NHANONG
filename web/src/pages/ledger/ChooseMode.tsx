@@ -1,3 +1,4 @@
+import { CLOUD_PRIVACY_NOTE } from '@nhanong/shared'
 import type { Ledger, StorageMode } from '@nhanong/shared'
 import { go } from '../../hooks'
 
@@ -27,7 +28,7 @@ export function ChooseMode({ ledger, onChosen }: { ledger: Ledger; onChosen?: (m
         </span>
         <span>
           <b>Lưu cả trên mạng (đổi máy không mất)</b>
-          <span className="muted">Đăng nhập bằng số điện thoại. Sổ vẫn dùng được khi mất mạng, có mạng lại sẽ tự gửi lên.</span>
+          <span className="muted">Đăng nhập bằng số điện thoại. Sổ vẫn dùng được khi mất mạng, có mạng lại sẽ tự gửi lên. {CLOUD_PRIVACY_NOTE}</span>
         </span>
       </button>
     </div>

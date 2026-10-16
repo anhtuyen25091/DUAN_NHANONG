@@ -31,7 +31,7 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Green,
             ])
-            ->navigationGroups(['Giá cả', 'Điểm bán', 'Thu thập giá', 'Danh mục'])
+            ->navigationGroups(['Giá cả', 'Giá theo khu vực', 'Điểm bán', 'Thu thập giá', 'Danh mục', 'Giao dịch người dùng', 'Tài khoản', 'Hệ thống'])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([

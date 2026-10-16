@@ -179,3 +179,6 @@ export class SyncEngine {
     this.setStatus('off');
   }
 }
+
+/** Báo trước khi bật "Lưu cả trên mạng": quản trị viên có thể xem sổ để hỗ trợ, mỗi lần xem đều được ghi lại */
+export const CLOUD_PRIVACY_NOTE = 'Sổ lưu trên máy chủ Nhà Nông. Quản trị viên có thể xem để hỗ trợ khi bạn cần; mỗi lần xem đều được ghi lại.';

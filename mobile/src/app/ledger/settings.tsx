@@ -1,4 +1,4 @@
-import { formatDateTime, formatVnd, SYNC_STATUS_LABELS, totals, type LedgerSnapshot } from '@nhanong/shared';
+import { CLOUD_PRIVACY_NOTE, formatDateTime, formatVnd, SYNC_STATUS_LABELS, totals, type LedgerSnapshot } from '@nhanong/shared';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { router, Stack } from 'expo-router';
@@ -214,6 +214,7 @@ function StoragePlace({ data }: { data: LedgerSnapshot }) {
         Tài khoản: <Text style={{ fontWeight: '700' }}>{account.name}</Text>
         {account.phone ? ` · ${account.phone}` : ''}
       </Text>
+      <Text style={[styles.muted, { marginTop: 6 }]}>🔒 {CLOUD_PRIVACY_NOTE}</Text>
       <Text style={[styles.muted, { marginVertical: 6 }]}>
         {SYNC_STATUS_LABELS[status]}
         {data.meta.last_synced_at ? ` · Lần cuối: ${formatDateTime(data.meta.last_synced_at)}` : ''}

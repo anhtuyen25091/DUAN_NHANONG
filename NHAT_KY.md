@@ -11,6 +11,62 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026: Admin xem giao dịch người dùng (chỉ xem, có nhật ký) ✅
+
+**Câu hỏi:** `/admin` có quản lý / xem được giao dịch không, nhất là khi khách bật "Lưu cả trên mạng"?
+- Trước đây: **không**. Admin chỉ có giá, mặt hàng, điểm bán, tài khoản, gói xem giá…
+- Dữ liệu thì có trên server:
+  - sổ thu chi đồng bộ ở `ledger_records` (JSON, không mã hóa)
+  - đơn mua bán, phiếu, doanh nghiệp
+
+**Bạn đã chọn:**
+- Xem **cả 4 loại**: sổ thu chi đồng bộ, đơn mua bán, phiếu + khách, doanh nghiệp.
+- **Chỉ xem + thống kê**, không sửa / xóa.
+- **Ghi nhật ký mỗi lần xem** và **báo trước** cho người dùng.
+
+### Đã làm
+- **Nhóm menu mới "Giao dịch người dùng"** (chỉ xem: không có trang tạo / sửa, không có nút xóa):
+  - **Sổ thu chi đồng bộ** (`/admin/ledger-accounts`)
+    - mỗi dòng 1 tài khoản: số vườn, số khoản, tổng thu / chi, đồng bộ lần cuối
+    - chi tiết: tổng, theo vườn, từng khoản (ngày, vườn, hạng mục, tiền, ghi chú), công nợ còn lại, bán cho lái
+    - `App\Support\LedgerReader` đọc JSON, nối tên vườn / hạng mục, bỏ bản ghi đã xóa
+  - **Đơn mua bán** (`/admin/deals`)
+    - lọc trạng thái / có báo sai / doanh nghiệp
+    - chi tiết: 2 bên, số liệu (bỏ mục báo sai), từng mục kèm trạng thái và lý do báo sai
+    - nút **Tải PDF** quyết toán
+  - **Phiếu mua / bán** (`/admin/purchases`)
+    - gồm cả phiếu đã xóa; lọc doanh nghiệp / người lập / sửa sau khi gửi khách
+    - chi tiết: dòng hàng, lịch sử sửa, khách được xem
+    - nút **Tải PDF**
+  - **Doanh nghiệp** (`/admin/businesses`)
+    - từng lái (mua / bán tháng này, đã ứng, đang giữ), tiền ứng gần đây
+    - nút **Tải báo cáo tháng (PDF)**
+- **Nhóm "Hệ thống" → Nhật ký xem dữ liệu** (`/admin/admin-view-logs`, bảng `admin_view_logs`):
+  - ghi lúc nào, admin nào, xem / tải, mục nào, của người dùng nào, bản ghi nào
+  - **chỉ ghi khi mở trang chi tiết hoặc tải PDF**; danh sách thì không ghi
+  - mở lại cùng thứ trong 10 phút chỉ ghi 1 lần (`App\Support\AdminAudit`)
+- **Trang chủ admin:** widget "Người dùng ghi chép giao dịch". Chỉ đếm / cộng tổng, không hiện dữ liệu riêng:
+  - số người bật lưu trên mạng, khoản đồng bộ 30 ngày
+  - đơn đang mở, đơn có mục báo sai
+  - phiếu tháng này và tổng tiền
+  - doanh nghiệp, lái con
+- **Tài khoản:** cột "Lưu trên mạng" và nút "Xem sổ".
+- **Báo trước cho người dùng** (`CLOUD_PRIVACY_NOTE` trong shared): "Sổ lưu trên máy chủ Nhà Nông. Quản trị viên có thể xem để hỗ trợ khi bạn cần; mỗi lần xem đều được ghi lại."
+  - hiện ở chọn nơi lưu, đăng nhập để lưu trên mạng, và cài đặt sổ (web + app)
+- Xếp lại thứ tự nhóm menu admin (Giá theo khu vực lên sau Giá cả).
+
+### Kiểm tra
+- `AdminUserDataTest` (4 test):
+  - `LedgerReader`: bỏ bản ghi đã xóa (cả 2 kiểu), nối tên, cộng đúng, công nợ còn lại
+  - 4 trang chi tiết mở được, hiện đúng ngày / tiền trong từng dòng; ghi đúng 4 dòng nhật ký, mở lại không ghi thêm, sau 10 phút ghi lại
+  - không có trang tạo / sửa, không có nút sửa / xóa; tải PDF có ghi nhật ký "tải"
+  - người không phải admin bị chặn
+- 156 test backend pass, Pint sạch. Shared 101 test pass, typecheck web + app sạch, lint web sạch.
+- **Bấm thử trên Chrome** bằng `admin@nhanong.local`: trang chủ có thống kê; mở 4 loại chi tiết; nhật ký có đủ 4 lần xem.
+  - **Lỗi tìm ra khi xem ảnh chụp, đã sửa:** cột tiền / ngày trong các bảng hiện "0 đ" / trống. Hàm định dạng của Filament nhận giá trị theo tên tham số phải là `$state`, mình đặt `$v`. Đã thêm test kiểm tra số trong từng dòng.
+
+---
+
 ## 16/10/2026: Chủ doanh nghiệp nhận thông báo việc của lái ✅
 
 **Vấn đề:** Lái Tèo (`0900000021`) tạo / xử lý đơn mua bán với Chi nhánh Tân Phú. Chi nhánh nhận thông báo, nhưng chủ (`0900000020`) thì không, vì chủ không đứng trong đơn.
