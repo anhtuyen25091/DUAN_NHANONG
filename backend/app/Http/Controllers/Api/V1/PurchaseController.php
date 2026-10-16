@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Documents\TransactionDocuments;
 use App\Enums\PurchaseKind;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Deal;
 use App\Models\Purchase;
+use App\Models\PurchaseVersion;
 use App\Models\User;
 use App\Transactions\TransactionFeed;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -110,12 +113,22 @@ class PurchaseController extends Controller
     }
 
     /** Các phiếu người khác gửi cho mình (kể cả phiếu người lập đã xóa: vẫn giữ để đối chiếu) */
+    /**
+     * ?since=ISO: chỉ các phiếu mới đổi / mới được gửi sau thời điểm đó (app hỏi 8 giây 1 lần để báo khách)
+     */
     public function received(Request $request): JsonResponse
     {
+        $since = $request->validate(['since' => ['nullable', 'date']])['since'] ?? null;
+        $since = $since ? CarbonImmutable::parse($since)->setTimezone(config('app.timezone')) : null;
+        $userId = $request->user()->id;
+
         $purchases = Purchase::query()
             ->withTrashed()
-            ->whereHas('viewers', fn ($q) => $q->whereKey($request->user()->id))
-            ->with('user.buyer')
+            ->whereHas('viewers', fn ($q) => $q->whereKey($userId))
+            ->when($since, fn ($q) => $q->where(fn ($w) => $w
+                ->where('updated_at', '>=', $since)
+                ->orWhereHas('viewers', fn ($v) => $v->whereKey($userId)->where('purchase_viewers.created_at', '>=', $since))))
+            ->with(['user.buyer', 'viewers' => fn ($q) => $q->whereKey($userId), 'versions'])
             ->latest('date')
             ->limit(200)
             ->get();
@@ -218,6 +231,42 @@ class PurchaseController extends Controller
             'history' => $p->history($p->shared_version ?? 1),
             'edited_after_share' => $p->version > ($p->shared_version ?? $p->version),
             'deleted_at' => $p->deleted_at?->toIso8601String(),
+            'activity' => self::viewerActivity($p),
+        ];
+    }
+
+    /**
+     * Việc mới nhất về phiếu, nhìn từ phía khách (app báo khi khách đang mở app):
+     * được gửi vào app, phiếu bị sửa sau khi mình nhận, phiếu bị xóa. Tự nhập mã thì là việc của mình (by_me).
+     *
+     * @return array{text: string, at: string, by_me: bool}|null
+     */
+    private static function viewerActivity(Purchase $p): ?array
+    {
+        $pivot = $p->relationLoaded('viewers') ? $p->viewers->first()?->pivot : null;
+        if ($pivot === null) {
+            return null;
+        }
+        $by = $p->user->buyer?->name ?? $p->user->name;
+        $code = $p->code();
+        $received = CarbonImmutable::parse($pivot->created_at);
+
+        if ($p->deleted_at !== null) {
+            return ['text' => "{$by} đã xóa phiếu {$code}", 'at' => $p->deleted_at->toIso8601String(), 'by_me' => false];
+        }
+
+        $latest = $p->versions->sortByDesc('version')->first();
+        if ($latest && $latest->version > ($p->shared_version ?? $latest->version) && $latest->created_at > $received) {
+            $previous = $p->versions->firstWhere('version', $latest->version - 1);
+            $changes = $previous ? array_slice(PurchaseVersion::changes($previous->data, $latest->data), 0, 2) : [];
+
+            return ['text' => "{$by} sửa phiếu {$code}".($changes ? ': '.implode('; ', $changes) : ''), 'at' => $latest->created_at->toIso8601String(), 'by_me' => false];
+        }
+
+        return [
+            'text' => $pivot->via === 'phone' ? "{$by} gửi phiếu {$code} cho bạn (".TransactionDocuments::vnd($p->amount).')' : "Bạn đã nhận phiếu {$code}",
+            'at' => $received->toIso8601String(),
+            'by_me' => $pivot->via !== 'phone',
         ];
     }
 

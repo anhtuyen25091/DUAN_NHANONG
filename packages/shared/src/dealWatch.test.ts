@@ -66,3 +66,39 @@ describe('DealWatcher', () => {
     await expect(idle.poll()).resolves.toEqual([]);
   });
 });
+
+describe('DealWatcher: phiếu được gửi cho mình', () => {
+  const purchase = (activity: { text: string; at: string; by_me: boolean } | null, updated_at = '2026-10-16T10:00:00+07:00') =>
+    ({ id: 'p1', code: 'PM-000012', updated_at, activity }) as unknown as import('./trade').ReceivedPurchase;
+
+  it('báo khi được gửi vào app và khi phiếu bị sửa; tự nhập mã thì không báo', async () => {
+    const responses = [
+      [purchase(null)],
+      [purchase({ text: 'Lái Tư gửi phiếu PM-000012 cho bạn (160.254.000 đ)', at: '2026-10-16T10:01:00+07:00', by_me: false })],
+      [purchase({ text: 'Lái Tư sửa phiếu PM-000012: Đã trả: 0 đ → 10.000.000 đ', at: '2026-10-16T10:05:00+07:00', by_me: false }, '2026-10-16T10:05:00+07:00')],
+      [purchase({ text: 'Bạn đã nhận phiếu PM-000013', at: '2026-10-16T10:06:00+07:00', by_me: true }, '2026-10-16T10:06:00+07:00')],
+    ];
+    const since: Array<string | undefined> = [];
+    let store: Record<string, string> = { a: '2026-10-15T08:00:00+07:00' };
+    const watcher = new DealWatcher(
+      {
+        deals: async () => [],
+        receivedPurchases: async (_token: string, s?: string) => {
+          since.push(s);
+          return responses.shift() ?? [];
+        },
+      },
+      { getToken: () => 'tok', loadSeen: () => store, saveSeen: (s) => (store = s) },
+    );
+    const changed: string[] = [];
+    watcher.onDealChanged((id) => changed.push(id));
+
+    for (let i = 0; i < 4; i++) await watcher.poll();
+    expect(watcher.getState().notices.map((n) => [n.purchaseId, n.title, n.text])).toEqual([
+      ['p1', 'Phiếu PM-000012', 'Lái Tư sửa phiếu PM-000012: Đã trả: 0 đ → 10.000.000 đ'],
+      ['p1', 'Phiếu PM-000012', 'Lái Tư gửi phiếu PM-000012 cho bạn (160.254.000 đ)'],
+    ]);
+    expect(changed).toEqual(['p1', 'p1']);
+    expect(since).toEqual([undefined, '2026-10-16T10:00:00+07:00', '2026-10-16T10:01:00+07:00', '2026-10-16T10:05:00+07:00']);
+  });
+});

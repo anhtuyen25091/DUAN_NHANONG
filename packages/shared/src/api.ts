@@ -468,7 +468,9 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
     sendPurchase: (token: string, id: string) => request<{ data: Purchase; message: string }>('POST', `/purchases/${id}/send`, { token }),
     /** Khách nhập mã để nhận phiếu */
     receivePurchase: (token: string, code: string) => request<{ data: ReceivedPurchase }>('POST', '/received-purchases', { token, body: { code } }).then((r) => r.data),
-    receivedPurchases: (token: string) => request<{ data: ReceivedPurchase[] }>('GET', '/received-purchases', { token }).then((r) => r.data),
+    /** since: chỉ lấy phiếu mới đổi / mới được gửi sau thời điểm đó */
+    receivedPurchases: (token: string, since?: string) =>
+      request<{ data: ReceivedPurchase[] }>('GET', '/received-purchases', { token, query: since ? { since } : {} }).then((r) => r.data),
     receivedPurchase: (token: string, id: string) => request<{ data: ReceivedPurchase }>('GET', `/received-purchases/${id}`, { token }).then((r) => r.data),
     /** Tải giấy tờ PDF / Word: trả nội dung file + tên file (web lưu bằng Blob, app ghi file rồi chia sẻ) */
     downloadDocument: async (token: string, target: DocumentTarget, format: DocumentFormat): Promise<{ data: ArrayBuffer; filename: string; mime: string }> => {

@@ -264,6 +264,45 @@ class TransactionApiTest extends TestCase
         $this->postJson(route('api.v1.purchases.send', $other))->assertUnprocessable();
     }
 
+    public function test_customer_gets_activity_when_purchase_is_sent_edited_or_deleted(): void
+    {
+        $farmer = User::factory()->create(['phone' => '0912345678']);
+        $id = $this->postJson(route('api.v1.purchases.store'), $this->purchase())->json('data.id');
+        $this->postJson(route('api.v1.purchases.send', $id))->assertOk();
+
+        Sanctum::actingAs($farmer);
+        $this->getJson(route('api.v1.received-purchases.index'))
+            ->assertJsonPath('data.0.activity.text', 'Lái Tư gửi phiếu PM-000001 cho bạn (160.254.000 đ)')
+            ->assertJsonPath('data.0.activity.by_me', false);
+
+        // Hỏi lại với since: không có gì mới
+        $this->travel(1)->minutes();
+        $since = now()->toIso8601String();
+        $this->travel(1)->minutes();
+        $this->getJson(route('api.v1.received-purchases.index', ['since' => $since]))->assertJsonCount(0, 'data');
+
+        Sanctum::actingAs($this->trader);
+        $this->patchJson(route('api.v1.purchases.update', $id), ['paid' => 10_000_000])->assertOk();
+        Sanctum::actingAs($farmer);
+        $this->getJson(route('api.v1.received-purchases.index', ['since' => $since]))
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.activity.text', 'Lái Tư sửa phiếu PM-000001: Đã trả: 0 đ → 10.000.000 đ');
+
+        Sanctum::actingAs($this->trader);
+        $this->deleteJson(route('api.v1.purchases.destroy', $id))->assertNoContent();
+        Sanctum::actingAs($farmer);
+        $this->getJson(route('api.v1.received-purchases.index', ['since' => $since]))
+            ->assertJsonPath('data.0.activity.text', 'Lái Tư đã xóa phiếu PM-000001');
+
+        // Tự nhập mã: là việc của mình, không báo
+        Sanctum::actingAs($this->trader);
+        $other = $this->postJson(route('api.v1.purchases.store'), $this->purchase(['customer_phone' => null]))->json('data.id');
+        $code = $this->postJson(route('api.v1.purchases.share', $other))->json('data.share_code');
+        Sanctum::actingAs($farmer);
+        $this->postJson(route('api.v1.received-purchases.receive'), ['code' => $code]);
+        $this->getJson(route('api.v1.received-purchases.index'))->assertJsonPath('data.1.activity.by_me', true);
+    }
+
     /**
      * @param  array<string, mixed>  $override
      * @return array<string, mixed>

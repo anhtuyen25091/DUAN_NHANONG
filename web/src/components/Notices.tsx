@@ -28,7 +28,7 @@ export function Notices() {
                 <b>{n.title}</b>
                 <span>{n.text}</span>
               </span>
-              <a className="button small-btn primary" href={href(`don/${n.dealUuid}`)} onClick={() => dealWatcher.dismiss(n.id)}>
+              <a className="button small-btn primary" href={href(n.purchaseId ? `giao-dich/nhan/${n.purchaseId}` : `don/${n.dealUuid}`)} onClick={() => dealWatcher.dismiss(n.id)}>
                 Xem
               </a>
               <button type="button" className="notice-close" aria-label="Đóng" onClick={() => dealWatcher.dismiss(n.id)}>

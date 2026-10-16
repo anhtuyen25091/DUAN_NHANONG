@@ -1,15 +1,19 @@
 /**
- * Theo dõi đơn mua bán chung: hỏi server vài giây 1 lần (chỉ lấy đơn mới đổi), để
+ * Theo dõi đơn mua bán chung và phiếu được gửi cho mình: hỏi server vài giây 1 lần (chỉ lấy cái mới đổi), để
  * - đếm số mục bên kia ghi đang chờ mình xác nhận (hiện số trên menu / tab "Đơn")
  * - báo "Chú Ba đồng ý Đợt cân …" khi BÊN KIA vừa làm gì (việc của chính mình thì không báo)
- * - báo trang đơn đang mở tải lại ngay khi đơn đó đổi.
+ * - báo "Lái Tư gửi phiếu PM-000012 cho bạn", "Lái Tư sửa phiếu …", "… đã xóa phiếu …"
+ * - báo trang đơn / phiếu đang mở tải lại ngay khi nó đổi.
  * Lần đầu chạy trên máy (chưa có gì đã xem) chỉ ghi nhận, không báo dồn các việc cũ.
  */
 import type { Api, Deal } from './api';
 
 export interface DealNotice {
   id: string;
-  dealUuid: string;
+  /** Thông báo về đơn mua bán: mở đơn này */
+  dealUuid?: string;
+  /** Thông báo về phiếu được gửi cho mình: mở phiếu này */
+  purchaseId?: string;
   title: string;
   text: string;
   at: string;
@@ -30,11 +34,12 @@ export class DealWatcher {
   private awaitingByDeal = new Map<string, number>();
   private updatedAt = new Map<string, string>();
   private since: string | null = null;
+  private purchaseSince: string | null = null;
   private running = false;
-  private api: Pick<Api, 'deals'>;
+  private api: Pick<Api, 'deals'> & Partial<Pick<Api, 'receivedPurchases'>>;
   private options: { getToken: () => string | null; loadSeen: () => Seen; saveSeen: (seen: Seen) => void; maxNotices?: number };
 
-  constructor(api: Pick<Api, 'deals'>, options: DealWatcher['options']) {
+  constructor(api: Pick<Api, 'deals'> & Partial<Pick<Api, 'receivedPurchases'>>, options: DealWatcher['options']) {
     this.api = api;
     this.options = options;
   }
@@ -46,7 +51,7 @@ export class DealWatcher {
 
   getState = (): DealWatchState => this.state;
 
-  /** Gọi khi 1 đơn vừa đổi (trang chi tiết đơn dùng để tải lại) */
+  /** Gọi khi 1 đơn (uuid đơn) hoặc 1 phiếu được gửi (uuid phiếu) vừa đổi: trang đang mở dùng để tải lại */
   onDealChanged(listener: (dealUuid: string) => void): () => void {
     this.changeListeners.add(listener);
     return () => this.changeListeners.delete(listener);
@@ -61,6 +66,7 @@ export class DealWatcher {
     this.awaitingByDeal.clear();
     this.updatedAt.clear();
     this.since = null;
+    this.purchaseSince = null;
     this.set({ awaiting: 0, notices: [] });
   }
 
@@ -94,6 +100,8 @@ export class DealWatcher {
         if (!this.since || deal.updated_at > this.since) this.since = deal.updated_at;
       }
 
+      await this.pollPurchases(token, seen, firstRun, notices);
+
       this.options.saveSeen(seen);
       const awaiting = [...this.awaitingByDeal.values()].reduce((s, n) => s + n, 0);
       const max = this.options.maxNotices ?? 5;
@@ -102,6 +110,31 @@ export class DealWatcher {
       return changed;
     } finally {
       this.running = false;
+    }
+  }
+
+  /** Phiếu được gửi cho mình: báo khi được gửi vào app, bị sửa, bị xóa (lỗi thì bỏ qua, không làm hỏng phần đơn) */
+  private async pollPurchases(token: string, seen: Seen, firstRun: boolean, notices: DealNotice[]) {
+    if (!this.api.receivedPurchases) return;
+    let purchases;
+    try {
+      purchases = await this.api.receivedPurchases(token, this.purchaseSince ?? undefined);
+    } catch {
+      return;
+    }
+    for (const p of purchases) {
+      const key = `p:${p.id}`;
+      const activity = p.activity;
+      if (activity?.at && (!seen[key] || activity.at > seen[key])) {
+        if (!activity.by_me && !firstRun) {
+          notices.push({ id: `${key}|${activity.at}`, purchaseId: p.id, title: `Phiếu ${p.code}`, text: activity.text, at: activity.at });
+          this.changeListeners.forEach((l) => l(p.id));
+        }
+        seen[key] = activity.at;
+      }
+      for (const at of [p.updated_at, activity?.at]) {
+        if (at && (!this.purchaseSince || at > this.purchaseSince)) this.purchaseSince = at;
+      }
     }
   }
 

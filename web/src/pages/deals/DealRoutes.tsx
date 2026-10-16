@@ -1,7 +1,8 @@
 import { ApiError, formatDate, formatVnd, today, type DealRole } from '@nhanong/shared'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
+import { dealWatcher } from '../../dealWatch'
 import { Status } from '../../components/Status'
 import { go, href, useAsync } from '../../hooks'
 import { MoneyField } from '../ledger/fields'
@@ -97,7 +98,9 @@ function DealList({ token }: { token: string }) {
 
 /** Phiếu mua / bán điểm thu mua gửi cho mình (chỉ xem) */
 function ReceivedPurchases({ token }: { token: string }) {
-  const [state] = useAsync(() => api.receivedPurchases(token), [token])
+  const [state, retry] = useAsync(() => api.receivedPurchases(token), [token])
+  // Có phiếu mới được gửi / bị sửa: tải lại danh sách
+  useEffect(() => dealWatcher.onDealChanged(() => retry()), [retry])
   if (state.status !== 'ok' || state.data.length === 0) return null
   return (
     <section>

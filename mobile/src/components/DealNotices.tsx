@@ -41,7 +41,8 @@ export function DealNotices() {
             accessibilityLabel={`${n.title}: ${n.text}. Bấm để xem`}
             onPress={() => {
               dealWatcher.dismiss(n.id);
-              router.push({ pathname: '/deals/[id]', params: { id: n.dealUuid } });
+              if (n.purchaseId) router.push({ pathname: '/trade/received/[id]', params: { id: n.purchaseId } });
+              else if (n.dealUuid) router.push({ pathname: '/deals/[id]', params: { id: n.dealUuid } });
             }}
             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 }}
           >

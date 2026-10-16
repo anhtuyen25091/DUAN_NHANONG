@@ -1,12 +1,13 @@
 import { formatDate, formatVnd, type Deal } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { DealsSignIn, Notice, Tag } from '../../components/deals';
 import { RowCard } from '../../components/ledger';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
+import { dealWatcher } from '../../lib/dealWatch';
 import { counterpartName } from '../../lib/deals';
 import { colors, font } from '../../lib/theme';
 import { useAsync } from '../../lib/useAsync';
@@ -73,6 +74,8 @@ function DealList({ token }: { token: string }) {
 function ReceivedPurchases({ token }: { token: string }) {
   const received = useAsync(() => api.receivedPurchases(token), [token]);
   const { refetch } = received;
+  // Có phiếu mới được gửi / bị sửa (bộ theo dõi báo): tải lại danh sách
+  useEffect(() => dealWatcher.onDealChanged(() => refetch()), [refetch]);
   useFocusEffect(
     useCallback(() => {
       refetch();

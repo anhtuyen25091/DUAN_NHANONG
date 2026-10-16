@@ -22,9 +22,10 @@ import {
   type TradeRow,
   type TradeTotals,
 } from '@nhanong/shared'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
+import { dealWatcher } from '../../dealWatch'
 import { DateField } from '../../components/DateField'
 import { PrintButtons } from '../../components/PrintButtons'
 import { Status } from '../../components/Status'
@@ -759,6 +760,8 @@ function HistoryCard({ history, sharedVersion }: { history: PurchaseHistoryItem[
 /** Phiếu người khác gửi cho mình: chỉ xem, tải PDF / Word, thấy lịch sử sửa sau khi gửi */
 function ReceivedView({ token, id }: { token: string; id: string }) {
   const [state, retry] = useAsync(() => api.receivedPurchase(token, id), [token, id])
+  // Người lập vừa sửa / xóa phiếu (bộ theo dõi báo): tải lại ngay
+  useEffect(() => dealWatcher.onDealChanged((changed) => changed === id && retry()), [id, retry])
   if (state.status !== 'ok') return <Status state={state} retry={retry} />
   const p = state.data
   return (

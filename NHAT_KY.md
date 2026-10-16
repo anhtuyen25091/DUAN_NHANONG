@@ -11,6 +11,38 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026: Thông báo cho khách khi phiếu được gửi / sửa / xóa ✅
+
+**Đã làm**
+- `GET /received-purchases?since=`: chỉ trả phiếu mới đổi, hoặc mới được gửi cho mình, sau thời điểm đó.
+- Mỗi phiếu kèm `activity` (việc mới nhất nhìn từ phía khách):
+  - "Lái Tư gửi phiếu PM-000009 cho bạn (74.400.000 đ)": khi người lập bấm "Gửi vào app của khách"
+  - "Lái Tư sửa phiếu PM-000009: Đã trả: 0 đ → 40.000.000 đ": kèm tối đa 2 thay đổi của lần sửa mới nhất
+  - "Lái Tư đã xóa phiếu PM-000009"
+  - Tự nhập mã là việc của mình (`by_me`), nên không báo.
+- `DealWatcher` (shared) hỏi thêm phiếu được gửi trong cùng vòng 8 giây với đơn mua bán.
+  - Mỗi thông báo có `purchaseId` (phiếu) hoặc `dealUuid` (đơn).
+  - Lỗi khi hỏi phiếu thì bỏ qua, không làm hỏng phần đơn.
+  - Lần đầu chạy trên máy chỉ ghi nhận, không báo dồn.
+- **Web:**
+  - Thông báo nổi có nút "Xem" mở đúng phiếu.
+  - Tab đang ẩn thì hiện thông báo của trình duyệt (như đơn mua bán).
+  - Danh sách "📄 Phiếu được gửi cho bạn" và trang phiếu đang mở tự tải lại.
+- **App:** băng thông báo trên cùng mở đúng màn phiếu; tab Đơn và màn phiếu tự tải lại.
+
+**Kiểm tra**
+- Backend: thêm 1 test (gửi, `since` không có gì mới, sửa, xóa, tự nhập mã thì không báo); 147 test pass.
+- Shared: thêm 1 test cho bộ theo dõi phiếu; 100 test pass. Typecheck web + app sạch, lint web sạch.
+- Bấm thử trên Chrome:
+  1. Chú Ba đang mở trang Đơn; Lái Tư gửi phiếu vào app Chú Ba. Sau 6,9 giây Chú Ba thấy thông báo, danh sách tự có phiếu mới.
+  2. Chú Ba bấm "Xem" trên thông báo: mở đúng phiếu.
+  3. Lái Tư ghi tiền trả. Sau 7,5 giây Chú Ba thấy thông báo "sửa phiếu"; trang phiếu tự cập nhật còn nợ và lịch sử.
+
+**Còn tồn**
+- Giống đơn mua bán: chỉ báo khi web / app đang mở. App đóng hẳn thì cần thông báo đẩy từ server (cần development build, mục 9 trong "Việc còn lại").
+
+---
+
 ## 16/10/2026: Chia sẻ phiếu mua / bán với khách + lịch sử sửa phiếu ✅
 
 **Câu hỏi:** SĐT khách trên phiếu trùng tài khoản đã đăng ký thì khách có thấy phiếu không?
@@ -69,7 +101,7 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ### Còn tồn
 - Chưa thử trên điện thoại thật.
-- Khách chưa nhận thông báo khi phiếu được gửi hoặc bị sửa; phải mở trang Đơn mới thấy. Có thể nối vào bộ theo dõi đơn (8 giây / lần) sau.
+- ~~Khách chưa nhận thông báo khi phiếu được gửi hoặc bị sửa~~ → đã làm, xem mục "Thông báo cho khách khi phiếu được gửi / sửa / xóa".
 - Dữ liệu thử: phiếu PM-000007, PM-000008 của Lái Tư gửi Chú Ba ("Thử chia sẻ (Claude)", đã xóa), chi nhánh `0900000003` đã nhận PM-000008.
 
 ---

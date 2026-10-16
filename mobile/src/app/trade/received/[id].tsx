@@ -1,5 +1,6 @@
 import { formatDate, formatDateTime, formatKg, formatVnd, telHref } from '@nhanong/shared';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { useEffect } from 'react';
 import { Linking, ScrollView, Text, View } from 'react-native';
 import { DealsSignIn } from '../../../components/deals';
 import { PrintButtons } from '../../../components/PrintButtons';
@@ -7,6 +8,7 @@ import { PurchaseHistory, PurchaseLines } from '../../../components/trade';
 import { Card, Status, styles } from '../../../components/ui';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
+import { dealWatcher } from '../../../lib/dealWatch';
 import { colors, font } from '../../../lib/theme';
 import { useAsync } from '../../../lib/useAsync';
 
@@ -15,6 +17,9 @@ export default function ReceivedPurchaseScreen() {
   const auth = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const loaded = useAsync(() => (auth ? api.receivedPurchase(auth.token, id) : Promise.resolve(null)), [auth?.token, id]);
+  // Người lập vừa sửa / xóa phiếu (bộ theo dõi báo): tải lại ngay
+  const { refetch } = loaded;
+  useEffect(() => dealWatcher.onDealChanged((changed) => changed === id && refetch()), [id, refetch]);
   if (!auth) return <DealsSignIn />;
   if (loaded.state.status !== 'ok' || !loaded.state.data) return <Status state={loaded.state} retry={loaded.reload} />;
   const p = loaded.state.data;

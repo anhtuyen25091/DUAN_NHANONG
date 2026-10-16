@@ -133,6 +133,8 @@ export interface ReceivedPurchase {
   edited_after_share: boolean;
   /** Người lập đã xóa phiếu (vẫn giữ để đối chiếu) */
   deleted_at: string | null;
+  /** Việc mới nhất về phiếu (được gửi, bị sửa, bị xóa) để app báo khách; by_me: tự nhập mã */
+  activity: { text: string; at: string; by_me: boolean } | null;
 }
 
 export interface TradeTotals {
