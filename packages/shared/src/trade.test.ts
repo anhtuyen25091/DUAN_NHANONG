@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { documentPath, formatKg, itemsText, purchaseTotals } from './trade';
+import { documentPath, formatKg, itemsText, kgInputText, parseKgText, purchaseTotals } from './trade';
 
 describe('purchaseTotals', () => {
   it('tính kg tịnh, thành tiền như backend', () => {
@@ -32,5 +32,16 @@ describe('documentPath', () => {
     expect(documentPath({ type: 'deal-entry', id: 'e1' }, 'docx')).toBe('/documents/deal-entries/e1?format=docx');
     expect(documentPath({ type: 'customer', id: 'c1', from: '2026-10-01', to: '2026-10-16' }, 'pdf')).toBe('/documents/customers/c1?format=pdf&from=2026-10-01&to=2026-10-16');
     expect(documentPath({ type: 'report', from: '2026-10-01' }, 'docx')).toBe('/documents/report?format=docx&from=2026-10-01');
+  });
+});
+
+describe('parseKgText', () => {
+  it('đọc số kg gõ kiểu Việt Nam', () => {
+    expect(parseKgText('1250,5')).toBe(1250.5);
+    expect(parseKgText('1.250,5')).toBe(1250.5);
+    expect(parseKgText('1250.5')).toBe(1250.5);
+    expect(parseKgText('')).toBe(0);
+    expect(kgInputText(1250.5)).toBe('1250,5');
+    expect(kgInputText(0)).toBe('');
   });
 });

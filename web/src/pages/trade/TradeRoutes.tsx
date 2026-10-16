@@ -4,7 +4,9 @@ import {
   formatKg,
   formatVnd,
   itemsText,
+  kgInputText,
   monthStart,
+  parseKgText,
   purchaseTotals,
   telHref,
   today,
@@ -353,16 +355,6 @@ interface LineDraft {
   price: number
 }
 
-/** "1.250,5" / "1250,5" / "1250.5" → 1250.5 */
-function parseKg(text: string): number {
-  const t = text.trim()
-  const normalized = t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t
-  const n = Number(normalized.replace(/[^\d.]/g, ''))
-  return Number.isFinite(n) ? n : 0
-}
-
-const kgText = (n: number) => (n ? String(n).replace('.', ',') : '')
-
 function PurchaseEdit({ token, id }: { token: string; id: string }) {
   const [state, retry] = useAsync(() => api.purchase(token, id), [token, id])
   if (state.status !== 'ok') return <Status state={state} retry={retry} />
@@ -378,7 +370,7 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
   const [phone, setPhone] = useState(purchase?.phone ?? '')
   const [date, setDate] = useState(purchase?.date ?? today())
   const [lines, setLines] = useState<LineDraft[]>(
-    purchase?.lines.map((l) => ({ product_code: l.product_code ?? '', name: l.name, kg: kgText(l.kg), deduct: kgText(l.deduct_kg), price: l.price })) ?? [{ product_code: '', name: '', kg: '', deduct: '', price: 0 }],
+    purchase?.lines.map((l) => ({ product_code: l.product_code ?? '', name: l.name, kg: kgInputText(l.kg), deduct: kgInputText(l.deduct_kg), price: l.price })) ?? [{ product_code: '', name: '', kg: '', deduct: '', price: 0 }],
   )
   const [paid, setPaid] = useState(purchase?.paid ?? 0)
   const [note, setNote] = useState(purchase?.note ?? '')
@@ -389,7 +381,7 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
   const chosen = list.find((c) => c.id === customer) ?? null
   const shownName = chosen?.name ?? name
   const products = categories.status === 'ok' ? categories.data.flatMap((c: Category) => c.products.map((p) => ({ ...p, group: c.name }))) : []
-  const inputs: PurchaseLineInput[] = lines.map((l) => ({ product_code: l.product_code || null, name: l.name.trim(), kg: parseKg(l.kg), deduct_kg: parseKg(l.deduct), price: l.price }))
+  const inputs: PurchaseLineInput[] = lines.map((l) => ({ product_code: l.product_code || null, name: l.name.trim(), kg: parseKgText(l.kg), deduct_kg: parseKgText(l.deduct), price: l.price }))
   const totals = purchaseTotals(inputs)
 
   const setLine = (i: number, patch: Partial<LineDraft>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)))

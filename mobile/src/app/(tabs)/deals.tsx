@@ -50,6 +50,9 @@ function DealList({ token }: { token: string }) {
               <Button label="🔑 Nhập mã" variant="outline" onPress={() => router.push('/deals/join')} />
             </View>
           </View>
+          <View style={{ marginBottom: 12 }}>
+            <Button label="📒 Sổ giao dịch, gửi phiếu PDF / Word" variant="outline" onPress={() => router.push('/trade')} />
+          </View>
           {waiting > 0 && <Notice text={`🔔 Có ${waiting} mục bên kia vừa ghi, chờ bạn xác nhận.`} />}
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
             <Chip label="Đang mở" active={tab === 'open'} onPress={() => setTab('open')} />

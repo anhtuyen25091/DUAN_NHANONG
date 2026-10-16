@@ -11,6 +11,92 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026: Sổ giao dịch cho điểm thu mua / thương lái, in phiếu PDF / Word ✅
+
+**Yêu cầu:** điểm thu mua hoặc cá nhân chuyên thu mua cần quản lý tất cả giao dịch, và in giao dịch ra PDF hoặc Word để gửi khách.
+
+**Bạn đã chọn:**
+- Làm cả 2 loại giao dịch:
+  - **phiếu mua / bán** ghi nhanh cho khách vãng lai, không cần khách có tài khoản
+  - **gộp chung với các đợt cân của đơn mua bán 2 bên**
+- In 3 loại giấy:
+  - phiếu cân / biên nhận
+  - bảng kê / quyết toán khách
+  - báo cáo tổng hợp
+- Định dạng: PDF và Word.
+
+### Backend
+- **Thư viện mới:** `barryvdh/laravel-dompdf` (PDF, font DejaVu Sans có đủ dấu tiếng Việt, chỉ nhúng chữ có dùng nên file khoảng 35 KB) và `phpoffice/phpword` (Word).
+- **Migration** `2026_10_16_095903_create_customers_table`:
+  - `customers`: khách quen của từng người dùng (tên, SĐT, địa chỉ, ghi chú)
+  - `purchases`: phiếu mua (`PM-000001`) / phiếu bán (`PB-000001`), đánh số riêng theo người dùng
+    - dòng hàng: cân (kg), trừ bì / tạp chất, kg tịnh, đơn giá theo kg tịnh, thành tiền
+    - đã trả, còn nợ
+    - chép tên / SĐT khách lúc lập phiếu, nên sửa khách sau này không đổi phiếu đã in
+- **Gõ tên khách mới khi lập phiếu thì tự lưu vào sổ khách.** Trùng SĐT (hoặc trùng tên khi không có SĐT) thì dùng lại khách cũ.
+- **`App\Transactions\TransactionFeed`:** gộp phiếu với các đợt cân của đơn mua bán thành 1 danh sách cùng dạng.
+  - Mình là bên mua thì giao dịch là "mua vào", bên bán thì là "bán ra".
+  - Trừ cọc tính là đã trả.
+  - Bỏ đợt cân bị báo sai và đơn đã hủy. Đợt cân chờ xác nhận vẫn tính, có ghi chú "chờ".
+- **Giấy tờ** (`App\Documents`): `TransactionDocuments` lập nội dung 1 lần, rồi `PdfRenderer` / `DocxRenderer` cùng vẽ, nên PDF và Word giống nhau.
+  - Phiếu mua / bán: có dòng "Bằng chữ" (`App\Support\VietnameseNumber`, đọc đúng "mốt", "tư", "lăm", "linh", "không trăm") và chỗ ký 2 bên.
+  - Phiếu cân 1 đợt của đơn mua bán.
+  - Bảng quyết toán đơn: mọi đợt cân, cọc, tiền đã trả, còn lại.
+  - Bảng kê 1 khách trong khoảng ngày.
+  - Báo cáo tổng hợp (trang ngang): mua vào / bán ra theo mặt hàng (giá bình quân), theo khách, chi tiết từng giao dịch.
+  - Bên lập phiếu lấy từ hồ sơ điểm mua (tên, SĐT, địa chỉ); chưa có hồ sơ thì lấy tên và SĐT tài khoản.
+- **API (cần đăng nhập):**
+  - `GET/POST/PATCH/DELETE /customers`
+  - `POST/GET/PATCH/DELETE /purchases`
+  - `GET /transactions?from=&to=&kind=&q=&customer=`
+  - `GET /documents/{purchases|deal-entries|deals|customers}/{uuid}?format=pdf|docx`, `GET /documents/report?from=&to=`. Mỗi lần xem / in tối đa 400 ngày.
+- **Sửa lỗi giới hạn tần suất:**
+  - `throttle:30,1` lồng trong nhóm `throttle:120,1` dùng chung bộ đếm theo người dùng, nên chỉ việc app hỏi đơn mới mỗi 8 giây cũng làm hết lượt (bị 429).
+  - Đổi sang giới hạn có tên, bộ đếm riêng (`AppServiceProvider`): `documents`, `places`, `deal-join` (nhập mã tham gia đơn), `buyer-prices` (đăng giá).
+
+### Web + app
+- **Màn "📒 Sổ giao dịch"** (web `#/giao-dich`, app `/trade`): 3 tab.
+  - **Giao dịch:** lọc theo khoảng ngày, mua / bán, tìm tên khách / số phiếu / mặt hàng. Có tổng mua vào, bán ra, còn nợ 2 chiều. Bấm 1 giao dịch: phiếu thì mở phiếu, đợt cân thì mở đơn.
+  - **Khách hàng:** còn nợ 2 chiều, thêm / sửa khách.
+  - **Báo cáo:** theo mặt hàng, nút in báo cáo.
+- **Lập / sửa phiếu:**
+  - gõ tên thì gợi ý khách cũ
+  - chọn mặt hàng từ danh mục, hoặc tự gõ tên hàng
+  - cân, trừ bì, đơn giá; thấy ngay kg tịnh và thành tiền
+  - nút "Trả đủ" / "Chưa trả"
+- **Trang phiếu:** ghi thêm tiền trả, in / gửi.
+- **Trang khách:** các phiếu trong khoảng ngày, in bảng kê.
+- **Đơn mua bán:** mỗi đợt cân có nút "In / Gửi phiếu cân đợt này"; cuối đơn có nút bảng quyết toán.
+- **Lối vào:** trang Đơn và trang Điểm mua.
+- **Cách tải file:**
+  - Web: tải file; điện thoại có chia sẻ file thì thêm nút "📤 Gửi PDF".
+  - App: tạo file trong bộ nhớ đệm, rồi mở bảng chia sẻ của máy (Zalo, Messenger, lưu Tệp, in) bằng `expo-file-system` + `expo-sharing` có sẵn.
+- **Shared** (`packages/shared/src/trade.ts`): kiểu dữ liệu, `purchaseTotals` (tính giống backend để xem trước), `formatKg` (tự định dạng, không dùng `toLocaleString` vì Hermes), `parseKgText`, `documentPath`, `api.downloadDocument`.
+
+### Kiểm tra
+- Backend: thêm `TransactionApiTest` (6 test) và `VietnameseNumberTest`; 143 test pass, Pint sạch.
+  - Test bắt được 3 lỗi đã sửa: sửa phiếu bắt nhập lại tên khách; gộp danh sách bị lỗi; lọc "đến ngày" bỏ sót phiếu cùng ngày khi cột ngày lưu kèm giờ (SQLite).
+- Shared: 99 test pass. Typecheck web + app sạch, lint web sạch.
+- Mở PDF tạo ra: phiếu mua, quyết toán đơn, bảng kê, báo cáo đều đủ dấu, cộng đúng (1.238 kg × 93.000 = 115.134.000 đ).
+- File Word:
+  - đã kiểm tra XML: bảng độ rộng cố định, số nguyên
+  - ban đầu độ rộng là số lẻ / phần trăm nên nhiều trình xem bỏ qua, đã sửa
+  - máy này không có Word / LibreOffice để mở thử; bản xem trước Quick Look của macOS vẫn tự co bảng
+- Bấm thử trên Chrome (web):
+  - lập phiếu 2 loại hàng có trừ bì, trả 1 phần
+  - xem phiếu, tải PDF + Word
+  - tab khách, bảng kê khách, báo cáo Word
+  - đơn mua bán: in phiếu cân + quyết toán
+  - sửa lỗi form tràn ngang trên màn hẹp
+- App: bundle Android đủ 1734 module. Bản web của app mở được sổ giao dịch, khách, form lập phiếu, trang phiếu có nút "Gửi PDF / Gửi Word".
+
+### Còn tồn
+- Chưa thử nút "Gửi PDF / Word" trên điện thoại thật (bảng chia sẻ → Zalo).
+- Chưa mở thử file Word bằng Microsoft Word / WPS thật.
+- Dữ liệu thử trên máy dev: tài khoản `0900000002` (Lái Tư) có vài phiếu PM-000001…000006 (khách Chú Năm Lộc, Cô Sáu Mận), và 1 đơn thử "Thử in phiếu (Claude)" đã hủy.
+
+---
+
 ## 16/10/2026: Giá quanh tôi: tìm xã / phường để lấy đúng vị trí, gợi ý mặt hàng ở xa hơn ✅
 
 **Vấn đề:** người dùng `0900000101` chọn tỉnh Đắk Lắk, gõ "buôn hồ" vào ô tên chỗ ở, bán kính 10 km. Kết quả "Giá quanh tôi" chỉ có cà phê, hồ tiêu. Có 2 nguyên nhân:
@@ -519,7 +605,7 @@ Máy khác muốn lấy tiếp: nạp file `exports/*.sql.gz` (có cả `crawl_l
 | 9 | Thông báo đẩy khi app đóng (đơn mua bán, cảnh báo giá trên Android) | Cần development build của app; Expo Go Android không hỗ trợ |
 | 10 | Cập nhật tức thì giữa 2 bên (WebSocket, Laravel Reverb) | Hiện hỏi server 8 giây/lần, trễ khoảng 6–8 giây |
 | 11 | Màn hình tổng hợp cho thương lái | Lời các lô theo tháng/vụ, tổng nợ nông dân, tổng chi nhánh nợ mình |
-| 12 | Phiếu cân / biên nhận gửi bên kia | Ảnh hoặc PDF |
+| 12 | ~~Phiếu cân / biên nhận gửi bên kia~~ | ✅ Xong 16/10: Sổ giao dịch, in PDF / Word (web + app) |
 | 13 | Link mã đơn mở thẳng app | Hiện link mở bản web; trên app phải nhập mã tay |
 | 14 | Quên mật khẩu | Cần OTP qua SMS (dịch vụ trả phí) |
 | 15 | Bản đồ điểm bán | Hiện chỉ có danh sách + nút chỉ đường |

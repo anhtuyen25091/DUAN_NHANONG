@@ -5,6 +5,7 @@ import { ActivityIndicator, Linking, Platform, RefreshControl, ScrollView, Share
 import { DealsSignIn, Notice, Tag } from '../../components/deals';
 import { CheckRow, inputStyle } from '../../components/fields';
 import { SectionTitle } from '../../components/ledger';
+import { PrintButtons } from '../../components/PrintButtons';
 import { Button, Card, Chip, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -157,6 +158,10 @@ function DealDetail({ token, id }: { token: string; id: string }) {
 
       <LedgerLinkCard deal={deal} />
 
+      <Card>
+        <PrintButtons token={token} target={{ type: 'deal', id: deal.uuid }} label="Gửi bảng quyết toán đơn (mọi đợt cân, cọc, tiền đã trả, còn lại) cho bên kia" />
+      </Card>
+
       <Card style={{ gap: 8 }}>
         <Text style={heading}>Đơn</Text>
         {open ? (
@@ -183,6 +188,20 @@ function DealDetail({ token, id }: { token: string; id: string }) {
 const heading = { fontSize: font.body + 1, fontWeight: '700' as const, color: colors.text, marginBottom: 4 };
 
 /** 1 dòng: nhãn bên trái, số tiền bên phải */
+/** "🖨 Gửi phiếu cân đợt này": bấm mới hiện 2 nút PDF / Word để thẻ đợt cân gọn */
+function CutPrint({ token, entryId }: { token: string; entryId: string }) {
+  const [open, setOpen] = useState(false);
+  return open ? (
+    <View style={{ marginTop: 8 }}>
+      <PrintButtons token={token} target={{ type: 'deal-entry', id: entryId }} />
+    </View>
+  ) : (
+    <Text style={{ color: colors.primary, marginTop: 8, minHeight: 32 }} onPress={() => setOpen(true)}>
+      🖨 Gửi phiếu cân đợt này
+    </Text>
+  );
+}
+
 function Row({ label, value, bold, color }: { label: string; value: string; bold?: boolean; color?: string }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border, borderStyle: 'dashed' }}>
@@ -274,6 +293,7 @@ function EntryCard({ deal, entry: e, token, run }: { deal: Deal; entry: DealEntr
       )}
       {e.note ? <Text style={[styles.muted, { marginTop: 4 }]}>{e.note}</Text> : null}
       {e.status === 'disputed' && e.dispute_reason ? <Text style={[styles.body, { color: colors.error, marginTop: 4 }]}>⚠️ Lý do báo sai: {e.dispute_reason}</Text> : null}
+      {e.kind === 'cut' && e.status !== 'disputed' && <CutPrint token={token} entryId={e.uuid} />}
 
       {(canRespond || (open && e.mine)) && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>

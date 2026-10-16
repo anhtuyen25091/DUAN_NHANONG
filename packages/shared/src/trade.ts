@@ -157,6 +157,19 @@ export function formatKg(kg: number): string {
   return `${kg < 0 ? '-' : ''}${formatNumber(Number(whole))}${fraction ? `,${fraction}` : ''}`;
 }
 
+/** Chữ người dùng gõ → số kg: "1.250,5" / "1250,5" / "1250.5" → 1250.5; trống / sai → 0 */
+export function parseKgText(text: string): number {
+  const t = text.trim();
+  const normalized = t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t;
+  const n = Number(normalized.replace(/[^\d.]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Số kg → chữ để điền sẵn vào ô (0 → trống): 1250.5 → "1250,5" */
+export function kgInputText(kg: number): string {
+  return kg ? String(kg).replace('.', ',') : '';
+}
+
 /** Đầu tháng của 1 ngày "YYYY-MM-DD" */
 export function monthStart(date: string): string {
   return `${date.slice(0, 7)}-01`;

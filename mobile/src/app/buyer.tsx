@@ -57,6 +57,9 @@ export default function BuyerScreen() {
         <BuyerForm token={auth.token} buyer={buyer.state.data} onSaved={() => (setEditing(false), reload())} onCancel={buyer.state.data ? () => setEditing(false) : undefined} />
       ) : (
         <>
+          <View style={{ marginBottom: 12 }}>
+            <Button label="📒 Sổ giao dịch, gửi phiếu PDF / Word" variant="outline" onPress={() => router.push('/trade')} />
+          </View>
           <StatusCard buyer={buyer.state.data} onEdit={() => setEditing(true)} />
           {buyer.state.data.status === 'approved' && <PostPrices token={auth.token} buyer={buyer.state.data} />}
         </>
