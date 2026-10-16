@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BuyerController;
 use App\Http\Controllers\Api\V1\CatalogController;
+use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\DealController;
 use App\Http\Controllers\Api\V1\DealEntryController;
 use App\Http\Controllers\Api\V1\DeviceController;
@@ -11,7 +12,9 @@ use App\Http\Controllers\Api\V1\LocalPriceController;
 use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\PriceAlertController;
 use App\Http\Controllers\Api\V1\PriceController;
+use App\Http\Controllers\Api\V1\PurchaseController;
 use App\Http\Controllers\Api\V1\ShopController;
+use App\Http\Controllers\Api\V1\TransactionController;
 use App\Http\Middleware\ResolveDevice;
 use Illuminate\Support\Facades\Route;
 
@@ -82,5 +85,23 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::delete('/deal-entries/{entry}', [DealEntryController::class, 'destroy'])->name('deal-entries.destroy');
         Route::post('/deal-entries/{entry}/confirm', [DealEntryController::class, 'confirm'])->name('deal-entries.confirm');
         Route::post('/deal-entries/{entry}/dispute', [DealEntryController::class, 'dispute'])->name('deal-entries.dispute');
+
+        // Sổ giao dịch của điểm thu mua: khách, phiếu mua / bán, in PDF / Word
+        Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+        Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
+        Route::patch('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
+        Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
+        Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
+        Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->name('purchases.show');
+        Route::patch('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
+        Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy');
+        Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+        Route::middleware('throttle:30,1')->prefix('documents')->name('documents.')->group(function () {
+            Route::get('/purchases/{purchase}', [TransactionController::class, 'purchaseDocument'])->name('purchase');
+            Route::get('/deal-entries/{entry}', [TransactionController::class, 'dealEntryDocument'])->name('deal-entry');
+            Route::get('/deals/{deal}', [TransactionController::class, 'dealDocument'])->name('deal');
+            Route::get('/customers/{customer}', [TransactionController::class, 'customerDocument'])->name('customer');
+            Route::get('/report', [TransactionController::class, 'reportDocument'])->name('report');
+        });
     });
 });
