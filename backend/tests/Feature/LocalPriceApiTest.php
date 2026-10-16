@@ -13,6 +13,7 @@ use App\Models\Shop;
 use App\Models\User;
 use Database\Seeders\CatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class LocalPriceApiTest extends TestCase
@@ -126,6 +127,69 @@ class LocalPriceApiTest extends TestCase
             ->assertJsonPath('data.0.entries.1.price', 93000);
     }
 
+    public function test_products_only_outside_radius_are_suggested_as_farther(): void
+    {
+        $near = $this->buyer(name: 'Gần', lat: 12.68);
+        $mid = $this->buyer(name: 'Cách 15 km', lat: 12.80);
+        $tooFar = $this->buyer(name: 'Quá xa', lat: 13.98); // ~146 km, ngoài FARTHER_KM
+
+        $this->report($near, 'ca-phe-robusta', 93000);
+        $this->report($mid, 'ca-phe-robusta', 94000); // đã có cà phê trong bán kính: không gợi ý
+        $this->report($mid, 'sau-rieng-ri6', 36000);
+        $this->report($tooFar, 'chanh-day-xuat-khau', 33000);
+
+        $response = $this->getJson(route('api.v1.local-prices.index', ['lat' => self::BMT[0], 'lng' => self::BMT[1], 'radius' => 10]))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.product.code', 'ca-phe-robusta')
+            ->assertJsonCount(1, 'meta.farther')
+            ->assertJsonPath('meta.farther.0.product.code', 'sau-rieng-ri6')
+            ->assertJsonPath('meta.farther.0.count', 1);
+        $this->assertEqualsWithDelta(14.8, $response->json('meta.farther.0.nearest_km'), 0.5);
+
+        // Mở rộng bán kính thì sầu riêng vào danh sách chính, hết gợi ý
+        $this->getJson(route('api.v1.local-prices.index', ['lat' => self::BMT[0], 'lng' => self::BMT[1], 'radius' => 20]))
+            ->assertJsonCount(2, 'data')
+            ->assertJsonCount(0, 'meta.farther');
+    }
+
+    public function test_place_search_keeps_settlements_and_prefers_selected_province(): void
+    {
+        Http::fake(['photon.komoot.io/*' => Http::response(['features' => [
+            $this->photon('place', 'village', 'Hòa Thuận', 'Thành phố Đồng Nai', 11.17, 107.33),
+            $this->photon('amenity', 'pharmacy', 'Nhà thuốc Hòa Thuận', 'Đắk Lắk', 12.70, 108.10, county: 'Xã Hòa Phú'),
+            $this->photon('boundary', 'historic', 'Thị xã Buôn Hồ', 'Đắk Lắk', 12.85, 108.28, county: 'Xã Ea Drông'),
+            $this->photon('place', 'hamlet', 'Thôn Hòa Thuận', 'Đắk Lắk', 12.72, 108.12, county: 'Xã Hòa Phú'),
+            $this->photon('place', 'village', 'Hòa Thuận', 'Đắk Lắk', 12.72, 108.12, county: 'Xã Hòa Phú', countrycode: 'LA'),
+        ]])]);
+
+        $this->getJson(route('api.v1.places.index', ['q' => 'Hòa Thuận', 'province' => 'dak-lak']))
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            // Tỉnh đang chọn xếp trước; bỏ nhà thuốc và địa danh ngoài Việt Nam
+            ->assertJsonPath('data.0.name', 'Thị xã Buôn Hồ (cũ)')
+            ->assertJsonPath('data.0.detail', null)
+            ->assertJsonPath('data.1.name', 'Thôn Hòa Thuận')
+            ->assertJsonPath('data.1.detail', 'Xã Hòa Phú')
+            ->assertJsonPath('data.1.province', 'dak-lak')
+            ->assertJsonPath('data.1.lat', 12.72)
+            ->assertJsonPath('data.2.province', 'dong-nai');
+
+        // Lần sau lấy từ cache, không gọi lại dịch vụ ngoài
+        $this->getJson(route('api.v1.places.index', ['q' => 'hòa  thuận', 'province' => 'dak-lak']))->assertOk()->assertJsonCount(3, 'data');
+        Http::assertSentCount(1);
+    }
+
+    public function test_place_search_reports_when_geocoder_is_down(): void
+    {
+        Http::fake(['photon.komoot.io/*' => Http::response('Bad gateway', 502)]);
+
+        $this->getJson(route('api.v1.places.index', ['q' => 'Buôn Hồ']))
+            ->assertStatus(503)
+            ->assertJsonPath('message', 'Chưa tìm được địa danh lúc này. Hãy thử lại sau, hoặc dùng vị trí của máy.');
+        $this->getJson(route('api.v1.places.index', ['q' => 'B']))->assertUnprocessable();
+    }
+
     public function test_fertilizer_is_sorted_cheapest_first_and_filter_by_type(): void
     {
         $a = $this->buyer(name: 'Cửa hàng A', dealsIn: ['phan_bon']);
@@ -223,6 +287,19 @@ class LocalPriceApiTest extends TestCase
         $product = Product::query()->where('code', $code)->firstOrFail();
 
         return PriceReport::factory()->for($buyer)->for($product)->create(['date' => $date, 'price' => $price, 'unit' => $product->unit, 'status' => $status]);
+    }
+
+    /**
+     * 1 kết quả Photon (GeoJSON feature)
+     *
+     * @return array<string, mixed>
+     */
+    private function photon(string $key, string $value, string $name, string $state, float $lat, float $lng, ?string $county = null, string $countrycode = 'VN'): array
+    {
+        return [
+            'geometry' => ['type' => 'Point', 'coordinates' => [$lng, $lat]],
+            'properties' => array_filter(['osm_key' => $key, 'osm_value' => $value, 'name' => $name, 'county' => $county, 'state' => $state, 'countrycode' => $countrycode]),
+        ];
     }
 
     private function crawled(string $code, string $region, int $price): void

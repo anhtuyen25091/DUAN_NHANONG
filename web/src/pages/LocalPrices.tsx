@@ -7,7 +7,9 @@ import {
   formatVnd,
   SHOP_TYPE_LABELS,
   telHref,
+  radiusToReach,
   type CategoryType,
+  type FartherProduct,
   type LocalPriceProduct,
 } from '@nhanong/shared'
 import { useState } from 'react'
@@ -15,7 +17,7 @@ import { api } from '../api'
 import { LocationBar } from '../components/LocationPicker'
 import { Status } from '../components/Status'
 import { href, replaceQuery, useAsync } from '../hooks'
-import { useMyLocation } from '../myLocation'
+import { setMyLocation, useMyLocation } from '../myLocation'
 
 const TYPES = Object.keys(CATEGORY_TYPE_LABELS) as CategoryType[]
 
@@ -56,19 +58,55 @@ function LocalPriceList({ type, product }: { type?: CategoryType; product?: stri
     [location.lat, location.lng, location.radius, location.province, type, product],
   )
   if (state.status !== 'ok') return <Status state={state} retry={retry} />
+  const farther = state.data.meta.farther ?? []
   if (state.data.data.length === 0)
     return (
-      <div className="notice">
-        Chưa có điểm mua nào trong {location.radius} km đăng giá {type ? CATEGORY_TYPE_LABELS[type].toLowerCase() : 'mặt hàng này'} gần đây. Thử tăng bán kính, hoặc xem{' '}
-        <a href={href('')}>giá chung trên báo</a>.
-      </div>
+      <>
+        <div className="notice">
+          Chưa có điểm mua nào trong {location.radius} km đăng giá {type ? CATEGORY_TYPE_LABELS[type].toLowerCase() : 'mặt hàng này'} gần đây.
+          {farther.length === 0 && (
+            <>
+              {' '}
+              Thử tăng bán kính, hoặc xem <a href={href('')}>giá chung trên báo</a>.
+            </>
+          )}
+        </div>
+        <FartherHint farther={farther} />
+      </>
     )
   return (
     <>
       {state.data.data.map((p) => (
         <LocalPriceCard key={p.product.code} item={p} />
       ))}
+      <FartherHint farther={farther} />
     </>
+  )
+}
+
+/** "Xa hơn 10 km còn có: Sầu riêng Ri6 (gần nhất 12,9 km)… [Mở rộng 20 km]" */
+function FartherHint({ farther }: { farther: FartherProduct[] }) {
+  const location = useMyLocation()!
+  if (farther.length === 0) return null
+  const reach = radiusToReach(farther[0].nearest_km)
+  return (
+    <section className="card local-farther">
+      <p>
+        <b>Xa hơn {location.radius} km còn có giá:</b>
+      </p>
+      <ul>
+        {farther.map((f) => (
+          <li key={f.product.code}>
+            {f.product.name} <span className="small muted">· gần nhất {formatDistance(f.nearest_km)}{f.count > 1 ? `, ${f.count} điểm mua` : ''}</span>
+          </li>
+        ))}
+      </ul>
+      {reach && (
+        <button type="button" className="primary" onClick={() => setMyLocation({ ...location, radius: reach })}>
+          Mở rộng ra {reach} km
+        </button>
+      )}
+    </section>
   )
 }
 

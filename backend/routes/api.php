@@ -27,6 +27,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
     // Giá quanh 1 vị trí do các điểm mua đã duyệt đăng (không cần đăng nhập)
     Route::get('/local-prices', [LocalPriceController::class, 'index'])->middleware('throttle:60,1')->name('local-prices.index');
+    Route::get('/places', [LocalPriceController::class, 'places'])->middleware('throttle:30,1')->name('places.index');
 
     // Không cần đăng nhập: nhận diện máy qua header X-Device-Id
     Route::middleware([ResolveDevice::class, 'throttle:60,1'])->group(function () {

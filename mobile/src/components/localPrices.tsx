@@ -1,10 +1,10 @@
-import { CATEGORY_TYPE_LABELS, compareToReference, formatDate, formatPercent, formatDistance, formatVnd, SHOP_TYPE_LABELS, telHref, type CategoryType, type LocalPriceProduct } from '@nhanong/shared';
+import { CATEGORY_TYPE_LABELS, compareToReference, formatDate, formatPercent, formatDistance, formatVnd, SHOP_TYPE_LABELS, radiusToReach, telHref, type CategoryType, type FartherProduct, type LocalPriceProduct } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 import { api } from '../lib/api';
 import { confirmAsync } from '../lib/confirm';
-import { useMyLocation } from '../lib/myLocation';
+import { setMyLocation, useMyLocation } from '../lib/myLocation';
 import { colors, font } from '../lib/theme';
 import { useAsync } from '../lib/useAsync';
 import { Button, Card, Status, styles } from './ui';
@@ -17,21 +17,53 @@ export function LocalPriceList({ type, product }: { type?: CategoryType; product
     [location.lat, location.lng, location.radius, location.province, type, product],
   );
   if (prices.state.status !== 'ok') return <Status state={prices.state} retry={prices.reload} />;
+  const farther = prices.state.data.meta.farther ?? [];
   if (prices.state.data.data.length === 0)
     return (
-      <Card>
-        <Text style={styles.body}>
-          Chưa có điểm mua nào trong {location.radius} km đăng giá {type ? CATEGORY_TYPE_LABELS[type].toLowerCase() : 'mặt hàng này'} gần đây.
-        </Text>
-        <Text style={[styles.muted, { marginTop: 4 }]}>Thử tăng bán kính, hoặc xem giá chung ở tab Bảng giá.</Text>
-      </Card>
+      <>
+        <Card>
+          <Text style={styles.body}>
+            Chưa có điểm mua nào trong {location.radius} km đăng giá {type ? CATEGORY_TYPE_LABELS[type].toLowerCase() : 'mặt hàng này'} gần đây.
+          </Text>
+          {farther.length === 0 && <Text style={[styles.muted, { marginTop: 4 }]}>Thử tăng bán kính, hoặc xem giá chung ở tab Bảng giá.</Text>}
+        </Card>
+        <FartherHint farther={farther} />
+      </>
     );
   return (
     <>
       {prices.state.data.data.map((p) => (
         <LocalPriceCard key={p.product.code} item={p} />
       ))}
+      <FartherHint farther={farther} />
     </>
+  );
+}
+
+/** "Xa hơn 10 km còn có giá: Sầu riêng Ri6 (gần nhất 12,9 km)… [Mở rộng ra 20 km]" */
+function FartherHint({ farther }: { farther: FartherProduct[] }) {
+  const location = useMyLocation()!;
+  if (farther.length === 0) return null;
+  const reach = radiusToReach(farther[0].nearest_km);
+  return (
+    <Card>
+      <Text style={[styles.body, { fontWeight: '700' }]}>Xa hơn {location.radius} km còn có giá:</Text>
+      {farther.map((f) => (
+        <Text key={f.product.code} style={[styles.body, { marginTop: 4 }]}>
+          • {f.product.name}
+          <Text style={styles.muted}>
+            {' '}
+            · gần nhất {formatDistance(f.nearest_km)}
+            {f.count > 1 ? `, ${f.count} điểm mua` : ''}
+          </Text>
+        </Text>
+      ))}
+      {reach && (
+        <View style={{ marginTop: 10 }}>
+          <Button label={`Mở rộng ra ${reach} km`} onPress={() => setMyLocation({ ...location, radius: reach })} />
+        </View>
+      )}
+    </Card>
   );
 }
 

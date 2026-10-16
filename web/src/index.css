@@ -1728,6 +1728,47 @@ a.card.local-banner {
   margin-bottom: 2px;
 }
 
+.place-search {
+  display: flex;
+  gap: 8px;
+}
+
+.place-search input {
+  flex: 1;
+  min-width: 0;
+}
+
+.place-results {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.place-results button {
+  width: 100%;
+  text-align: left;
+}
+
+.place-chosen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.local-farther {
+  margin-top: 12px;
+}
+
+.local-farther ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
 .local-summary {
   display: flex;
   flex-wrap: wrap;

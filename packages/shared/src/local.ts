@@ -87,9 +87,27 @@ export interface LocalPriceProduct {
   entries: LocalPriceEntry[];
 }
 
+/** Mặt hàng chỉ có giá ngoài bán kính đang chọn (tới 100 km) */
+export interface FartherProduct {
+  product: { code: string; name: string };
+  nearest_km: number;
+  count: number;
+}
+
 export interface LocalPrices {
   data: LocalPriceProduct[];
-  meta: { radius_km: number; days: number; province: string | null; province_name: string | null };
+  meta: { radius_km: number; days: number; province: string | null; province_name: string | null; farther?: FartherProduct[] };
+}
+
+/** Địa danh tìm được (xã / phường / thôn / huyện cũ) để lấy tọa độ chỗ ở */
+export interface Place {
+  name: string;
+  /** Thuộc xã / phường nào (khi khác tên địa danh) */
+  detail: string | null;
+  province: string | null;
+  province_name: string | null;
+  lat: number;
+  lng: number;
 }
 
 export interface LocalPriceFilters {
@@ -108,14 +126,24 @@ export interface MyLocation {
   province_name?: string | null;
   lat: number;
   lng: number;
-  /** Tên chỗ ở người dùng tự đặt ("Xã Hòa Thuận"); null = trung tâm tỉnh */
+  /** Tên chỗ ở ("Xã Hòa Thuận"): tên địa danh đã chọn, hoặc tên tự đặt khi dùng GPS; null = trung tâm tỉnh */
   label: string | null;
   radius: number;
-  /** true: tọa độ lấy từ GPS; false: trung tâm tỉnh */
+  /** true: tọa độ thật (GPS hoặc địa danh đã chọn); false: trung tâm tỉnh */
   gps?: boolean;
 }
 
 export const RADIUS_OPTIONS = [10, 20, 30, 50];
+
+/** Bán kính nhỏ nhất trong các lựa chọn đủ tới khoảng cách này; xa hơn mọi lựa chọn thì null */
+export function radiusToReach(km: number): number | null {
+  return RADIUS_OPTIONS.find((r) => r >= km) ?? null;
+}
+
+/** "Phường Buôn Hồ" / "Thôn Hòa Thuận (Xã Hòa Phú)" */
+export function placeLabel(place: Place): string {
+  return place.detail ? `${place.name} (${place.detail})` : place.name;
+}
 
 /** Tọa độ trung tâm hành chính 34 tỉnh/thành (giống App\Support\Geo ở backend) */
 export const PROVINCE_CENTERS: Record<string, [number, number]> = {
@@ -150,9 +178,13 @@ export function nearestProvince(lat: number, lng: number): string {
   return best;
 }
 
-/** "Xã Hòa Thuận, Đắk Lắk · 30 km" / "Trung tâm Đắk Lắk · 30 km" */
+/**
+ * "Xã Hòa Thuận, Đắk Lắk · 30 km" / "Trung tâm Đắk Lắk · 30 km".
+ * Không có tọa độ thật thì luôn ghi "Trung tâm …" (tên tự gõ không đổi chỗ tìm, ghi tên đó dễ hiểu nhầm).
+ */
 export function describeLocation(location: MyLocation): string {
-  const place = location.label ? `${location.label}${location.province_name ? `, ${location.province_name}` : ''}` : location.gps ? `Vị trí của tôi${location.province_name ? `, ${location.province_name}` : ''}` : `Trung tâm ${location.province_name ?? location.province}`;
+  const province = location.province_name ? `, ${location.province_name}` : '';
+  const place = !location.gps ? `Trung tâm ${location.province_name ?? location.province}` : `${location.label ?? 'Vị trí của tôi'}${province}`;
   return `${place} · ${location.radius} km`;
 }
 

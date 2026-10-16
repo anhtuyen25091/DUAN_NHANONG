@@ -11,6 +11,43 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026: Giá quanh tôi: tìm xã / phường để lấy đúng vị trí, gợi ý mặt hàng ở xa hơn ✅
+
+**Vấn đề:** người dùng `0900000101` chọn tỉnh Đắk Lắk, gõ "buôn hồ" vào ô tên chỗ ở, bán kính 10 km. Kết quả "Giá quanh tôi" chỉ có cà phê, hồ tiêu. Có 2 nguyên nhân:
+1. Tên tự gõ không đổi chỗ tìm. Không bật GPS thì vẫn tìm quanh **trung tâm tỉnh** (Buôn Ma Thuột, cách Buôn Hồ khoảng 40 km), nhưng thanh vị trí lại ghi "buôn hồ, Đắk Lắk".
+2. Sầu riêng, chanh dây có giá ở cách 12–23 km, ngoài bán kính 10 km, nên bị ẩn mà không báo gì.
+
+**Đã làm**
+- **Tìm địa danh** `GET /api/v1/places?q=&province=` (`App\Support\PlaceSearch`):
+  - gọi Photon (dữ liệu OpenStreetMap, miễn phí, không cần khóa); đã có tên xã / phường mới sau sáp nhập 2025, và tên huyện / thị xã cũ (ghi "(cũ)")
+  - chỉ nhận địa danh hành chính và khu dân cư, bỏ cửa hàng, sông hồ, đường; tỉnh đang chọn xếp trước
+  - cache 30 ngày; giới hạn 30 lần/phút; dịch vụ lỗi thì trả 503 kèm lời nhắn
+  - đổi dịch vụ: biến `GEOCODER_URL` (`config/nhanong.php`)
+  - máy dev này chặn `nominatim.openstreetmap.org` (trỏ về 127.0.0.1) nên dùng Photon
+- **Ô chọn khu vực** (web + app):
+  - mục "Chỗ ở": gõ xã / phường / thôn → Tìm → chọn trong danh sách thì lấy tọa độ địa danh đó; hoặc "dùng vị trí của máy" (GPS)
+  - chưa chọn chỗ ở thì báo rõ "đang tìm quanh trung tâm tỉnh …"
+  - bỏ ô tên tự gõ khi không có tọa độ (chỉ còn khi dùng GPS, để đặt tên cho vị trí)
+- `describeLocation`: không có tọa độ thật thì luôn ghi "Trung tâm <tỉnh>", kể cả khi tài khoản cũ còn lưu tên tự gõ.
+- **Gợi ý xa hơn:**
+  - `GET /local-prices` trả thêm `meta.farther`: các mặt hàng chỉ có giá ngoài bán kính (tìm tới 100 km), kèm điểm mua gần nhất cách bao xa và số điểm mua
+  - web + app hiện "Xa hơn 10 km còn có giá: …" và nút "Mở rộng ra 20 km" (bán kính nhỏ nhất đủ tới điểm gần nhất)
+
+**Kiểm tra**
+- Thêm 3 test backend (gợi ý xa hơn, tìm địa danh + cache, dịch vụ lỗi): 128 test pass, Pint sạch.
+- Thêm test shared (`radiusToReach`, `placeLabel`, `describeLocation`): 94 test pass.
+- Typecheck web và mobile sạch, lint sạch ở các file đã sửa.
+- Bấm thử trên Chrome đúng tình huống của người dùng:
+  - thanh vị trí ghi "Trung tâm Đắk Lắk · 10 km"
+  - có gợi ý sầu riêng, chanh dây ở xa hơn; bấm "Mở rộng ra 20 km" thì sầu riêng vào danh sách
+  - tìm "Buôn Hồ" ra Phường Buôn Hồ và Thị xã Buôn Hồ (cũ); chọn Phường Buôn Hồ thì lưu đúng tọa độ (12,8961, 108,2454)
+
+**Còn tồn**
+- Photon là dịch vụ miễn phí dùng chung. Khi chạy thật nhiều người dùng, nên tự chạy Photon, hoặc dùng dịch vụ trả phí, rồi đổi `GEOCODER_URL`.
+- Chưa thử ô tìm địa danh trên điện thoại thật.
+
+---
+
 ## 16/10/2026: Thêm mặt hàng chanh dây (chanh leo) ✅
 
 **Tìm nguồn giá:** không có nguồn nào đăng giá chanh dây đều đặn để lấy tự động.

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PriceReport;
 use App\Models\PriceReportFlag;
 use App\Support\Geo;
+use App\Support\PlaceSearch;
 use App\Support\Provinces;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,6 +26,9 @@ class LocalPriceController extends Controller
     public const DEFAULT_RADIUS = 30;
 
     public const DEFAULT_DAYS = 7;
+
+    /** Mặt hàng không có giá trong bán kính: tìm tiếp tới chừng này km để gợi ý "xa hơn còn có …" */
+    public const FARTHER_KM = 100;
 
     public function index(Request $request): JsonResponse
     {
@@ -44,7 +48,9 @@ class LocalPriceController extends Controller
         $days = (int) ($data['days'] ?? self::DEFAULT_DAYS);
         $today = CarbonImmutable::today();
 
-        $reports = Geo::withinBox(PriceReport::query()->published(), $lat, $lng, $radius)
+        // Lấy rộng tới FARTHER_KM một lần, rồi tách trong / ngoài bán kính
+        $searchKm = max($radius, self::FARTHER_KM);
+        [$reports, $outside] = Geo::withinBox(PriceReport::query()->published(), $lat, $lng, $searchKm)
             ->with(['buyer', 'product.category'])
             ->where('date', '>=', $today->subDays($days - 1)->toDateString())
             ->whereHas('buyer', fn (Builder $q) => $q->where('status', 'approved'))
@@ -52,10 +58,11 @@ class LocalPriceController extends Controller
             ->when($data['product'] ?? null, fn (Builder $q, string $code) => $q->whereHas('product', fn (Builder $p) => $p->where('code', $code)))
             ->get()
             ->each(fn (PriceReport $r) => $r->distance_km = Geo::distanceKm($lat, $lng, $r->lat, $r->lng))
-            ->filter(fn (PriceReport $r): bool => $r->distance_km <= $radius)
+            ->filter(fn (PriceReport $r): bool => $r->distance_km <= $searchKm)
             // Mỗi điểm mua 1 giá mới nhất cho mỗi mặt hàng
             ->sortByDesc(fn (PriceReport $r): string => $r->date->toDateString().'|'.$r->updated_at)
-            ->unique(fn (PriceReport $r): string => $r->buyer_id.'|'.$r->product_id);
+            ->unique(fn (PriceReport $r): string => $r->buyer_id.'|'.$r->product_id)
+            ->partition(fn (PriceReport $r): bool => $r->distance_km <= $radius);
 
         $province = $data['province'] ?? $this->nearestProvince($lat, $lng);
 
@@ -66,8 +73,55 @@ class LocalPriceController extends Controller
 
         return response()->json([
             'data' => $products,
-            'meta' => ['radius_km' => $radius, 'days' => $days, 'province' => $province, 'province_name' => Provinces::name($province)],
+            'meta' => [
+                'radius_km' => $radius,
+                'days' => $days,
+                'province' => $province,
+                'province_name' => Provinces::name($province),
+                'farther' => $this->farther($outside, $reports),
+            ],
         ]);
+    }
+
+    /**
+     * Tìm địa danh (xã / phường / thôn / huyện cũ) để lấy đúng tọa độ chỗ ở, thay vì trung tâm tỉnh.
+     */
+    public function places(Request $request, PlaceSearch $search): JsonResponse
+    {
+        $data = $request->validate([
+            'q' => ['required', 'string', 'min:2', 'max:100'],
+            'province' => ['nullable', Rule::in(array_keys(Provinces::options()))],
+        ]);
+
+        $places = $search->search($data['q'], $data['province'] ?? null);
+        if ($places === null) {
+            return response()->json(['message' => 'Chưa tìm được địa danh lúc này. Hãy thử lại sau, hoặc dùng vị trí của máy.'], 503);
+        }
+
+        return response()->json(['data' => $places]);
+    }
+
+    /**
+     * Mặt hàng chỉ có giá ngoài bán kính (tới FARTHER_KM): điểm mua gần nhất cách bao xa, có mấy điểm.
+     *
+     * @param  Collection<int, PriceReport>  $outside
+     * @param  Collection<int, PriceReport>  $inside
+     * @return list<array{product: array{code: string, name: string}, nearest_km: float, count: int}>
+     */
+    private function farther(Collection $outside, Collection $inside): array
+    {
+        $shown = $inside->pluck('product_id')->unique();
+
+        return $outside->reject(fn (PriceReport $r): bool => $shown->contains($r->product_id))
+            ->groupBy('product_id')
+            ->map(fn (Collection $group): array => [
+                'product' => ['code' => $group->first()->product->code, 'name' => $group->first()->product->name],
+                'nearest_km' => round($group->min('distance_km'), 1),
+                'count' => $group->count(),
+            ])
+            ->sortBy('nearest_km')
+            ->values()
+            ->all();
     }
 
     /** Người dùng báo 1 giá sai (mỗi máy 1 lần); đủ lượt thì giá chuyển sang chờ duyệt */

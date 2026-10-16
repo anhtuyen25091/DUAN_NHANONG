@@ -13,4 +13,13 @@ return [
         'max_days' => 3660,
     ],
 
+    /*
+    | Tìm địa danh (xã / phường / thôn / huyện cũ) để lấy tọa độ "Khu vực của tôi".
+    | Mặc định dùng Photon (dữ liệu OpenStreetMap, miễn phí, không cần khóa); tự chạy Photon riêng thì đổi GEOCODER_URL.
+    */
+    'geocoder' => [
+        'url' => env('GEOCODER_URL', 'https://photon.komoot.io/api/'),
+        'cache_days' => 30,
+    ],
+
 ];

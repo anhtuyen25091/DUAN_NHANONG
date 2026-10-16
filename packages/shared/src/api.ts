@@ -1,7 +1,7 @@
 /**
  * Kiểu dữ liệu và client gọi API /api/v1 của backend, dùng chung cho web và mobile.
  */
-import type { BuyerProfile, BuyerProfileInput, BuyerReport, BuyerStatus, LocalPriceFilters, LocalPrices, MyLocation } from './local';
+import type { BuyerProfile, BuyerProfileInput, BuyerReport, BuyerStatus, LocalPriceFilters, LocalPrices, MyLocation, Place } from './local';
 
 export type CategoryType = 'nong_san' | 'phan_bon' | 'thuoc_bvtv';
 
@@ -439,6 +439,7 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
     localPrices: (filters: LocalPriceFilters) => request<LocalPrices>('GET', '/local-prices', { query: filters }),
     flagLocalPrice: (id: number, reason?: string) =>
       request<{ message: string }>('POST', `/local-prices/${id}/flag`, { body: { reason: reason ?? null }, device: true }).then((r) => r.message),
+    places: (q: string, province?: string | null) => request<{ data: Place[] }>('GET', '/places', { query: { q, province: province || undefined } }).then((r) => r.data),
     saveMyLocation: (token: string, location: Pick<MyLocation, 'province' | 'label' | 'radius'> & { lat?: number | null; lng?: number | null }) =>
       request<{ data: MyLocation }>('PUT', '/me/location', { token, body: location }).then((r) => r.data),
     myBuyer: (token: string) => request<{ data: BuyerProfile | null }>('GET', '/me/buyer', { token }).then((r) => r.data),
