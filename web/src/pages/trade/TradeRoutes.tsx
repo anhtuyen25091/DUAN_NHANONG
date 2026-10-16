@@ -5,6 +5,7 @@ import {
   formatKg,
   formatVnd,
   kgInputText,
+  monthLabel,
   parseKgText,
   purchaseShareText,
   purchaseTotals,
@@ -61,10 +62,10 @@ export default function TradeRoutes({ path, query }: { path: string[]; query: UR
   return <TradeHome token={auth.token} query={query} />
 }
 
-type Tab = 'so' | 'khach' | 'bao-cao'
+type Tab = 'so' | 'tong-hop' | 'khach' | 'bao-cao'
 
 function TradeHome({ token, query }: { token: string; query: URLSearchParams }) {
-  const tab = (['so', 'khach', 'bao-cao'].includes(query.get('tab') ?? '') ? query.get('tab') : 'so') as Tab
+  const tab = (['so', 'tong-hop', 'khach', 'bao-cao'].includes(query.get('tab') ?? '') ? query.get('tab') : 'so') as Tab
   return (
     <div className="ledger">
       <h1>📒 Sổ giao dịch</h1>
@@ -84,6 +85,7 @@ function TradeHome({ token, query }: { token: string; query: URLSearchParams }) 
         {(
           [
             ['so', 'Giao dịch'],
+            ['tong-hop', 'Tổng hợp'],
             ['khach', 'Khách hàng'],
             ['bao-cao', 'Báo cáo'],
           ] as const
@@ -94,6 +96,7 @@ function TradeHome({ token, query }: { token: string; query: URLSearchParams }) 
         ))}
       </nav>
       {tab === 'so' && <TradeList token={token} />}
+      {tab === 'tong-hop' && <TradeSummaryView token={token} />}
       {tab === 'khach' && <CustomerList token={token} />}
       {tab === 'bao-cao' && <TradeReport token={token} />}
     </div>
@@ -130,6 +133,99 @@ function TradeList({ token }: { token: string }) {
           <div className="garden-list">
             {state.data.data.map((r) => (
               <TradeRowCard key={r.id} row={r} />
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
+/** Tổng hợp cho thương lái: lãi gộp theo tháng, còn nợ 2 chiều tính đến nay, lời từng lô */
+function TradeSummaryView({ token }: { token: string }) {
+  const range = useRange()
+  const [state, retry] = useAsync(() => api.tradeSummary(token, { from: range.from, to: range.to }), [token, range.from, range.to])
+  return (
+    <>
+      <section className="card form">
+        <RangeFields range={range} />
+      </section>
+      <Status state={state} retry={retry} />
+      {state.status === 'ok' && (
+        <>
+          <section className={`card profit-card ${state.data.margin < 0 ? 'loss' : 'gain'}`}>
+            <p className="small muted">Lãi gộp trong khoảng ngày (tiền bán − tiền mua, chưa trừ chi phí riêng)</p>
+            <p className="big">{formatVnd(state.data.margin)}</p>
+            <dl className="deal-totals">
+              <div>
+                <dt>Bán ra ({formatKg(state.data.totals.sell.kg)} kg)</dt>
+                <dd className="in">{formatVnd(state.data.totals.sell.amount)}</dd>
+              </div>
+              <div>
+                <dt>Mua vào ({formatKg(state.data.totals.buy.kg)} kg)</dt>
+                <dd className="out">−{formatVnd(state.data.totals.buy.amount)}</dd>
+              </div>
+            </dl>
+            {state.data.totals.buy.kg > state.data.totals.sell.kg && <p className="small muted">Hàng mua về chưa bán hết thì lãi gộp còn thấp / âm; bán ra rồi mới thấy lời.</p>}
+          </section>
+          <section className="card">
+            <h2>Còn nợ (tính đến hôm nay)</h2>
+            <dl className="deal-totals">
+              <div>
+                <dt>Mình còn nợ người bán (nông dân)</dt>
+                <dd className="out">{formatVnd(state.data.owing.i_owe)}</dd>
+              </div>
+              <div>
+                <dt>Người mua (chi nhánh, công ty) còn nợ mình</dt>
+                <dd className="in">{formatVnd(state.data.owing.owed_to_me)}</dd>
+              </div>
+            </dl>
+          </section>
+          {state.data.months.length > 0 && (
+            <section className="card">
+              <h2>Theo tháng</h2>
+              <table className="trade-table">
+                <thead>
+                  <tr>
+                    <th>Tháng</th>
+                    <th className="num">Mua vào</th>
+                    <th className="num">Bán ra</th>
+                    <th className="num">Lãi gộp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.data.months.map((m) => (
+                    <tr key={m.month}>
+                      <td>{monthLabel(m.month)}</td>
+                      <td className="num">{formatVnd(m.buy)}</td>
+                      <td className="num">{formatVnd(m.sell)}</td>
+                      <td className={`num ${m.margin < 0 ? 'out' : 'in'}`}>{formatVnd(m.margin)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+          <h2 className="section">Lời từng lô</h2>
+          <p className="small muted">Lô = đơn bán (cho chi nhánh, công ty) đã gộp các đơn mua của nông dân. Gộp trong trang đơn bán, mục "📦 Lời cả lô".</p>
+          {state.data.lots.length === 0 && <p className="muted">Chưa có lô nào.</p>}
+          <div className="garden-list">
+            {state.data.lots.map((l) => (
+              <a key={l.uuid} className="card garden-row" href={href(`don/${l.uuid}`)}>
+                <span className="garden-name">
+                  📦 {l.title}
+                  <span className="small muted">
+                    {' '}
+                    · bán {formatVnd(l.revenue)} ({formatKg(l.sell_kg)} kg) · mua {l.sources} đơn {formatVnd(l.buy_cost)}
+                    {l.costs > 0 ? ` · chi phí ${formatVnd(l.costs)}` : ''}
+                    {l.kg_loss !== 0 ? ` · hao hụt ${formatKg(l.kg_loss)} kg` : ''}
+                  </span>
+                </span>
+                <span className={`profit ${l.profit < 0 ? 'loss' : 'gain'}`}>
+                  {l.profit < 0 ? 'Lỗ ' : 'Lời '}
+                  {formatVnd(Math.abs(l.profit))}
+                </span>
+              </a>
             ))}
           </div>
         </>

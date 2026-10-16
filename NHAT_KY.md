@@ -11,6 +11,33 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026 (chiều): Xuất lại file giá, lọc điểm bán theo tỉnh, tổng hợp cho thương lái ✅
+
+### Xuất lại file dữ liệu giá
+- `exports/nhanong-gia-20261016-1446.sql.gz` (892 KB): **35.513 giá** (01/10/2021 → 15/10/2026, đều đã duyệt), 44 mặt hàng.
+- Đã nạp thử vào DB tạm (`root`) rồi xóa DB tạm: đủ số dòng.
+
+### Lọc điểm bán theo tỉnh (tự điền tỉnh từ tọa độ)
+- `PlaceSearch::provinceAt(lat, lng)`: tra ngược qua Photon (`GEOCODER_REVERSE_URL`), lấy kết quả gần nhất có ghi tỉnh.
+  - Thành phố trực thuộc TW (Cần Thơ, Hà Nội, TP.HCM…) Photon ghi ở `city`, nên đọc cả `city`.
+  - Tra ra thì lưu cache 90 ngày.
+  - Không ra thì để trống, không đoán theo tâm tỉnh để tránh điền sai.
+- Nhập điểm bán OSM (`shops:import-osm`) tự tra tỉnh khi OSM không ghi.
+- Lệnh `php artisan shops:fill-provinces` điền tỉnh cho điểm cũ (giãn 1 giây / lần): **41/42 điểm đã có tỉnh**. Còn 1 điểm (Kubota Thiên Trường) nằm ở vùng OSM chưa có dữ liệu tỉnh.
+
+### Tổng hợp cho thương lái (Sổ giao dịch → tab "Tổng hợp", web + app)
+- `GET /transactions/summary?from=&to=`:
+  - **lãi gộp** = tiền bán − tiền mua trong khoảng ngày, kèm bảng **theo tháng**
+  - **còn nợ 2 chiều tính đến hôm nay** (mình nợ người bán / người mua nợ mình, gồm cả phiếu và đợt cân của đơn)
+  - **lời từng lô** (đơn bán đã gộp các đơn mua, dùng `DealSummary::lot`)
+- Hàng mua về chưa bán hết thì ghi chú "lãi gộp còn thấp / âm".
+
+### Kiểm tra
+- Backend: thêm 2 test điểm bán (tỉnh từ tọa độ, thành phố trực thuộc TW, lệnh điền tỉnh để trống khi không ra) và 1 test tổng hợp (theo tháng, còn nợ tính đến nay, lời lô 10 tr). 159 test pass, Pint sạch.
+- Typecheck web + app, lint web sạch. Bấm thử tab Tổng hợp trên Chrome bằng `0900000002`.
+
+---
+
 ## 16/10/2026: Admin xem giao dịch người dùng (chỉ xem, có nhật ký) ✅
 
 **Câu hỏi:** `/admin` có quản lý / xem được giao dịch không, nhất là khi khách bật "Lưu cả trên mạng"?
@@ -842,60 +869,76 @@ gunzip -c exports/nhanong-gia-….sql.gz | mysql --default-character-set=utf8mb4
 
 ---
 
-## Việc còn lại (thống kê 15/10/2026, 16:00)
+## Việc còn lại (thống kê 16/10/2026, 15:00)
 
-### A. Đang chạy, sắp xong
-| # | Việc | Tình trạng |
-|---|---|---|
-| 1 | Lấy giá cũ cà phê, hồ tiêu (`crawl:backfill baoquocte-ca-phe baoquocte-ho-tieu --from=2021-11`) | Đang chạy, đã tới 08/2024. Log `backend/storage/logs/backfill-baoquocte.log` |
-| 2 | Lấy giá cũ lúa gạo An Giang (`crawl:backfill congthuong-lua-gao --from=2021-10`) | Đang chạy, đã tới 03/2023. Log `backend/storage/logs/backfill-congthuong.log` |
-| 3 | Sau khi 1–2 xong | Xét lại 137 giá "cần duyệt", rồi chạy lại `scripts/export-prices.sh` để xuất file dữ liệu giá đầy đủ |
+Đã xong từ lần thống kê trước (15/10):
+- lấy giá cũ 5 năm (giá "cần duyệt" còn 0), xuất lại file giá
+- phiếu cân / sổ giao dịch / PDF + Word
+- lịch tiếng Việt cho web, trường tự thêm / mẫu / thu hoạch / nhân công
+- chia sẻ phiếu có lịch sử sửa, doanh nghiệp (chủ + lái), thông báo cho khách / chủ
+- giá quanh tôi (tìm xã / phường), chanh dây, admin xem giao dịch
+- lọc điểm bán theo tỉnh (tự điền tỉnh), màn tổng hợp cho thương lái
 
-Máy khác muốn lấy tiếp: nạp file `exports/*.sql.gz` (có cả `crawl_logs`), rồi chạy lại 2 lệnh trên. Các bài đã lấy sẽ được bỏ qua.
-
-### B. Thiếu do nguồn dữ liệu miễn phí không có
+### A. Dữ liệu giá
 | # | Việc | Ghi chú |
 |---|---|---|
-| 4 | Giá thuốc BVTV | Chưa có nguồn giá hằng ngày |
-| 5 | Phân bón theo vùng / thương hiệu, Kali trước 11/2025 | Chỉ có giá bán lẻ An Giang. agro.gov.vn còn có DAP, Urê Trung Quốc, phân lân An Giang: thêm mặt hàng vào danh mục là lấy được |
-| 6 | Sầu riêng trước 10/2024 | Báo đăng bảng giá dạng ảnh |
-| 7 | Nguồn phân bón báo Hà Tĩnh | Đã dừng từ khoảng 05/2026, cần nguồn thay thế |
+| 1 | Giá thuốc BVTV | Chưa có nguồn đăng giá hằng ngày |
+| 2 | Phân bón theo vùng / thương hiệu | Mới có An Giang; agro.gov.vn có thêm DAP, Urê Trung Quốc nếu thêm mặt hàng |
+| 3 | Sầu riêng trước 10/2024 | Báo đăng bảng giá dạng ảnh |
+| 4 | Nguồn phân bón báo Hà Tĩnh | Đã ngừng, cần nguồn khác |
+| 5 | Chanh dây | Không có nguồn crawl; giá từ điểm mua đăng và admin nhập tay |
 
-### C. Chức năng chưa làm
+### B. Chức năng chưa làm
 | # | Việc | Ghi chú |
 |---|---|---|
-| 8 | Thanh toán gói xem giá (nạp thẻ / chuyển khoản QR / mã kích hoạt) | Làm sau theo yêu cầu; hiện admin kích hoạt tay trong /admin |
-| 9 | Thông báo đẩy khi app đóng (đơn mua bán, cảnh báo giá trên Android) | Cần development build của app; Expo Go Android không hỗ trợ |
-| 10 | Cập nhật tức thì giữa 2 bên (WebSocket, Laravel Reverb) | Hiện hỏi server 8 giây/lần, trễ khoảng 6–8 giây |
-| 11 | Màn hình tổng hợp cho thương lái | Lời các lô theo tháng/vụ, tổng nợ nông dân, tổng chi nhánh nợ mình |
-| 12 | ~~Phiếu cân / biên nhận gửi bên kia~~ | ✅ Xong 16/10: Sổ giao dịch, in PDF / Word (web + app) |
-| 13 | Link mã đơn mở thẳng app | Hiện link mở bản web; trên app phải nhập mã tay |
-| 14 | Quên mật khẩu | Cần OTP qua SMS (dịch vụ trả phí) |
-| 15 | Bản đồ điểm bán | Hiện chỉ có danh sách + nút chỉ đường |
-| 16 | Lọc điểm bán theo tỉnh | Nhiều điểm từ OpenStreetMap không ghi tỉnh; cần suy ra tỉnh từ tọa độ |
-| 17 | ~~Lịch chọn ngày tiếng Việt cho bản web~~ | ✅ Xong 15/10 tối |
-| 18 | Sổ thu chi: ghi chú bằng giọng nói, chụp ảnh hóa đơn | Có trong kế hoạch |
-| 19 | ~~Trường tự thêm, mẫu ghi nhanh, thu hoạch, nhân công~~ | ✅ Xong 15/10 tối (web + app). Chưa thử trên điện thoại thật |
+| 6 | Thanh toán gói xem giá | Làm sau theo yêu cầu; cần chọn cách thu tiền (chuyển khoản QR / mã kích hoạt / cổng thanh toán) |
+| 7 | Thông báo đẩy khi app đóng | Cần development build (mục 16) |
+| 8 | Cập nhật tức thì (WebSocket) | Hiện hỏi server 8 giây / lần |
+| 9 | Link mã đơn / phiếu mở thẳng app | Cần build riêng có scheme / app link |
+| 10 | Quên mật khẩu | Cần OTP qua SMS (trả phí); lái con thì chủ đặt lại được |
+| 11 | Bản đồ điểm bán | Hiện danh sách + chỉ đường |
+| 12 | Ghi chú giọng nói, chụp ảnh hóa đơn | |
+| 13 | Đợt cắt bán cho lái: "lái còn nợ" | Hiện giả định lái trả đủ mỗi đợt |
+| 14 | App tự gửi sổ khi có mạng lại (NetInfo); hỏi lại khi đổi tài khoản trên máy đang có sổ | |
+| 15 | Chủ doanh nghiệp mở thẳng trang đơn chung của lái | Hiện xem số liệu + tải quyết toán |
 
-### D. Chưa kiểm tra thật
-| # | Việc |
-|---|---|
-| 20 | Thử đầy đủ trên điện thoại thật: lưu SQLite, đồng bộ, nhắc hạn trả nợ, đơn mua bán giữa 2 máy, nút "Gần tôi" |
-| 21 | Thử với nông dân / thương lái thật: dễ hiểu không, thời gian ghi 1 khoản, cách tính chi chung / cọc / lãi vay có đúng thói quen |
-| 22 | Duyệt 137 giá "cần duyệt" trong /admin → Giá (giá nhảy mạnh thật, cần người xem) |
-
-### E. Giai đoạn 6: Phát hành (chưa bắt đầu)
-| # | Việc | Cần chuẩn bị |
+### C. Phát hành (cần bạn chuẩn bị)
+| # | Việc | Cần |
 |---|---|---|
-| 23 | Build app bằng EAS (bản thử nội bộ, rồi bản phát hành) | Tài khoản Expo |
-| 24 | Đưa lên CH Play / App Store | Tài khoản nhà phát triển Google (25 USD) và Apple (99 USD/năm) |
-| 25 | Đưa backend lên VPS: tên miền, HTTPS, lịch lấy giá mỗi ngày (`schedule:work` / cron + `queue:work`), sao lưu DB | VPS, tên miền |
-| 26 | Bảo mật trước khi chạy thật | Đổi mật khẩu admin, xóa tài khoản thử, `APP_DEBUG=false` |
+| 16 | Build app bằng EAS (bản thử nội bộ → phát hành) | Tài khoản Expo |
+| 17 | CH Play / App Store | Tài khoản Google (25 USD), Apple (99 USD/năm) |
+| 18 | Backend lên VPS: tên miền, HTTPS, lịch lấy giá, hàng đợi, sao lưu DB | VPS, tên miền |
+| 19 | Dịch vụ tìm địa danh riêng (đang dùng Photon miễn phí) | Tự cài Photon hoặc thuê |
+| 20 | Bảo mật trước khi chạy thật | Đổi mật khẩu admin, xóa tài khoản / dữ liệu thử, `APP_DEBUG=false` |
 
-**Thứ tự đề xuất:**
-1. Mục 20–21: thử trên máy thật, với người dùng thật.
-2. Mục 23 + 25: build riêng + server; xong thì làm được mục 9 (thông báo đẩy).
-3. Mục 8 (thanh toán), rồi 11–12 (cho thương lái).
+### D. Danh sách thử trên điện thoại thật / với người dùng thật
+Dùng app qua Expo Go (QR từ Metro), cùng Wi-Fi với máy dev. Tài khoản thử ở bảng "Tài khoản thử".
+1. **Sổ thu chi:**
+   - ghi thu / chi, tắt mạng ghi tiếp, bật lại thì đồng bộ
+   - đổi máy đăng nhập thấy đủ sổ
+   - nhắc hạn trả nợ (tắt / mở app)
+2. **Đơn mua bán giữa 2 máy:**
+   - 1 máy `0900000001`, 1 máy `0900000002`
+   - tạo đơn, nhập mã, ghi đợt cân, đồng ý / báo sai
+   - xem thông báo đến sau bao lâu
+3. **Sổ giao dịch:**
+   - lập phiếu (gõ số kg có dấu phẩy)
+   - "Gửi PDF / Gửi Word" qua Zalo: mở file trên điện thoại người nhận được không, chữ có đủ dấu không
+4. **Chia sẻ phiếu:**
+   - gửi vào app khách (SĐT trùng), nhập mã phiếu
+   - sửa phiếu thì khách thấy lịch sử
+5. **Doanh nghiệp:**
+   - chủ `0900000020` tạo lái mới
+   - lái đăng nhập trên máy khác, lập phiếu: chủ nhận thông báo
+   - ứng tiền, tiền đang giữ
+6. **Giá quanh tôi:** "Dùng vị trí của máy" (GPS thật), tìm xã / phường, mở rộng bán kính.
+7. **Người dùng thật** (5–10 người: nông dân, thương lái, chủ điểm thu mua):
+   - thời gian ghi 1 khoản / lập 1 phiếu, số lần bấm nhầm
+   - chữ có dễ hiểu không
+   - cách tính chi chung / cọc / lãi vay / tiền đang giữ có đúng thói quen không
+8. Mở file Word bằng Microsoft Word / WPS trên máy tính.
+
+**Thứ tự đề xuất:** D (thử thật) → C16 + C18 (build riêng + VPS) → B7, B9 → B6 (thanh toán).
 
 ---
 

@@ -1,4 +1,4 @@
-import { formatDate, formatKg, formatVnd, monthStart, today, TRADE_KIND_LABELS, type TradeKind } from '@nhanong/shared';
+import { formatDate, formatKg, formatVnd, monthLabel, monthStart, today, TRADE_KIND_LABELS, type TradeKind } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
@@ -10,10 +10,10 @@ import { CustomerForm, SmallTitle, TradeRowCard, TradeTotalsCard } from '../../c
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { colors } from '../../lib/theme';
+import { colors, font } from '../../lib/theme';
 import { useAsync } from '../../lib/useAsync';
 
-type Tab = 'so' | 'khach' | 'bao-cao';
+type Tab = 'so' | 'tong-hop' | 'khach' | 'bao-cao';
 
 /** Sổ giao dịch của điểm thu mua / thương lái: giao dịch, khách hàng, báo cáo */
 export default function TradeScreen() {
@@ -37,10 +37,12 @@ export default function TradeScreen() {
       </View>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
         <Chip label="Giao dịch" active={tab === 'so'} onPress={() => setTab('so')} />
+        <Chip label="Tổng hợp" active={tab === 'tong-hop'} onPress={() => setTab('tong-hop')} />
         <Chip label="Khách hàng" active={tab === 'khach'} onPress={() => setTab('khach')} />
         <Chip label="Báo cáo" active={tab === 'bao-cao'} onPress={() => setTab('bao-cao')} />
       </View>
       {tab === 'so' && <TradeList token={auth.token} />}
+      {tab === 'tong-hop' && <TradeSummaryView token={auth.token} />}
       {tab === 'khach' && <CustomerList token={auth.token} />}
       {tab === 'bao-cao' && <TradeReport token={auth.token} />}
     </ScrollView>
@@ -92,6 +94,67 @@ function TradeList({ token }: { token: string }) {
           {rows.state.data.data.length === 0 && <Text style={styles.muted}>Chưa có giao dịch trong khoảng ngày này.</Text>}
           {rows.state.data.data.map((r) => (
             <TradeRowCard key={r.id} row={r} />
+          ))}
+        </>
+      )}
+    </View>
+  );
+}
+
+/** Tổng hợp cho thương lái: lãi gộp theo tháng, còn nợ 2 chiều tính đến nay, lời từng lô */
+function TradeSummaryView({ token }: { token: string }) {
+  const range = useRange();
+  const summary = useAsync(() => api.tradeSummary(token, { from: range.from, to: range.to }), [token, range.from, range.to]);
+  const row = (label: string, value: string, color?: string) => (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 2 }}>
+      <Text style={[styles.body, { flex: 1 }]}>{label}</Text>
+      <Text style={[styles.body, { fontWeight: '700', color: color ?? colors.text }]}>{value}</Text>
+    </View>
+  );
+  return (
+    <View>
+      <RangeFields range={range} />
+      <Status state={summary.state} retry={summary.reload} />
+      {summary.state.status === 'ok' && (
+        <>
+          <Card style={{ borderLeftWidth: 6, borderLeftColor: summary.state.data.margin < 0 ? colors.loss : colors.gain }}>
+            <Text style={styles.muted}>Lãi gộp (tiền bán − tiền mua, chưa trừ chi phí riêng)</Text>
+            <Text style={{ fontSize: font.title + 4, fontWeight: '800', color: summary.state.data.margin < 0 ? colors.loss : colors.gain, marginBottom: 6 }}>{formatVnd(summary.state.data.margin)}</Text>
+            {row(`Bán ra (${formatKg(summary.state.data.totals.sell.kg)} kg)`, formatVnd(summary.state.data.totals.sell.amount), colors.gain)}
+            {row(`Mua vào (${formatKg(summary.state.data.totals.buy.kg)} kg)`, `−${formatVnd(summary.state.data.totals.buy.amount)}`, colors.loss)}
+            {summary.state.data.totals.buy.kg > summary.state.data.totals.sell.kg && <Text style={[styles.muted, { marginTop: 4 }]}>Hàng mua về chưa bán hết thì lãi gộp còn thấp / âm; bán ra rồi mới thấy lời.</Text>}
+          </Card>
+          <Card>
+            <SmallTitle>Còn nợ (tính đến hôm nay)</SmallTitle>
+            {row('Mình còn nợ người bán', formatVnd(summary.state.data.owing.i_owe), colors.loss)}
+            {row('Người mua còn nợ mình', formatVnd(summary.state.data.owing.owed_to_me), colors.gain)}
+          </Card>
+          {summary.state.data.months.length > 0 && (
+            <Card>
+              <SmallTitle>Theo tháng</SmallTitle>
+              {summary.state.data.months.map((m) => (
+                <View key={m.month} style={{ paddingVertical: 4, borderTopWidth: 1, borderTopColor: colors.border }}>
+                  <Text style={[styles.body, { fontWeight: '700' }]}>{monthLabel(m.month)}</Text>
+                  <Text style={styles.muted}>
+                    Mua {formatVnd(m.buy)} · bán {formatVnd(m.sell)}
+                  </Text>
+                  <Text style={[styles.body, { color: m.margin < 0 ? colors.loss : colors.gain, fontWeight: '700' }]}>Lãi gộp {formatVnd(m.margin)}</Text>
+                </View>
+              ))}
+            </Card>
+          )}
+          <SmallTitle>Lời từng lô</SmallTitle>
+          <Text style={[styles.muted, { marginBottom: 6 }]}>Lô = đơn bán đã gộp các đơn mua của nông dân (gộp trong trang đơn bán, mục "Lời cả lô").</Text>
+          {summary.state.data.lots.length === 0 && <Text style={styles.muted}>Chưa có lô nào.</Text>}
+          {summary.state.data.lots.map((l) => (
+            <RowCard
+              key={l.uuid}
+              title={`📦 ${l.title}`}
+              sub={`Bán ${formatVnd(l.revenue)} · mua ${l.sources} đơn ${formatVnd(l.buy_cost)}${l.costs > 0 ? ` · chi phí ${formatVnd(l.costs)}` : ''}`}
+              right={`${l.profit < 0 ? 'Lỗ' : 'Lời'} ${formatVnd(Math.abs(l.profit))}`}
+              rightColor={l.profit < 0 ? colors.loss : colors.gain}
+              onPress={() => router.push({ pathname: '/deals/[id]', params: { id: l.uuid } })}
+            />
           ))}
         </>
       )}

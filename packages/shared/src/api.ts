@@ -3,7 +3,7 @@
  */
 import type { BuyerProfile, BuyerProfileInput, BuyerReport, BuyerStatus, LocalPriceFilters, LocalPrices, MyLocation, Place } from './local';
 import type { AdvanceInput, Business, BusinessActivity, BusinessAdvance, BusinessDeal, BusinessInput, BusinessMemberInfo, BusinessSummary, MemberCash, MemberInput } from './business';
-import { documentPath, type CustomerInput, type DocumentFormat, type DocumentTarget, type Purchase, type PurchaseInput, type ReceivedPurchase, type TradeCustomer, type TradeFilters, type TradeList } from './trade';
+import { documentPath, type CustomerInput, type DocumentFormat, type DocumentTarget, type Purchase, type PurchaseInput, type ReceivedPurchase, type TradeCustomer, type TradeFilters, type TradeList, type TradeSummary } from './trade';
 
 export type CategoryType = 'nong_san' | 'phan_bon' | 'thuoc_bvtv';
 
@@ -458,6 +458,8 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
       request<{ data: TradeCustomer }>(id ? 'PATCH' : 'POST', id ? `/customers/${id}` : '/customers', { token, body: input }).then((r) => r.data),
     deleteCustomer: (token: string, id: string) => request<void>('DELETE', `/customers/${id}`, { token }),
     transactions: (token: string, filters: TradeFilters = {}) => request<TradeList>('GET', '/transactions', { token, query: filters }),
+    tradeSummary: (token: string, range: { from?: string; to?: string } = {}) =>
+      request<{ data: TradeSummary }>('GET', '/transactions/summary', { token, query: range }).then((r) => r.data),
     purchase: (token: string, id: string) => request<{ data: Purchase }>('GET', `/purchases/${id}`, { token }).then((r) => r.data),
     savePurchase: (token: string, input: PurchaseInput, id?: string) =>
       request<{ data: Purchase }>(id ? 'PATCH' : 'POST', id ? `/purchases/${id}` : '/purchases', { token, body: input }).then((r) => r.data),

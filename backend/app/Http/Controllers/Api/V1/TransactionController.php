@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Deals\DealSummary;
 use App\Documents\Document;
 use App\Documents\DocxRenderer;
 use App\Documents\PdfRenderer;
 use App\Documents\TransactionDocuments;
 use App\Enums\DealEntryKind;
+use App\Enums\DealStatus;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessMember;
 use App\Models\Customer;
@@ -17,6 +19,7 @@ use App\Transactions\TransactionFeed;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -45,6 +48,51 @@ class TransactionController extends Controller
             'data' => $rows->map(fn (array $r): array => collect($r)->except('sort')->all())->values(),
             'meta' => ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'totals' => TransactionFeed::totals($rows)],
         ]);
+    }
+
+    /**
+     * Tổng hợp cho thương lái / điểm thu mua: lãi gộp (bán − mua) theo tháng trong khoảng ngày,
+     * còn nợ 2 chiều tính đến nay, lời từng lô (đơn bán đã gộp các đơn mua).
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        [$from, $to] = self::dateRange($request);
+        $user = $request->user();
+        $rows = TransactionFeed::for($user, $from, $to);
+        $totals = TransactionFeed::totals($rows);
+
+        $months = $rows->groupBy(fn (array $r): string => substr($r['date'], 0, 7))
+            ->map(function (Collection $g, string $month): array {
+                $t = TransactionFeed::totals($g);
+
+                return ['month' => $month, 'buy' => $t['buy']['amount'], 'buy_kg' => $t['buy']['kg'], 'sell' => $t['sell']['amount'], 'sell_kg' => $t['sell']['kg'], 'margin' => $t['sell']['amount'] - $t['buy']['amount']];
+            })
+            ->sortKeys()
+            ->values();
+
+        // Còn nợ tính đến nay (không theo khoảng ngày): mọi giao dịch từ trước tới giờ
+        $allTime = TransactionFeed::totals(TransactionFeed::for($user, CarbonImmutable::create(2000), CarbonImmutable::today()));
+
+        $lots = Deal::query()
+            ->where('seller_id', $user->id)
+            ->where('status', '!=', DealStatus::Cancelled)
+            ->whereHas('sources')
+            ->with(['entries', 'sources.entries'])
+            ->latest('updated_at')
+            ->limit(50)
+            ->get()
+            ->map(fn (Deal $d): array => ['uuid' => $d->uuid, 'code' => $d->code, 'title' => $d->title, 'status' => $d->status->value, ...DealSummary::lot($d, $user)])
+            ->values();
+
+        return response()->json(['data' => [
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'totals' => $totals,
+            'margin' => $totals['sell']['amount'] - $totals['buy']['amount'],
+            'months' => $months,
+            'owing' => ['i_owe' => $allTime['buy']['owing'], 'owed_to_me' => $allTime['sell']['owing']],
+            'lots' => $lots,
+        ]]);
     }
 
     /** Khách được chia sẻ vẫn tải được phiếu người lập đã xóa (có ghi rõ đã xóa) */

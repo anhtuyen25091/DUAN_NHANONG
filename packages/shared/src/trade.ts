@@ -150,6 +150,36 @@ export interface TradeTotals {
   sell: { kg: number; amount: number; paid: number; owing: number };
 }
 
+/** Tổng hợp cho thương lái: lãi gộp theo tháng, còn nợ 2 chiều (tính đến nay), lời từng lô */
+export interface TradeSummary {
+  from: string;
+  to: string;
+  totals: TradeTotals;
+  /** Tiền bán − tiền mua trong khoảng ngày (chưa trừ chi phí riêng) */
+  margin: number;
+  months: { month: string; buy: number; buy_kg: number; sell: number; sell_kg: number; margin: number }[];
+  owing: { i_owe: number; owed_to_me: number };
+  lots: {
+    uuid: string;
+    code: string;
+    title: string;
+    status: string;
+    revenue: number;
+    sell_kg: number;
+    buy_cost: number;
+    buy_kg: number;
+    costs: number;
+    profit: number;
+    kg_loss: number;
+    sources: number;
+  }[];
+}
+
+/** "2026-10" → "Tháng 10/2026" */
+export function monthLabel(month: string): string {
+  return `Tháng ${Number(month.slice(5, 7))}/${month.slice(0, 4)}`;
+}
+
 export interface TradeFilters {
   from?: string;
   to?: string;

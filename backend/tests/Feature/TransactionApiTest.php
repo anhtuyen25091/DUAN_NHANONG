@@ -303,6 +303,37 @@ class TransactionApiTest extends TestCase
         $this->getJson(route('api.v1.received-purchases.index'))->assertJsonPath('data.1.activity.by_me', true);
     }
 
+    public function test_trader_summary_margin_by_month_owing_and_lots(): void
+    {
+        // Tháng 9: mua 93 tr (trả 90 tr); tháng 10: mua 160,254 tr, bán 200 tr (khách trả 150 tr)
+        $this->postJson(route('api.v1.purchases.store'), $this->purchase(['date' => '2026-09-20', 'lines' => [['name' => 'Cà phê', 'kg' => 1000, 'price' => 93000]], 'paid' => 90_000_000]))->assertCreated();
+        $this->postJson(route('api.v1.purchases.store'), $this->purchase())->assertCreated();
+        $this->postJson(route('api.v1.purchases.store'), $this->purchase(['kind' => 'sell', 'customer_name' => 'Công ty Xanh', 'customer_phone' => null, 'lines' => [['name' => 'Cà phê', 'kg' => 2000, 'price' => 100000]], 'paid' => 150_000_000]))->assertCreated();
+
+        // Lô: bán cho chi nhánh 50 tr, gộp đơn mua của nông dân 40 tr
+        $sell = Deal::factory()->create(['created_by' => $this->trader->id, 'seller_id' => $this->trader->id, 'buyer_id' => User::factory()->create()->id, 'title' => 'Lô cà phê 1']);
+        $buy = Deal::factory()->joined()->create(['created_by' => $this->trader->id, 'buyer_id' => $this->trader->id]);
+        $this->cut($sell, 50_000_000, DealEntryStatus::Confirmed);
+        $this->cut($buy, 40_000_000, DealEntryStatus::Confirmed);
+        $sell->sources()->attach($buy->id);
+
+        $data = $this->getJson(route('api.v1.transactions.summary', ['from' => '2026-09-01']))->assertOk()->json('data');
+        $this->assertSame([
+            ['month' => '2026-09', 'buy' => 93_000_000, 'sell' => 0, 'margin' => -93_000_000],
+            ['month' => '2026-10', 'buy' => 200_254_000, 'sell' => 250_000_000, 'margin' => 49_746_000],
+        ], array_map(fn (array $m): array => ['month' => $m['month'], 'buy' => $m['buy'], 'sell' => $m['sell'], 'margin' => $m['margin']], $data['months']));
+        $this->assertSame(-43_254_000, $data['margin']);
+        // Còn nợ tính đến nay: nợ người bán 3 tr + 160,254 tr + đợt mua 40 tr; người mua nợ mình 50 tr + đợt bán 50 tr
+        $this->assertSame(['i_owe' => 203_254_000, 'owed_to_me' => 100_000_000], $data['owing']);
+        $this->assertSame('Lô cà phê 1', $data['lots'][0]['title']);
+        $this->assertSame(10_000_000, $data['lots'][0]['profit']);
+
+        // Khoảng ngày chỉ tháng 10: tháng 9 không vào bảng, nhưng còn nợ vẫn tính đến nay
+        $oct = $this->getJson(route('api.v1.transactions.summary', ['from' => '2026-10-01']))->json('data');
+        $this->assertCount(1, $oct['months']);
+        $this->assertSame(203_254_000, $oct['owing']['i_owe']);
+    }
+
     /**
      * @param  array<string, mixed>  $override
      * @return array<string, mixed>

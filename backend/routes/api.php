@@ -103,6 +103,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/received-purchases', [PurchaseController::class, 'received'])->name('received-purchases.index');
         Route::get('/received-purchases/{purchase}', [PurchaseController::class, 'showReceived'])->name('received-purchases.show');
         Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+        Route::get('/transactions/summary', [TransactionController::class, 'summary'])->name('transactions.summary');
 
         // Doanh nghiệp thu mua: chủ + lái con
         Route::get('/business', [BusinessController::class, 'show'])->name('business.show');
