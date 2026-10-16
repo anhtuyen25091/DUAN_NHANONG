@@ -2,6 +2,7 @@ import { ApiError, formatDate, formatQty, formatVnd, telHref, type Deal, type De
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
 import { dealWatcher } from '../../dealWatch'
+import { PrintButtons } from '../../components/PrintButtons'
 import { Status } from '../../components/Status'
 import { go, href, useAsync } from '../../hooks'
 import { useLedger } from '../../ledger/useLedger'
@@ -117,6 +118,10 @@ export function DealDetail({ token, uuid }: { token: string; uuid: string }) {
       {deal.my_role === 'seller' && <LotCard deal={deal} token={token} onDeal={setDeal} />}
 
       <LedgerLinkCard deal={deal} />
+
+      <section className="card">
+        <PrintButtons token={token} target={{ type: 'deal', id: deal.uuid }} label="Bảng quyết toán đơn (mọi đợt cân, cọc, tiền đã trả, còn lại) để gửi bên kia" />
+      </section>
 
       <section className="card">
         <h2>Đơn</h2>
@@ -235,6 +240,12 @@ function EntryCard({
       )}
       {e.note && <p className="small muted">{e.note}</p>}
       {e.status === 'disputed' && e.dispute_reason && <p className="small out">⚠️ Lý do báo sai: {e.dispute_reason}</p>}
+      {e.kind === 'cut' && e.status !== 'disputed' && (
+        <details className="entry-print">
+          <summary className="small">🖨 In phiếu cân đợt này</summary>
+          <PrintButtons token={token} target={{ type: 'deal-entry', id: e.uuid }} label="" />
+        </details>
+      )}
       <div className="btn-row">
         {canRespond && (
           <>

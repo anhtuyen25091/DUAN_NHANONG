@@ -30,7 +30,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
     // Giá quanh 1 vị trí do các điểm mua đã duyệt đăng (không cần đăng nhập)
     Route::get('/local-prices', [LocalPriceController::class, 'index'])->middleware('throttle:60,1')->name('local-prices.index');
-    Route::get('/places', [LocalPriceController::class, 'places'])->middleware('throttle:30,1')->name('places.index');
+    Route::get('/places', [LocalPriceController::class, 'places'])->middleware('throttle:places')->name('places.index');
 
     // Không cần đăng nhập: nhận diện máy qua header X-Device-Id
     Route::middleware([ResolveDevice::class, 'throttle:60,1'])->group(function () {
@@ -65,7 +65,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/me/buyer', [BuyerController::class, 'show'])->name('buyer.show');
         Route::put('/me/buyer', [BuyerController::class, 'save'])->name('buyer.save');
         Route::get('/me/buyer/prices', [BuyerController::class, 'reports'])->name('buyer.prices.index');
-        Route::post('/me/buyer/prices', [BuyerController::class, 'storeReport'])->middleware('throttle:60,1')->name('buyer.prices.store');
+        Route::post('/me/buyer/prices', [BuyerController::class, 'storeReport'])->middleware('throttle:buyer-prices')->name('buyer.prices.store');
         Route::delete('/me/buyer/prices/{report}', [BuyerController::class, 'destroyReport'])->name('buyer.prices.destroy');
 
         Route::post('/sync/push', [LedgerSyncController::class, 'push'])->name('sync.push');
@@ -75,7 +75,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         // Đơn mua bán chung 2 bên (thương lái / chi nhánh / nông dân)
         Route::get('/deals', [DealController::class, 'index'])->name('deals.index');
         Route::post('/deals', [DealController::class, 'store'])->name('deals.store');
-        Route::post('/deals/join', [DealController::class, 'join'])->middleware('throttle:20,1')->name('deals.join');
+        Route::post('/deals/join', [DealController::class, 'join'])->middleware('throttle:deal-join')->name('deals.join');
         Route::get('/deals/{deal}', [DealController::class, 'show'])->name('deals.show');
         Route::patch('/deals/{deal}', [DealController::class, 'update'])->name('deals.update');
         Route::delete('/deals/{deal}', [DealController::class, 'destroy'])->name('deals.destroy');
@@ -96,7 +96,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::patch('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
         Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy');
         Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
-        Route::middleware('throttle:30,1')->prefix('documents')->name('documents.')->group(function () {
+        Route::middleware('throttle:documents')->prefix('documents')->name('documents.')->group(function () {
             Route::get('/purchases/{purchase}', [TransactionController::class, 'purchaseDocument'])->name('purchase');
             Route::get('/deal-entries/{entry}', [TransactionController::class, 'dealEntryDocument'])->name('deal-entry');
             Route::get('/deals/{deal}', [TransactionController::class, 'dealDocument'])->name('deal');

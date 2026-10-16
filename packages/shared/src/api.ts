@@ -2,6 +2,7 @@
  * Kiểu dữ liệu và client gọi API /api/v1 của backend, dùng chung cho web và mobile.
  */
 import type { BuyerProfile, BuyerProfileInput, BuyerReport, BuyerStatus, LocalPriceFilters, LocalPrices, MyLocation, Place } from './local';
+import { documentPath, type CustomerInput, type DocumentFormat, type DocumentTarget, type Purchase, type PurchaseInput, type TradeCustomer, type TradeFilters, type TradeList } from './trade';
 
 export type CategoryType = 'nong_san' | 'phan_bon' | 'thuoc_bvtv';
 
@@ -449,6 +450,32 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
     postBuyerPrice: (token: string, input: { product: string; price: number; date?: string; note?: string | null }) =>
       request<{ data: BuyerReport; message: string }>('POST', '/me/buyer/prices', { token, body: input }),
     deleteBuyerPrice: (token: string, id: number) => request<void>('DELETE', `/me/buyer/prices/${id}`, { token }),
+
+    // ---- Sổ giao dịch (điểm thu mua / thương lái) ----
+    customers: (token: string, q?: string) => request<{ data: TradeCustomer[] }>('GET', '/customers', { token, query: { q } }).then((r) => r.data),
+    saveCustomer: (token: string, input: CustomerInput, id?: string) =>
+      request<{ data: TradeCustomer }>(id ? 'PATCH' : 'POST', id ? `/customers/${id}` : '/customers', { token, body: input }).then((r) => r.data),
+    deleteCustomer: (token: string, id: string) => request<void>('DELETE', `/customers/${id}`, { token }),
+    transactions: (token: string, filters: TradeFilters = {}) => request<TradeList>('GET', '/transactions', { token, query: filters }),
+    purchase: (token: string, id: string) => request<{ data: Purchase }>('GET', `/purchases/${id}`, { token }).then((r) => r.data),
+    savePurchase: (token: string, input: PurchaseInput, id?: string) =>
+      request<{ data: Purchase }>(id ? 'PATCH' : 'POST', id ? `/purchases/${id}` : '/purchases', { token, body: input }).then((r) => r.data),
+    deletePurchase: (token: string, id: string) => request<void>('DELETE', `/purchases/${id}`, { token }),
+    /** Tải giấy tờ PDF / Word: trả nội dung file + tên file (web lưu bằng Blob, app ghi file rồi chia sẻ) */
+    downloadDocument: async (token: string, target: DocumentTarget, format: DocumentFormat): Promise<{ data: ArrayBuffer; filename: string; mime: string }> => {
+      let response: Response;
+      try {
+        response = await fetchFn(`${root}${documentPath(target, format)}`, { headers: { Authorization: `Bearer ${token}`, Accept: '*/*' } });
+      } catch {
+        throw new ApiError('Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.', 0);
+      }
+      if (!response.ok) {
+        const json = await response.json().catch(() => null);
+        throw new ApiError(json?.message ?? `Lỗi máy chủ (${response.status})`, response.status);
+      }
+      const filename = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? `giay-to.${format}`;
+      return { data: await response.arrayBuffer(), filename, mime: response.headers.get('Content-Type') ?? 'application/octet-stream' };
+    },
 
     shops: (filters: ShopFilters = {}) => request<ShopPage>('GET', '/shops', { query: filters }),
     provinces: () => request<{ data: Province[] }>('GET', '/provinces').then((r) => r.data),

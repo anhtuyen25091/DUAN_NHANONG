@@ -60,6 +60,14 @@ export function BuyerArea() {
         ‹ Giá quanh tôi
       </a>
       <h1>🏪 Điểm mua đăng giá</h1>
+      <a className="card local-banner" href={href('giao-dich')}>
+        <span>
+          <b>📒 Sổ giao dịch</b>
+          <br />
+          <span className="small muted">Ghi phiếu mua / bán, theo dõi khách nợ, in phiếu PDF / Word gửi khách</span>
+        </span>
+        <span aria-hidden="true">›</span>
+      </a>
       {!buyer || editing ? (
         <BuyerForm token={auth.token} buyer={buyer} onSaved={() => (setEditing(false), reload())} onCancel={buyer ? () => setEditing(false) : undefined} />
       ) : (

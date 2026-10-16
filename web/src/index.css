@@ -1832,3 +1832,90 @@ a.card.local-banner {
 .buyer-status.suspended {
   border-left: 6px solid var(--loss);
 }
+
+/* ---- Sổ giao dịch (điểm thu mua), in phiếu ---- */
+.range-fields {
+  display: grid;
+  /* minmax(0, …): ô có đuôi "kg" không đẩy lưới rộng hơn thẻ trên màn hình hẹp */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 12px;
+}
+
+.range-fields input {
+  min-width: 0;
+}
+
+/* fieldset mặc định rộng theo nội dung (min-content), làm khung loại hàng tràn ra ngoài thẻ */
+.form fieldset {
+  min-width: 0;
+}
+
+.btn-row .grow {
+  flex: 1;
+  min-width: 160px;
+}
+
+.btn-row .grow input {
+  width: 100%;
+}
+
+.trade-row .garden-name .tag {
+  margin-top: 4px;
+}
+
+.trade-line {
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.trade-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 1.15rem;
+  padding: 8px 0;
+  border-top: 2px solid var(--border);
+}
+
+.trade-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.trade-table th,
+.trade-table td {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.trade-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.card .trade-table {
+  display: block;
+  overflow-x: auto;
+}
+
+.print-buttons .btn-row {
+  margin-top: 6px;
+}
+
+.entry-print {
+  margin: 6px 0;
+}
+
+.entry-print summary {
+  cursor: pointer;
+  color: var(--primary);
+}
+
+button.linklike.danger {
+  color: var(--error, #b42318);
+}
