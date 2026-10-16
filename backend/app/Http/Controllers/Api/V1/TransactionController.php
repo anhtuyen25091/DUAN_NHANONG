@@ -46,9 +46,12 @@ class TransactionController extends Controller
         ]);
     }
 
-    public function purchaseDocument(Request $request, Purchase $purchase): Response
+    /** Khách được chia sẻ vẫn tải được phiếu người lập đã xóa (có ghi rõ đã xóa) */
+    public function purchaseDocument(Request $request, string $purchase): Response
     {
-        abort_unless($purchase->user_id === $request->user()->id, 404);
+        $purchase = Purchase::withTrashed()->where('uuid', $purchase)->firstOrFail();
+        // Người lập phiếu, hoặc khách được chia sẻ (chỉ xem)
+        abort_unless($purchase->canView($request->user()), 404);
 
         return $this->download($request, $this->documents->purchaseReceipt($purchase->load('customer', 'user.buyer')));
     }

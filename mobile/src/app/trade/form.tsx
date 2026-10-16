@@ -87,6 +87,11 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+      {purchase?.shared_version != null && (
+        <Card style={{ backgroundColor: colors.primarySoft }}>
+          <Text style={styles.body}>Phiếu đã gửi cho khách. Lần sửa này được lưu thành bản mới, khách thấy cả bản cũ và bản mới (đổi gì, lúc nào).</Text>
+        </Card>
+      )}
       {!purchase && (
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
           <Chip label="Mua vào" active={kind === 'buy'} onPress={() => setKind('buy')} />

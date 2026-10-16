@@ -156,6 +156,114 @@ class TransactionApiTest extends TestCase
         $this->getJson(route('api.v1.documents.report', ['from' => '2024-01-01']))->assertStatus(422);
     }
 
+    public function test_share_code_lets_customer_view_and_download_only(): void
+    {
+        $id = $this->postJson(route('api.v1.purchases.store'), $this->purchase(['paid' => 100_000_000]))->json('data.id');
+        $code = $this->postJson(route('api.v1.purchases.share', $id))->assertOk()->json('data.share_code');
+        $this->assertMatchesRegularExpression('/^[A-Z2-9]{6}$/', $code);
+        // Bấm lại vẫn giữ mã cũ
+        $this->assertSame($code, $this->postJson(route('api.v1.purchases.share', $id))->json('data.share_code'));
+
+        $farmer = User::factory()->create(['name' => 'Chú Năm']);
+        Sanctum::actingAs($farmer);
+        $this->postJson(route('api.v1.received-purchases.receive'), ['code' => 'zzzzzz'])->assertUnprocessable()->assertJsonValidationErrors('code');
+        $this->postJson(route('api.v1.received-purchases.receive'), ['code' => strtolower($code)])
+            ->assertOk()
+            // Lái mua vào = phía khách là bán ra
+            ->assertJsonPath('data.kind', 'sell')
+            ->assertJsonPath('data.issuer.name', 'Lái Tư')
+            ->assertJsonPath('data.owing', 60_254_000);
+        $this->getJson(route('api.v1.received-purchases.index'))->assertJsonCount(1, 'data');
+        $this->get(route('api.v1.documents.purchase', $id))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        // Chỉ xem: không sửa, không xem bản của người lập
+        $this->patchJson(route('api.v1.purchases.update', $id), ['paid' => 0])->assertNotFound();
+        $this->getJson(route('api.v1.purchases.show', $id))->assertNotFound();
+
+        Sanctum::actingAs($this->trader);
+        $this->getJson(route('api.v1.purchases.show', $id))
+            ->assertJsonPath('data.shared_with.0.name', 'Chú Năm')
+            ->assertJsonPath('data.shared_with.0.via', 'code');
+        $this->deleteJson(route('api.v1.purchases.unshare', $id))->assertOk()->assertJsonPath('data.share_code', null);
+
+        // Thu hồi mã: người mới không nhập được, khách đã nhận vẫn giữ phiếu
+        Sanctum::actingAs(User::factory()->create());
+        $this->postJson(route('api.v1.received-purchases.receive'), ['code' => $code])->assertUnprocessable();
+        Sanctum::actingAs($farmer);
+        $this->getJson(route('api.v1.received-purchases.index'))->assertJsonCount(1, 'data');
+        $this->get(route('api.v1.documents.purchase', $id))->assertOk();
+    }
+
+    public function test_edits_after_sharing_are_kept_as_versions_the_customer_can_see(): void
+    {
+        // Sửa trước khi gửi: khách không cần thấy
+        $id = $this->postJson(route('api.v1.purchases.store'), $this->purchase())->json('data.id');
+        $this->patchJson(route('api.v1.purchases.update', $id), ['note' => 'Bản nháp'])->assertJsonPath('data.version', 2);
+        $code = $this->postJson(route('api.v1.purchases.share', $id))->assertJsonPath('data.shared_version', 2)->json('data.share_code');
+
+        $farmer = User::factory()->create();
+        Sanctum::actingAs($farmer);
+        $this->postJson(route('api.v1.received-purchases.receive'), ['code' => $code])
+            ->assertJsonPath('data.version', 2)
+            ->assertJsonPath('data.edited_after_share', false)
+            ->assertJsonCount(1, 'data.history');
+
+        // Người lập sửa số kg cân và ghi thêm tiền trả: mỗi lần là 1 bản mới
+        Sanctum::actingAs($this->trader);
+        $lines = $this->purchase()['lines'];
+        $lines[0]['kg'] = 1300.5;
+        $this->patchJson(route('api.v1.purchases.update', $id), ['lines' => $lines])->assertOk();
+        $this->patchJson(route('api.v1.purchases.update', $id), ['paid' => 50_000_000])->assertOk();
+        // Lưu lại y nguyên: không sinh bản mới
+        $this->patchJson(route('api.v1.purchases.update', $id), ['paid' => 50_000_000])->assertJsonPath('data.version', 4);
+
+        Sanctum::actingAs($farmer);
+        $received = $this->getJson(route('api.v1.received-purchases.show', $id))
+            ->assertJsonPath('data.version', 4)
+            ->assertJsonPath('data.edited_after_share', true)
+            ->assertJsonCount(3, 'data.history')
+            ->assertJsonPath('data.history.0.amount', 160_254_000)
+            ->json('data.history');
+        $this->assertSame(['Cà phê nhân xô: cân 1.250,5 kg → 1.300,5 kg', 'Tổng tiền: 160.254.000 đ → 164.904.000 đ'], $received[1]['changes']);
+        $this->assertSame(['Đã trả: 0 đ → 50.000.000 đ'], $received[2]['changes']);
+
+        // Người lập xóa phiếu: khách vẫn thấy, có ghi đã xóa, vẫn tải được giấy tờ
+        Sanctum::actingAs($this->trader);
+        $this->deleteJson(route('api.v1.purchases.destroy', $id))->assertNoContent();
+        Sanctum::actingAs($farmer);
+        $this->getJson(route('api.v1.received-purchases.index'))->assertJsonCount(1, 'data')->assertJsonPath('data.0.deleted_at', fn ($v) => $v !== null);
+        $this->get(route('api.v1.documents.purchase', $id))->assertOk();
+    }
+
+    public function test_send_to_account_when_customer_phone_matches_registered_user(): void
+    {
+        $farmer = User::factory()->create(['name' => 'Chú Năm Lộc', 'phone' => '0912345678']);
+        // SĐT gõ có dấu cách vẫn nhận ra
+        $id = $this->postJson(route('api.v1.purchases.store'), $this->purchase(['customer_phone' => '0912 345 678']))->json('data.id');
+
+        $this->getJson(route('api.v1.purchases.show', $id))
+            ->assertJsonPath('data.account_match.name', 'Chú Năm Lộc')
+            ->assertJsonCount(0, 'data.shared_with');
+        // Chưa bấm gửi thì khách chưa thấy
+        Sanctum::actingAs($farmer);
+        $this->getJson(route('api.v1.received-purchases.index'))->assertJsonCount(0, 'data');
+
+        Sanctum::actingAs($this->trader);
+        $this->postJson(route('api.v1.purchases.send', $id))
+            ->assertOk()
+            ->assertJsonPath('message', 'Đã gửi phiếu vào app của Chú Năm Lộc')
+            ->assertJsonPath('data.account_match', null)
+            ->assertJsonPath('data.shared_with.0.via', 'phone');
+
+        Sanctum::actingAs($farmer);
+        $this->getJson(route('api.v1.received-purchases.index'))->assertJsonCount(1, 'data');
+
+        // SĐT chưa có tài khoản: báo gửi mã
+        Sanctum::actingAs($this->trader);
+        $other = $this->postJson(route('api.v1.purchases.store'), $this->purchase(['customer_name' => 'Cô Tư', 'customer_phone' => '0977000000']))->json('data.id');
+        $this->getJson(route('api.v1.purchases.show', $other))->assertJsonPath('data.account_match', null);
+        $this->postJson(route('api.v1.purchases.send', $other))->assertUnprocessable();
+    }
+
     /**
      * @param  array<string, mixed>  $override
      * @return array<string, mixed>

@@ -5,6 +5,7 @@ import { Alert, Linking, ScrollView, Text, View } from 'react-native';
 import { DealsSignIn } from '../../components/deals';
 import { MoneyField } from '../../components/fields';
 import { PrintButtons } from '../../components/PrintButtons';
+import { PurchaseHistory, PurchaseLines, PurchaseShare } from '../../components/trade';
 import { Button, Card, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -29,7 +30,7 @@ export default function PurchaseScreen() {
   if (loaded.state.status !== 'ok' || !loaded.state.data) return <Status state={loaded.state} retry={loaded.reload} />;
   const data = loaded.state.data;
   // key: phiếu vừa sửa ở màn khác (tải lại khi quay về) thì vẽ lại từ dữ liệu mới
-  return <PurchaseView key={`${data.id}|${data.amount}|${data.paid}|${data.date}`} token={auth.token} initial={data} />;
+  return <PurchaseView key={`${data.id}|${data.version}`} token={auth.token} initial={data} />;
 }
 
 function PurchaseView({ token, initial }: { token: string; initial: Purchase }) {
@@ -63,19 +64,7 @@ function PurchaseView({ token, initial }: { token: string; initial: Purchase }) 
           📞 {p.phone}
         </Text>
       )}
-      <Card>
-        {p.lines.map((l, i) => (
-          <View key={i} style={{ paddingVertical: 6, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-              <Text style={[styles.body, { flex: 1, fontWeight: '700' }]}>{l.name}</Text>
-              <Text style={[styles.body, { fontWeight: '700' }]}>{formatVnd(l.amount)}</Text>
-            </View>
-            <Text style={styles.muted}>
-              Cân {formatKg(l.kg)} kg{l.deduct_kg > 0 ? ` − bì ${formatKg(l.deduct_kg)} kg` : ''} = {formatKg(l.net_kg)} kg × {formatVnd(l.price)}
-            </Text>
-          </View>
-        ))}
-      </Card>
+      <PurchaseLines lines={p.lines} />
       <Card>
         <Row label={`Tổng tiền hàng (${formatKg(p.kg)} kg tịnh)`} value={formatVnd(p.amount)} bold />
         <Row label="Đã trả" value={formatVnd(p.paid)} />
@@ -98,6 +87,8 @@ function PurchaseView({ token, initial }: { token: string; initial: Purchase }) 
       <Card>
         <PrintButtons token={token} target={{ type: 'purchase', id: p.id }} label="Gửi phiếu cho khách (có chỗ ký 2 bên, số tiền bằng chữ)" />
       </Card>
+      <PurchaseShare token={token} purchase={p} onChange={setP} />
+      {p.history && p.history.length > 1 && <PurchaseHistory history={p.history} sharedVersion={p.shared_version ?? null} />}
       <View style={{ gap: 8 }}>
         <Button label="Sửa phiếu" variant="outline" onPress={() => router.push({ pathname: '/trade/form', params: { id: p.id } })} />
         <Button

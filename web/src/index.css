@@ -1925,3 +1925,29 @@ a.card.local-banner {
 button.linklike.danger {
   color: var(--error, #b42318);
 }
+
+.purchase-history {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.purchase-history > li {
+  margin-bottom: 10px;
+}
+
+.purchase-history ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+/* Bảng hàng trên điện thoại: chữ nhỏ, sát hơn để đủ 6 cột */
+@media (max-width: 520px) {
+  .trade-table {
+    font-size: 0.8rem;
+  }
+
+  .trade-table th,
+  .trade-table td {
+    padding: 5px 3px;
+  }
+}

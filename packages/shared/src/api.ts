@@ -2,7 +2,7 @@
  * Kiểu dữ liệu và client gọi API /api/v1 của backend, dùng chung cho web và mobile.
  */
 import type { BuyerProfile, BuyerProfileInput, BuyerReport, BuyerStatus, LocalPriceFilters, LocalPrices, MyLocation, Place } from './local';
-import { documentPath, type CustomerInput, type DocumentFormat, type DocumentTarget, type Purchase, type PurchaseInput, type TradeCustomer, type TradeFilters, type TradeList } from './trade';
+import { documentPath, type CustomerInput, type DocumentFormat, type DocumentTarget, type Purchase, type PurchaseInput, type ReceivedPurchase, type TradeCustomer, type TradeFilters, type TradeList } from './trade';
 
 export type CategoryType = 'nong_san' | 'phan_bon' | 'thuoc_bvtv';
 
@@ -461,6 +461,15 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
     savePurchase: (token: string, input: PurchaseInput, id?: string) =>
       request<{ data: Purchase }>(id ? 'PATCH' : 'POST', id ? `/purchases/${id}` : '/purchases', { token, body: input }).then((r) => r.data),
     deletePurchase: (token: string, id: string) => request<void>('DELETE', `/purchases/${id}`, { token }),
+    /** Tạo (hoặc lấy lại) mã chia sẻ phiếu cho khách */
+    sharePurchase: (token: string, id: string) => request<{ data: Purchase }>('POST', `/purchases/${id}/share`, { token }).then((r) => r.data),
+    unsharePurchase: (token: string, id: string) => request<{ data: Purchase }>('DELETE', `/purchases/${id}/share`, { token }).then((r) => r.data),
+    /** Gửi thẳng vào app của khách (SĐT khách trùng tài khoản) */
+    sendPurchase: (token: string, id: string) => request<{ data: Purchase; message: string }>('POST', `/purchases/${id}/send`, { token }),
+    /** Khách nhập mã để nhận phiếu */
+    receivePurchase: (token: string, code: string) => request<{ data: ReceivedPurchase }>('POST', '/received-purchases', { token, body: { code } }).then((r) => r.data),
+    receivedPurchases: (token: string) => request<{ data: ReceivedPurchase[] }>('GET', '/received-purchases', { token }).then((r) => r.data),
+    receivedPurchase: (token: string, id: string) => request<{ data: ReceivedPurchase }>('GET', `/received-purchases/${id}`, { token }).then((r) => r.data),
     /** Tải giấy tờ PDF / Word: trả nội dung file + tên file (web lưu bằng Blob, app ghi file rồi chia sẻ) */
     downloadDocument: async (token: string, target: DocumentTarget, format: DocumentFormat): Promise<{ data: ArrayBuffer; filename: string; mime: string }> => {
       let response: Response;

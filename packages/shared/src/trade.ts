@@ -91,6 +91,48 @@ export interface Purchase extends TradeRow {
   number: number;
   lines: PurchaseLine[];
   customer_address: string | null;
+  /** Bản thứ mấy (mỗi lần sửa nội dung / ghi thêm tiền trả là 1 bản mới) */
+  version: number;
+  /** Chỉ có khi xem 1 phiếu của mình: mã chia sẻ, ai đang xem, tài khoản trùng SĐT khách (chưa gửi), lịch sử */
+  share_code?: string | null;
+  /** Bản lúc chia sẻ lần đầu; null = chưa chia sẻ */
+  shared_version?: number | null;
+  history?: PurchaseHistoryItem[];
+  shared_with?: { name: string; phone: string | null; via: 'code' | 'phone' }[];
+  account_match?: { name: string; phone: string } | null;
+}
+
+/** 1 bản trong lịch sử phiếu: thời gian lưu, tổng tiền, đã trả, đổi gì so với bản trước */
+export interface PurchaseHistoryItem {
+  version: number;
+  at: string | null;
+  amount: number;
+  paid: number;
+  changes: string[];
+}
+
+/** Phiếu người khác (điểm thu mua, thương lái) gửi cho mình: chỉ xem, tải PDF / Word */
+export interface ReceivedPurchase {
+  id: string;
+  code: string;
+  date: string;
+  /** Nhìn từ phía mình: người lập phiếu mua vào thì mình là bán ra */
+  kind: TradeKind;
+  issuer: { name: string; phone: string | null };
+  customer_name: string;
+  lines: PurchaseLine[];
+  kg: number;
+  amount: number;
+  paid: number;
+  owing: number;
+  note: string | null;
+  updated_at: string | null;
+  version: number;
+  /** Bản lúc mình nhận và mọi lần sửa sau đó */
+  history: PurchaseHistoryItem[];
+  edited_after_share: boolean;
+  /** Người lập đã xóa phiếu (vẫn giữ để đối chiếu) */
+  deleted_at: string | null;
 }
 
 export interface TradeTotals {
@@ -177,4 +219,9 @@ export function monthStart(date: string): string {
 
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
+}
+
+/** Lời nhắn gửi khách kèm mã phiếu (dán vào Zalo) */
+export function purchaseShareText(p: Pick<Purchase, 'code' | 'kind' | 'amount' | 'date'>, shareCode: string, link?: string): string {
+  return `Phiếu ${p.kind === 'buy' ? 'mua hàng' : 'bán hàng'} ${p.code} ngày ${p.date.split('-').reverse().join('/')}, ${formatNumber(p.amount)} đ. Mở app Nhà Nông → Đơn → Nhập mã: ${shareCode}${link ? ` · ${link}` : ''}`;
 }

@@ -42,6 +42,7 @@ class Deal extends Model
         });
     }
 
+    /** Mã mới không trùng mã đơn nào và mã phiếu nào (2 loại mã nhập chung 1 ô "Nhập mã") */
     public static function newCode(): string
     {
         do {
@@ -49,7 +50,7 @@ class Deal extends Model
             for ($i = 0; $i < 6; $i++) {
                 $code .= self::CODE_ALPHABET[random_int(0, strlen(self::CODE_ALPHABET) - 1)];
             }
-        } while (self::query()->where('code', $code)->exists());
+        } while (self::query()->where('code', $code)->exists() || Purchase::query()->withTrashed()->where('share_code', $code)->exists());
 
         return $code;
     }

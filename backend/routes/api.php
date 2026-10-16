@@ -95,6 +95,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->name('purchases.show');
         Route::patch('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
         Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy');
+        Route::post('/purchases/{purchase}/share', [PurchaseController::class, 'share'])->name('purchases.share');
+        Route::delete('/purchases/{purchase}/share', [PurchaseController::class, 'unshare'])->name('purchases.unshare');
+        Route::post('/purchases/{purchase}/send', [PurchaseController::class, 'sendToAccount'])->name('purchases.send');
+        Route::post('/received-purchases', [PurchaseController::class, 'receive'])->middleware('throttle:deal-join')->name('received-purchases.receive');
+        Route::get('/received-purchases', [PurchaseController::class, 'received'])->name('received-purchases.index');
+        Route::get('/received-purchases/{purchase}', [PurchaseController::class, 'showReceived'])->name('received-purchases.show');
         Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
         Route::middleware('throttle:documents')->prefix('documents')->name('documents.')->group(function () {
             Route::get('/purchases/{purchase}', [TransactionController::class, 'purchaseDocument'])->name('purchase');

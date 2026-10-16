@@ -41,6 +41,24 @@ final class TransactionDocuments
             $summary[] = [$isBuy ? 'Còn nợ khách' : 'Khách còn nợ', self::vnd($purchase->owing()), true];
         }
 
+        $tables = [new DocumentTable(
+            columns: [['STT', 'center'], ['Hàng'], ['Cân (kg)', 'right'], ['Trừ bì (kg)', 'right'], ['Tịnh (kg)', 'right'], ['Đơn giá (đ/kg)', 'right'], ['Thành tiền (đ)', 'right']],
+            rows: $rows,
+            footer: ['', 'Cộng', self::kg(array_sum(array_column($purchase->lines, 'kg'))), self::kg(array_sum(array_column($purchase->lines, 'deduct_kg'))), self::kg($purchase->kg), '', self::money($purchase->amount)],
+        )];
+        // Đã sửa sau khi gửi khách: in kèm từng lần sửa (bản cũ → bản mới) để 2 bên đối chiếu
+        if ($purchase->shared_version !== null && $purchase->version > $purchase->shared_version) {
+            $tables[] = new DocumentTable(
+                heading: 'Lịch sử sửa phiếu sau khi gửi khách',
+                columns: [['Lần', 'center'], ['Thời gian', 'center'], ['Thay đổi']],
+                rows: array_map(fn (array $h): array => [
+                    $h['version'] === $purchase->shared_version ? 'Bản gửi khách' : 'Sửa lần '.($h['version'] - $purchase->shared_version),
+                    $h['at'] ? CarbonImmutable::parse($h['at'])->setTimezone(config('app.timezone'))->format('d/m/Y H:i') : '',
+                    $h['changes'] ? implode('; ', $h['changes']) : 'Tổng tiền '.self::vnd($h['amount']).', đã trả '.self::vnd($h['paid']),
+                ], $purchase->history($purchase->shared_version)),
+            );
+        }
+
         return new Document(
             title: $purchase->kind->title(),
             subtitle: 'Số: '.$purchase->code().' · Ngày '.self::date($purchase->date),
@@ -50,14 +68,14 @@ final class TransactionDocuments
                 $purchase->customer_phone ? ['Số điện thoại', $purchase->customer_phone] : null,
                 $purchase->customer?->address ? ['Địa chỉ', $purchase->customer->address] : null,
             ])),
-            tables: [new DocumentTable(
-                columns: [['STT', 'center'], ['Hàng'], ['Cân (kg)', 'right'], ['Trừ bì (kg)', 'right'], ['Tịnh (kg)', 'right'], ['Đơn giá (đ/kg)', 'right'], ['Thành tiền (đ)', 'right']],
-                rows: $rows,
-                footer: ['', 'Cộng', self::kg(array_sum(array_column($purchase->lines, 'kg'))), self::kg(array_sum(array_column($purchase->lines, 'deduct_kg'))), self::kg($purchase->kg), '', self::money($purchase->amount)],
-            )],
+            tables: $tables,
             summary: $summary,
             inWords: VietnameseNumber::money($purchase->amount),
-            notes: $purchase->note ? ['Ghi chú: '.$purchase->note] : [],
+            notes: array_values(array_filter([
+                $purchase->note ? 'Ghi chú: '.$purchase->note : null,
+                $purchase->version > 1 ? 'Phiếu đã sửa, đây là bản thứ '.$purchase->version.' (lưu lúc '.$purchase->updated_at?->format('d/m/Y H:i').').' : null,
+                $purchase->trashed() ? 'Người lập phiếu đã xóa phiếu này ngày '.$purchase->deleted_at->format('d/m/Y H:i').'.' : null,
+            ])),
             signatures: $isBuy ? ['Người bán', 'Người mua'] : ['Người mua', 'Người bán'],
             filename: Str::slug(($isBuy ? 'phieu mua ' : 'phieu ban ').$purchase->code()),
         );

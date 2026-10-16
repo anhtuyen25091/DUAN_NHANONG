@@ -1,18 +1,21 @@
 import {
   ApiError,
   formatDate,
+  formatDateTime,
   formatKg,
   formatVnd,
   itemsText,
   kgInputText,
   monthStart,
   parseKgText,
+  purchaseShareText,
   purchaseTotals,
   telHref,
   today,
   TRADE_KIND_LABELS,
   type Category,
   type Purchase,
+  type PurchaseHistoryItem,
   type PurchaseLineInput,
   type TradeCustomer,
   type TradeKind,
@@ -31,7 +34,8 @@ import { MoneyField, QtyField } from '../ledger/fields'
 
 /**
  * #/giao-dich/...: sổ giao dịch của điểm thu mua / thương lái (tải riêng).
- * #/giao-dich?tab=so|khach|bao-cao, #/giao-dich/moi?loai=buy|sell&khach=, #/giao-dich/phieu/:uuid(/sua), #/giao-dich/khach/:uuid
+ * #/giao-dich?tab=so|khach|bao-cao, #/giao-dich/moi?loai=buy|sell&khach=, #/giao-dich/phieu/:uuid(/sua), #/giao-dich/khach/:uuid,
+ * #/giao-dich/nhan/:uuid (phiếu người khác gửi cho mình, chỉ xem)
  */
 export default function TradeRoutes({ path, query }: { path: string[]; query: URLSearchParams }) {
   const auth = useAuth()
@@ -54,6 +58,7 @@ export default function TradeRoutes({ path, query }: { path: string[]; query: UR
   if (page === 'phieu' && id && action === 'sua') return <PurchaseEdit token={auth.token} id={id} />
   if (page === 'phieu' && id) return <PurchaseView key={id} token={auth.token} id={id} />
   if (page === 'khach' && id) return <CustomerView key={id} token={auth.token} id={id} />
+  if (page === 'nhan' && id) return <ReceivedView key={id} token={auth.token} id={id} />
   return <TradeHome token={auth.token} query={query} />
 }
 
@@ -427,6 +432,9 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
         ‹ {purchase ? `Phiếu ${purchase.code}` : 'Sổ giao dịch'}
       </a>
       <h1>{purchase ? `Sửa phiếu ${purchase.code}` : kind === 'buy' ? '🛒 Phiếu mua hàng' : '📦 Phiếu bán hàng'}</h1>
+      {purchase?.shared_version != null && (
+        <div className="notice upgrade">Phiếu đã gửi cho khách. Lần sửa này được lưu thành bản mới, khách thấy cả bản cũ và bản mới (đổi gì, lúc nào).</div>
+      )}
       <form className="form card" onSubmit={submit}>
         {!purchase && (
           <div className="segmented">
@@ -628,6 +636,8 @@ function PurchaseView({ token, id }: { token: string; id: string }) {
       <section className="card">
         <PrintButtons token={token} target={{ type: 'purchase', id: p.id }} label="In phiếu / gửi khách (có chỗ ký 2 bên, số tiền bằng chữ)" />
       </section>
+      <ShareCard token={token} purchase={p} onChange={setPurchase} />
+      {p.history && p.history.length > 1 && <HistoryCard history={p.history} sharedVersion={p.shared_version ?? null} />}
       <div className="btn-row">
         <a className="button" href={href(`giao-dich/phieu/${p.id}/sua`)}>
           Sửa phiếu
@@ -645,6 +655,180 @@ function PurchaseView({ token, id }: { token: string; id: string }) {
           Xóa phiếu
         </button>
       </div>
+    </div>
+  )
+}
+
+/** Chia sẻ phiếu cho khách xem: mã 6 ký tự (gửi Zalo), hoặc gửi thẳng khi SĐT khách trùng tài khoản */
+function ShareCard({ token, purchase: p, onChange }: { token: string; purchase: Purchase; onChange: (p: Purchase) => void }) {
+  const [busy, setBusy] = useState(false)
+  const act = async (action: () => Promise<Purchase>, message?: string) => {
+    setBusy(true)
+    try {
+      onChange(await action())
+      if (message) showToast({ message })
+    } catch (err) {
+      showToast({ message: (err as Error).message })
+    } finally {
+      setBusy(false)
+    }
+  }
+  const link = p.share_code ? `${window.location.origin}${window.location.pathname}#/don/tham-gia?ma=${p.share_code}` : ''
+  const sendCode = async () => {
+    const text = purchaseShareText(p, p.share_code!, link)
+    try {
+      if (navigator.share) await navigator.share({ title: `Phiếu ${p.code}`, text })
+      else {
+        await navigator.clipboard.writeText(text)
+        showToast({ message: 'Đã chép lời nhắn kèm mã, dán vào Zalo để gửi khách.' })
+      }
+    } catch {
+      // Người dùng hủy chia sẻ
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2>🔗 Chia sẻ phiếu với khách</h2>
+      <p className="small muted">Khách có app Nhà Nông xem được phiếu và tải PDF / Word (không sửa được). Sửa phiếu sau khi gửi: khách thấy cả bản cũ và bản mới.</p>
+      {p.account_match && (
+        <div className="notice upgrade">
+          <p>
+            Số {p.account_match.phone} là tài khoản Nhà Nông của <b>{p.account_match.name}</b>.
+          </p>
+          <button type="button" className="primary" disabled={busy} onClick={() => act(async () => (await api.sendPurchase(token, p.id)).data, `Đã gửi phiếu vào app của ${p.account_match!.name}`)}>
+            📲 Gửi vào app của khách
+          </button>
+        </div>
+      )}
+      {p.share_code ? (
+        <>
+          <p className="code">{p.share_code}</p>
+          <div className="btn-row">
+            <button type="button" className="primary" onClick={sendCode}>
+              📤 Gửi mã cho khách (Zalo, tin nhắn…)
+            </button>
+            <button type="button" className="danger-outline" disabled={busy} onClick={() => window.confirm('Thu hồi mã? Người khác không nhập mã này được nữa; khách đã nhận vẫn giữ phiếu.') && act(() => api.unsharePurchase(token, p.id), 'Đã thu hồi mã')}>
+              Thu hồi mã
+            </button>
+          </div>
+        </>
+      ) : (
+        <button type="button" disabled={busy} onClick={() => act(() => api.sharePurchase(token, p.id))}>
+          🔑 Tạo mã gửi khách
+        </button>
+      )}
+      {(p.shared_with ?? []).length > 0 && (
+        <p className="small">
+          Đang xem phiếu: {(p.shared_with ?? []).map((v) => `${v.name}${v.via === 'phone' ? ' (gửi vào app)' : ' (nhập mã)'}`).join(', ')}
+        </p>
+      )}
+    </section>
+  )
+}
+
+/** Lịch sử phiếu: mỗi lần lưu là 1 bản (thời gian, đổi gì) */
+function HistoryCard({ history, sharedVersion }: { history: PurchaseHistoryItem[]; sharedVersion: number | null }) {
+  return (
+    <section className="card">
+      <h2>🕘 Lịch sử sửa phiếu</h2>
+      <ol className="purchase-history">
+        {history.map((h) => (
+          <li key={h.version}>
+            <b>{h.version === history[0].version ? (sharedVersion === h.version ? 'Bản gửi khách' : 'Bản đầu') : `Sửa lần ${h.version - history[0].version}`}</b>
+            {h.version === sharedVersion && h.version !== history[0].version && <span className="tag">Bản gửi khách</span>}
+            <span className="small muted"> · {h.at ? formatDateTime(h.at) : ''}</span>
+            {h.changes.length > 0 ? (
+              <ul>
+                {h.changes.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="small muted">
+                Tổng tiền {formatVnd(h.amount)}, đã trả {formatVnd(h.paid)}
+              </p>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+/** Phiếu người khác gửi cho mình: chỉ xem, tải PDF / Word, thấy lịch sử sửa sau khi gửi */
+function ReceivedView({ token, id }: { token: string; id: string }) {
+  const [state, retry] = useAsync(() => api.receivedPurchase(token, id), [token, id])
+  if (state.status !== 'ok') return <Status state={state} retry={retry} />
+  const p = state.data
+  return (
+    <div className="ledger">
+      <a className="back" href={href('don')}>
+        ‹ Đơn mua bán
+      </a>
+      <h1>📄 Phiếu {p.code}</h1>
+      <p className="muted">
+        {formatDate(p.date)} · {p.issuer.name} lập · mình {p.kind === 'sell' ? 'bán cho' : 'mua của'} {p.issuer.name}
+        {p.issuer.phone && (
+          <>
+            {' '}
+            · <a href={telHref(p.issuer.phone)}>{p.issuer.phone}</a>
+          </>
+        )}
+      </p>
+      {p.deleted_at && <div className="notice error">Người lập phiếu đã xóa phiếu này lúc {formatDateTime(p.deleted_at)}. Phiếu vẫn được giữ ở đây để bạn đối chiếu.</div>}
+      {!p.deleted_at && p.edited_after_share && <div className="notice upgrade">Phiếu đã được sửa sau khi gửi cho bạn. Xem các lần sửa ở dưới.</div>}
+      <section className="card">
+        <table className="trade-table">
+          <thead>
+            <tr>
+              <th>Hàng</th>
+              <th className="num">Cân</th>
+              <th className="num">Trừ bì</th>
+              <th className="num">Tịnh</th>
+              <th className="num">Đơn giá</th>
+              <th className="num">Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            {p.lines.map((l, i) => (
+              <tr key={i}>
+                <td>{l.name}</td>
+                <td className="num">{formatKg(l.kg)}</td>
+                <td className="num">{formatKg(l.deduct_kg)}</td>
+                <td className="num">{formatKg(l.net_kg)}</td>
+                <td className="num">{formatVnd(l.price)}</td>
+                <td className="num">{formatVnd(l.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <dl className="deal-totals">
+          <div>
+            <dt>Tổng tiền hàng ({formatKg(p.kg)} kg tịnh)</dt>
+            <dd>
+              <b>{formatVnd(p.amount)}</b>
+            </dd>
+          </div>
+          <div>
+            <dt>Đã trả</dt>
+            <dd>{formatVnd(p.paid)}</dd>
+          </div>
+          {p.owing > 0 && (
+            <div>
+              <dt>{p.kind === 'sell' ? 'Bên mua còn nợ mình' : 'Mình còn nợ'}</dt>
+              <dd className="out">
+                <b>{formatVnd(p.owing)}</b>
+              </dd>
+            </div>
+          )}
+        </dl>
+        {p.note && <p className="small muted">Ghi chú: {p.note}</p>}
+      </section>
+      <section className="card">
+        <PrintButtons token={token} target={{ type: 'purchase', id: p.id }} label="Tải phiếu (có lịch sử sửa nếu phiếu đã sửa sau khi gửi)" />
+      </section>
+      {p.history.length > 1 && <HistoryCard history={p.history} sharedVersion={p.history[0].version} />}
     </div>
   )
 }

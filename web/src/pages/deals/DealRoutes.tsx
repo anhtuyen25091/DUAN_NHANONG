@@ -1,4 +1,4 @@
-import { ApiError, formatVnd, today, type DealRole } from '@nhanong/shared'
+import { ApiError, formatDate, formatVnd, today, type DealRole } from '@nhanong/shared'
 import { useState, type FormEvent } from 'react'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
@@ -54,13 +54,14 @@ function DealList({ token }: { token: string }) {
           ＋ Tạo đơn
         </a>
         <a className="button" href={href('don/tham-gia')}>
-          🔑 Nhập mã tham gia
+          🔑 Nhập mã đơn / phiếu
         </a>
         <a className="button" href={href('giao-dich')}>
           📒 Sổ giao dịch, in phiếu
         </a>
       </div>
       {waiting > 0 && <div className="notice upgrade">🔔 Có {waiting} mục bên kia vừa ghi, chờ bạn xác nhận.</div>}
+      <ReceivedPurchases token={token} />
       <BrowserNotifyPrompt />
 
       <nav className="segmented" aria-label="Lọc đơn">
@@ -91,6 +92,33 @@ function DealList({ token }: { token: string }) {
         ))}
       </div>
     </div>
+  )
+}
+
+/** Phiếu mua / bán điểm thu mua gửi cho mình (chỉ xem) */
+function ReceivedPurchases({ token }: { token: string }) {
+  const [state] = useAsync(() => api.receivedPurchases(token), [token])
+  if (state.status !== 'ok' || state.data.length === 0) return null
+  return (
+    <section>
+      <h2 className="section">📄 Phiếu được gửi cho bạn</h2>
+      <div className="garden-list">
+        {state.data.map((p) => (
+          <a key={p.id} className="card garden-row" href={href(`giao-dich/nhan/${p.id}`)}>
+            <span className="garden-name">
+              {p.issuer.name}
+              <span className="small muted">
+                {' '}
+                · {p.code} · {formatDate(p.date, true)} · mình {p.kind === 'sell' ? 'bán' : 'mua'}
+              </span>
+              {p.deleted_at && <span className="tag overdue">Người lập đã xóa</span>}
+              {!p.deleted_at && p.edited_after_share && <span className="tag overdue">Đã sửa sau khi gửi</span>}
+            </span>
+            <span className="profit">{formatVnd(p.amount)}</span>
+          </a>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -187,6 +215,17 @@ function DealJoin({ token, initialCode }: { token: string; initialCode: string }
       const deal = await api.joinDeal(token, code)
       go(`don/${deal.uuid}`)
     } catch (err) {
+      // Không phải mã đơn: thử mã phiếu (điểm thu mua gửi phiếu cho khách xem)
+      if (err instanceof ApiError && err.errors.code?.[0]?.startsWith('Không tìm thấy')) {
+        try {
+          const received = await api.receivePurchase(token, code)
+          go(`giao-dich/nhan/${received.id}`)
+          return
+        } catch {
+          setError('Không tìm thấy đơn hoặc phiếu với mã này. Kiểm tra lại mã.')
+          return
+        }
+      }
       setError(err instanceof ApiError && err.errors.code ? err.errors.code[0] : (err as Error).message)
     } finally {
       setSending(false)
@@ -198,15 +237,17 @@ function DealJoin({ token, initialCode }: { token: string; initialCode: string }
       <a className="back" href={href('don')}>
         ‹ Đơn mua bán
       </a>
-      <h1>🔑 Tham gia đơn</h1>
-      <p className="small muted">Nhập mã 6 ký tự bên kia gửi (ví dụ NN7K3P). Tham gia xong, 2 bên cùng xem và xác nhận các đợt cân, tiền cọc, tiền trả.</p>
+      <h1>🔑 Nhập mã đơn / phiếu</h1>
+      <p className="small muted">
+        Nhập mã 6 ký tự bên kia gửi (ví dụ NN7K3P). Mã đơn: 2 bên cùng xem và xác nhận các đợt cân, tiền cọc, tiền trả. Mã phiếu: xem và tải phiếu mua / bán điểm thu mua gửi cho bạn.
+      </p>
       <label>
-        Mã đơn
+        Mã
         <input className="code-input" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={12} autoCapitalize="characters" autoComplete="off" required placeholder="NN7K3P" />
       </label>
       {error && <div className="notice error">{error}</div>}
       <button type="submit" className="wide primary" disabled={code.replace(/[^A-Za-z0-9]/g, '').length < 6 || sending}>
-        {sending ? 'Đang tham gia…' : 'Tham gia'}
+        {sending ? 'Đang mở…' : 'Mở'}
       </button>
     </form>
   )

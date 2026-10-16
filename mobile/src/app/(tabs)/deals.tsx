@@ -1,8 +1,9 @@
-import { formatVnd, type Deal } from '@nhanong/shared';
+import { formatDate, formatVnd, type Deal } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { DealsSignIn, Notice, Tag } from '../../components/deals';
+import { RowCard } from '../../components/ledger';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -47,13 +48,14 @@ function DealList({ token }: { token: string }) {
               <Button label="＋ Tạo đơn" onPress={() => router.push('/deals/new')} />
             </View>
             <View style={{ flex: 1 }}>
-              <Button label="🔑 Nhập mã" variant="outline" onPress={() => router.push('/deals/join')} />
+              <Button label="🔑 Nhập mã đơn / phiếu" variant="outline" onPress={() => router.push('/deals/join')} />
             </View>
           </View>
           <View style={{ marginBottom: 12 }}>
             <Button label="📒 Sổ giao dịch, gửi phiếu PDF / Word" variant="outline" onPress={() => router.push('/trade')} />
           </View>
           {waiting > 0 && <Notice text={`🔔 Có ${waiting} mục bên kia vừa ghi, chờ bạn xác nhận.`} />}
+          <ReceivedPurchases token={token} />
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
             <Chip label="Đang mở" active={tab === 'open'} onPress={() => setTab('open')} />
             <Chip label="Đã xong / hủy" active={tab === 'closed'} onPress={() => setTab('closed')} />
@@ -64,6 +66,33 @@ function DealList({ token }: { token: string }) {
       }
       renderItem={({ item }) => <DealRow deal={item} />}
     />
+  );
+}
+
+/** Phiếu mua / bán điểm thu mua gửi cho mình (chỉ xem) */
+function ReceivedPurchases({ token }: { token: string }) {
+  const received = useAsync(() => api.receivedPurchases(token), [token]);
+  const { refetch } = received;
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch]),
+  );
+  if (received.state.status !== 'ok' || received.state.data.length === 0) return null;
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text, marginBottom: 6 }}>📄 Phiếu được gửi cho bạn</Text>
+      {received.state.data.map((p) => (
+        <RowCard
+          key={p.id}
+          title={p.issuer.name}
+          sub={`${p.code} · ${formatDate(p.date, true)} · mình ${p.kind === 'sell' ? 'bán' : 'mua'}`}
+          right={formatVnd(p.amount)}
+          tag={p.deleted_at ? 'Người lập đã xóa' : p.edited_after_share ? 'Đã sửa sau khi gửi' : null}
+          onPress={() => router.push({ pathname: '/trade/received/[id]', params: { id: p.id } })}
+        />
+      ))}
+    </View>
   );
 }
 

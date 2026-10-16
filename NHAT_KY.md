@@ -11,6 +11,69 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026: Chia sẻ phiếu mua / bán với khách + lịch sử sửa phiếu ✅
+
+**Câu hỏi:** SĐT khách trên phiếu trùng tài khoản đã đăng ký thì khách có thấy phiếu không?
+- Trước đây: **không**. Phiếu chỉ người lập xem được; SĐT chỉ để in lên phiếu.
+
+**Bạn đã chọn:**
+- Khách **chỉ xem và tải phiếu** (PDF / Word), không xác nhận, không sửa.
+- SĐT trùng tài khoản thì **hỏi trước rồi gửi**: trang phiếu hiện tên tài khoản và nút "Gửi vào app của khách", người lập bấm mới gửi.
+- Lưu ý thêm của bạn: **khách phải nhận đúng phiếu như lúc được chia sẻ**. Người lập sửa phiếu thì vẫn giữ đủ thông tin cũ và mới, để không "tạo rồi sửa lại" làm sai lệch cho người nhận.
+
+### Đã làm
+- **Chia sẻ** (migration `2026_10_16_104346_add_sharing_to_purchases`):
+  - `purchases.share_code`: mã 6 ký tự, không trùng mã đơn mua bán, nên nhập chung 1 ô "🔑 Nhập mã đơn / phiếu". Mã đơn thì tham gia đơn, mã phiếu thì nhận phiếu.
+  - `purchase_viewers`: ai được xem phiếu, nhận bằng mã hay được gửi vào app (`via`).
+  - SĐT khách có dấu cách hay +84 vẫn nhận ra tài khoản (`User::normalizePhone`).
+  - API:
+    - `POST/DELETE /purchases/{id}/share`: tạo / thu hồi mã
+    - `POST /purchases/{id}/send`: gửi vào app khách
+    - `POST /received-purchases {code}`: khách nhập mã
+    - `GET /received-purchases(/{id})`: khách xem
+  - Khách được chia sẻ tải được PDF / Word của phiếu.
+- **Lịch sử phiên bản** (migration `2026_10_16_104553_create_purchase_versions_table`):
+  - Mỗi lần lưu có đổi nội dung (khách, ngày, dòng hàng, đã trả, ghi chú) là 1 bản mới trong `purchase_versions`, bản cũ không sửa. Lưu lại y nguyên thì không sinh bản mới.
+  - `purchases.shared_version`: bản lúc chia sẻ lần đầu. Khách thấy từ bản đó trở đi (các lần sửa nháp trước khi gửi khách không cần thấy).
+  - `PurchaseVersion::changes` ghi đổi gì cho dễ đọc, ví dụ:
+    - "Sầu riêng Ri6 loại A: cân 1.500 kg → 1.520 kg"
+    - "Tổng tiền: 53.460.000 đ → 54.180.000 đ"
+    - "Đã trả: 20.000.000 đ → 54.000.000 đ"
+  - **Không xóa dấu vết:**
+    - Người lập xóa phiếu: khách vẫn thấy phiếu, có ghi "Người lập đã xóa lúc …", vẫn tải được.
+    - "Thu hồi mã" chỉ chặn người mới nhập mã; khách đã nhận vẫn giữ phiếu.
+  - Phiếu PDF / Word in thêm bảng **"Lịch sử sửa phiếu sau khi gửi khách"** (bản gửi khách, sửa lần 1, 2…). Ghi chú cuối phiếu có "đây là bản thứ N", và "người lập đã xóa" nếu có.
+- **Web + app:**
+  - Trang phiếu của người lập có thêm:
+    - mục "🔗 Chia sẻ phiếu với khách": gửi vào app khách khi SĐT trùng; tạo mã; gửi mã qua Zalo; thu hồi mã; danh sách ai đang xem
+    - mục "🕘 Lịch sử sửa phiếu"
+  - Form sửa phiếu đã gửi báo trước: "lần sửa này được lưu thành bản mới, khách thấy cả bản cũ và bản mới".
+  - Trang Đơn có mục **"📄 Phiếu được gửi cho bạn"**, nhãn "Đã sửa sau khi gửi" / "Người lập đã xóa".
+  - Trang xem phiếu được gửi (web `#/giao-dich/nhan/:id`, app `/trade/received/[id]`):
+    - ghi đúng chiều phía khách ("mình bán cho Lái Tư")
+    - dòng hàng, đã trả, còn nợ
+    - tải / gửi PDF / Word
+    - lịch sử sửa
+  - Bảng hàng trên web điện thoại: chữ nhỏ hơn cho đủ 6 cột.
+
+### Kiểm tra
+- Backend: thêm 3 test (chia sẻ bằng mã, gửi vào app khi SĐT trùng, lịch sử sửa / xóa sau khi chia sẻ); 146 test pass, Pint sạch.
+- Shared 99 test pass. Typecheck web + app sạch, lint web sạch. App bundle 1735 module.
+- Bấm thử trên Chrome với 3 tài khoản:
+  1. Lái Tư lập phiếu cho Chú Ba (SĐT `0900 000 001`): hiện "tài khoản Nhà Nông của Chú Ba", gửi vào app, tạo mã.
+  2. Lái Tư sửa số kg rồi ghi thêm tiền trả: lịch sử ghi đúng 2 lần sửa.
+  3. Chú Ba: thấy phiếu trong trang Đơn kèm nhãn "Đã sửa sau khi gửi"; mở ra thấy bản gửi và 2 lần sửa, ghi "mình bán cho Lái Tư".
+  4. Chi nhánh nhập mã phiếu ở ô "Nhập mã đơn / phiếu": mở đúng phiếu.
+  5. Lái Tư xóa phiếu: Chú Ba vẫn xem được, có ghi đã xóa; PDF có bảng lịch sử sửa.
+- Bản web của app: tab Đơn có phiếu được gửi, trang phiếu được gửi, mục chia sẻ trên trang phiếu.
+
+### Còn tồn
+- Chưa thử trên điện thoại thật.
+- Khách chưa nhận thông báo khi phiếu được gửi hoặc bị sửa; phải mở trang Đơn mới thấy. Có thể nối vào bộ theo dõi đơn (8 giây / lần) sau.
+- Dữ liệu thử: phiếu PM-000007, PM-000008 của Lái Tư gửi Chú Ba ("Thử chia sẻ (Claude)", đã xóa), chi nhánh `0900000003` đã nhận PM-000008.
+
+---
+
 ## 16/10/2026: Sổ giao dịch cho điểm thu mua / thương lái, in phiếu PDF / Word ✅
 
 **Yêu cầu:** điểm thu mua hoặc cá nhân chuyên thu mua cần quản lý tất cả giao dịch, và in giao dịch ra PDF hoặc Word để gửi khách.

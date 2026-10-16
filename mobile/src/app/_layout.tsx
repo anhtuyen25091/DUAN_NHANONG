@@ -73,13 +73,14 @@ export default function RootLayout() {
         <Stack.Screen name="ledger/workers/[id]" options={{ title: 'Người làm' }} />
         <Stack.Screen name="ledger/workers/work-day" options={{ title: '✅ Chấm công' }} />
         <Stack.Screen name="deals/new" options={{ title: 'Tạo đơn mua bán' }} />
-        <Stack.Screen name="deals/join" options={{ title: '🔑 Tham gia đơn' }} />
+        <Stack.Screen name="deals/join" options={{ title: '🔑 Nhập mã đơn / phiếu' }} />
         <Stack.Screen name="deals/[id]" options={{ title: 'Đơn mua bán' }} />
         <Stack.Screen name="deals/entry" options={{ title: 'Ghi mục' }} />
         <Stack.Screen name="trade/index" options={{ title: '📒 Sổ giao dịch' }} />
         <Stack.Screen name="trade/form" options={{ title: 'Phiếu mua / bán' }} />
         <Stack.Screen name="trade/[id]" options={{ title: 'Phiếu' }} />
         <Stack.Screen name="trade/customer/[id]" options={{ title: 'Khách hàng' }} />
+        <Stack.Screen name="trade/received/[id]" options={{ title: '📄 Phiếu được gửi' }} />
       </Stack>
       <ToastHost />
       <DealNotices />
