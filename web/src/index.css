@@ -1960,3 +1960,14 @@ button.linklike.danger {
     padding: 5px 3px;
   }
 }
+
+/* Hỏi khi đăng nhập tài khoản khác trên máy đang có sổ */
+.switch-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+.switch-choices p {
+  margin: 0 0 8px;
+}

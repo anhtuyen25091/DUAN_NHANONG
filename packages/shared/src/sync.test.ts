@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError, type SyncPullResult, type SyncPushRecord } from './api';
 import { Ledger, type LedgerMeta, type LedgerStorage } from './ledger';
-import { SyncEngine } from './sync';
+import { previousAccount, SyncEngine } from './sync';
 import type { SyncRecord } from './types';
 
 function memoryStorage(): LedgerStorage {
@@ -210,5 +210,47 @@ describe('SyncEngine', () => {
     expect(a.sync.hasPending()).toBe(false);
     expect([...server.rows.values()].some((r) => r.data.amount === 5000)).toBe(true);
     a.sync.stop();
+  });
+
+  it('mất mạng: tự thử lại, có mạng lại là tự gửi (không cần bấm)', async () => {
+    const server = fakeServer();
+    const ledger = await Ledger.open(memoryStorage());
+    const sync = new SyncEngine(ledger, server.api, { debounceMs: 0, retryMs: [5, 5] });
+    await sync.enable('tok', user);
+    server.setOnline(false);
+    const cat = ledger.getSnapshot().categories[0];
+    await ledger.addEntry({ type: 'income', amount: 7_000, category_id: cat.id, garden_id: null });
+    await sync.syncNow();
+    expect(sync.getStatus()).toBe('offline');
+
+    server.setOnline(true);
+    await new Promise((r) => setTimeout(r, 40));
+    expect(sync.getStatus()).toBe('saved');
+    expect(sync.hasPending()).toBe(false);
+    sync.stop();
+  });
+
+  it('đăng nhập tài khoản khác trên máy đang có sổ: hỏi lại; bỏ sổ trên máy thì chỉ còn sổ của tài khoản mới', async () => {
+    const server = fakeServer();
+    const a = await device(server);
+    await a.sync.enable('tok', user);
+    const cat = a.ledger.getSnapshot().categories[0];
+    await a.ledger.addEntry({ type: 'income', amount: 1_000, category_id: cat.id, garden_id: null });
+    await a.sync.disable(false);
+
+    const other = { id: 2, name: 'Chị Tư', phone: '0987654321' };
+    // Đã tắt lưu trên mạng vẫn nhớ sổ này của ai
+    expect(previousAccount(a.ledger.getSnapshot(), other)).toBe(user.phone);
+    expect(previousAccount(a.ledger.getSnapshot(), user)).toBeNull();
+
+    // Sổ trống thì không cần hỏi
+    const b = await device(server);
+    expect(previousAccount(b.ledger.getSnapshot(), other)).toBeNull();
+
+    server.rows.clear();
+    await a.sync.enable('tok', other, { discardLocal: true });
+    expect(a.ledger.getSnapshot().transactions).toHaveLength(0);
+    expect(a.ledger.getSnapshot().meta.linked_phone).toBe(other.phone);
+    expect(a.ledger.getSnapshot().categories.length).toBeGreaterThan(0);
   });
 });

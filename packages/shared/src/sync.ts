@@ -4,7 +4,7 @@
  * Dùng chung cho web và mobile; mỗi nơi chỉ cần gọi syncNow() khi mở app / có mạng lại.
  */
 import { ApiError, type AccountUser, type Api, type SyncPushRecord } from './api';
-import { LEDGER_TABLES, type Ledger, type LedgerRecords } from './ledger';
+import { LEDGER_TABLES, type Ledger, type LedgerRecords, type LedgerSnapshot } from './ledger';
 
 /**
  * Trạng thái hiển thị bằng 1 biểu tượng:
@@ -26,6 +26,21 @@ type SyncApi = Pick<Api, 'syncPush' | 'syncPull' | 'deleteServerLedger' | 'logou
 
 const PUSH_CHUNK = 500;
 
+/** Mất mạng thì tự thử lại sau 5 giây, 15 giây, 30 giây, rồi mỗi phút (cho tới khi gửi được) */
+const RETRY_MS = [5_000, 15_000, 30_000, 60_000];
+
+/**
+ * Máy đang có sổ của tài khoản khác (hoặc sổ chưa gửi lên đâu nhưng đã có dữ liệu thì không hỏi):
+ * trả số điện thoại / tên tài khoản cũ để hỏi người dùng gộp vào tài khoản mới hay bỏ sổ trên máy.
+ */
+export function previousAccount(snapshot: LedgerSnapshot, user: AccountUser): string | null {
+  const meta = snapshot.meta;
+  const previous = meta.account?.phone ?? meta.linked_phone ?? null;
+  if (!previous || previous === (user.phone ?? user.name)) return null;
+  const hasData = snapshot.transactions.length > 0 || snapshot.gardens.length > 0;
+  return hasData ? previous : null;
+}
+
 export class SyncEngine {
   private status: SyncStatus = 'off';
   private listeners = new Set<() => void>();
@@ -36,11 +51,15 @@ export class SyncEngine {
   private ledger: Ledger;
   private api: SyncApi;
   private debounceMs: number;
+  private retryMs: number[];
+  private retryTimer: ReturnType<typeof setTimeout> | undefined;
+  private failures = 0;
 
-  constructor(ledger: Ledger, api: SyncApi, options: { debounceMs?: number } = {}) {
+  constructor(ledger: Ledger, api: SyncApi, options: { debounceMs?: number; retryMs?: number[] } = {}) {
     this.ledger = ledger;
     this.api = api;
     this.debounceMs = options.debounceMs ?? 1500;
+    this.retryMs = options.retryMs ?? RETRY_MS;
     this.status = this.enabled ? 'saved' : 'off';
   }
 
@@ -85,6 +104,7 @@ export class SyncEngine {
     this.unsubscribe?.();
     this.unsubscribe = null;
     clearTimeout(this.timer);
+    clearTimeout(this.retryTimer);
   }
 
   private schedule() {
@@ -121,11 +141,24 @@ export class SyncEngine {
       await this.ledger.setMeta({ last_synced_at: this.ledger.clock() });
       // Không tự chạy lại dựa vào hasPending(): mục nhận từ máy có đồng hồ chạy nhanh trông như "chưa gửi"
       // và sẽ lặp mãi. Thay đổi mới trên máy đã có subscribe/again lo.
+      this.failures = 0;
+      clearTimeout(this.retryTimer);
       this.setStatus('saved');
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) this.setStatus('expired');
-      else this.setStatus('offline');
+      else {
+        this.setStatus('offline');
+        this.retryLater();
+      }
     }
+  }
+
+  /** Không gửi được (mất mạng / server lỗi): tự thử lại, giãn dần; có mạng lại là sổ tự lên, không cần bấm gì */
+  private retryLater() {
+    clearTimeout(this.retryTimer);
+    const delay = this.retryMs[Math.min(this.failures, this.retryMs.length - 1)];
+    this.failures++;
+    this.retryTimer = setTimeout(() => void this.syncNow(), delay);
   }
 
   private async push(token: string) {
@@ -155,10 +188,18 @@ export class SyncEngine {
    * Bật "lưu cả trên mạng" sau khi đăng nhập/đăng ký: gửi toàn bộ sổ trên máy rồi lấy dữ liệu đã có trên mạng về.
    * Máy đã có sổ + tài khoản đã có sổ (đổi máy): 2 bên được gộp, không mất bên nào.
    */
-  async enable(token: string, user: AccountUser): Promise<void> {
+  async enable(token: string, user: AccountUser, options: { discardLocal?: boolean } = {}): Promise<void> {
+    // Bỏ sổ đang có trên máy (của tài khoản khác), chỉ lấy sổ của tài khoản mới về
+    if (options.discardLocal) {
+      const advanced = this.ledger.getSnapshot().meta.advanced;
+      await this.ledger.reset();
+      if (advanced) await this.ledger.setMeta({ advanced });
+    }
+    this.failures = 0;
     await this.ledger.setMeta({
       storage_mode: 'sync',
       account: { token, name: user.name, phone: user.phone },
+      linked_phone: user.phone ?? user.name,
       last_pushed_at: undefined,
       sync_version: 0,
     });
@@ -176,6 +217,7 @@ export class SyncEngine {
     if (token && !options.keepToken) await this.api.logout(token).catch(() => {});
     await this.ledger.setMeta({ storage_mode: 'local', account: undefined, sync_version: undefined, last_pushed_at: undefined, last_synced_at: undefined });
     clearTimeout(this.timer);
+    clearTimeout(this.retryTimer);
     this.setStatus('off');
   }
 }

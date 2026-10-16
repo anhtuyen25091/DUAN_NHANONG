@@ -1,4 +1,4 @@
-import { CLOUD_PRIVACY_NOTE, ApiError, type LedgerSnapshot } from '@nhanong/shared'
+import { CLOUD_PRIVACY_NOTE, ApiError, previousAccount, type AccountUser, type LedgerSnapshot } from '@nhanong/shared'
 import { useState, type FormEvent } from 'react'
 import { api } from '../../api'
 import { setAuth, useAuth } from '../../auth'
@@ -19,6 +19,8 @@ export function SignIn({ data }: { data: LedgerSnapshot }) {
   const [errors, setErrors] = useState<Record<string, string[]>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  // Đăng nhập tài khoản khác trên máy đang có sổ của tài khoản trước: hỏi gộp hay bỏ sổ trên máy
+  const [conflict, setConflict] = useState<{ token: string; user: AccountUser; previous: string; fresh: boolean } | null>(null)
 
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value })
   const hasData = data.transactions.length > 0 || data.gardens.length > 0
@@ -31,17 +33,75 @@ export function SignIn({ data }: { data: LedgerSnapshot }) {
     try {
       const input = { phone: form.phone.trim(), password: form.password, device_name: deviceName() }
       const { token, user } = tab === 'register' ? await api.register({ ...input, name: form.name.trim() }) : await api.login(input)
-      await getSync().enable(token, user)
-      // Dùng luôn tài khoản này để xem lịch sử giá dài hơn
-      setAuth({ token, user, shared: true })
-      showToast({ message: `Đã bật lưu cả trên mạng cho tài khoản ${user.phone ?? user.name}.` })
-      go('so')
+      const previous = previousAccount(data, user)
+      if (previous) setConflict({ token, user, previous, fresh: true })
+      else await finish(token, user)
     } catch (error) {
       if (error instanceof ApiError) setErrors(error.errors)
       setMessage((error as Error).message)
     } finally {
       setSending(false)
     }
+  }
+
+  const finish = async (token: string, user: AccountUser, discardLocal = false, fresh = true) => {
+    await getSync().enable(token, user, { discardLocal })
+    // Dùng luôn tài khoản này để xem lịch sử giá dài hơn
+    setAuth(fresh || !signedIn ? { token, user, shared: true } : { ...signedIn, shared: true })
+    showToast({ message: `Đã bật lưu cả trên mạng cho tài khoản ${user.phone ?? user.name}.` })
+    go('so')
+  }
+
+  const choose = async (discardLocal: boolean | null) => {
+    if (!conflict) return
+    setSending(true)
+    setMessage(null)
+    try {
+      if (discardLocal === null) {
+        // Thôi: không đổi gì, hủy phiên vừa đăng nhập (trừ khi đó là phiên đang dùng để xem giá)
+        if (conflict.fresh) await api.logout(conflict.token).catch(() => {})
+        setConflict(null)
+        return
+      }
+      await finish(conflict.token, conflict.user, discardLocal, conflict.fresh)
+    } catch (error) {
+      setMessage((error as Error).message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (conflict) {
+    const next = conflict.user.phone ?? conflict.user.name
+    return (
+      <div className="form ledger">
+        <h1>Máy này đang có sổ của tài khoản khác</h1>
+        <p>
+          Sổ trên máy đang gắn với tài khoản <b>{conflict.previous}</b>. Bạn vừa đăng nhập <b>{next}</b>. Bạn muốn làm gì với sổ đang có trên máy?
+        </p>
+        <div className="switch-choices">
+          <button type="button" className="wide primary" disabled={sending} onClick={() => choose(false)}>
+            Gộp sổ trên máy vào tài khoản {next}
+          </button>
+          <p className="muted small">Các khoản thu chi trên máy được gửi lên tài khoản {next}, cộng chung với sổ đã có của tài khoản đó.</p>
+          <button
+            type="button"
+            className="wide danger-outline"
+            disabled={sending}
+            onClick={() => {
+              if (confirm(`Xóa sổ đang có trên máy này và chỉ dùng sổ của tài khoản ${next}? Sổ của ${conflict.previous} đã lưu trên mạng vẫn còn, đăng nhập lại là có.`)) void choose(true)
+            }}
+          >
+            Bỏ sổ trên máy, chỉ dùng sổ của {next}
+          </button>
+          <p className="muted small">Hợp khi máy này dùng chung, hoặc sổ trên máy là của người khác.</p>
+          <button type="button" className="wide" disabled={sending} onClick={() => choose(null)}>
+            Thôi, không đổi gì
+          </button>
+        </div>
+        {message && <div className="notice error">{message}</div>}
+      </div>
+    )
   }
 
   const error = (key: string) => errors[key] && <span className="field-error">{errors[key][0]}</span>
@@ -69,10 +129,9 @@ export function SignIn({ data }: { data: LedgerSnapshot }) {
             type="button"
             className="primary"
             onClick={async () => {
-              await getSync().enable(signedIn.token, signedIn.user)
-              setAuth({ ...signedIn, shared: true })
-              showToast({ message: `Đã bật lưu cả trên mạng cho tài khoản ${signedIn.user.phone ?? signedIn.user.name}.` })
-              go('so')
+              const previous = previousAccount(data, signedIn.user)
+              if (previous) setConflict({ token: signedIn.token, user: signedIn.user, previous, fresh: false })
+              else await finish(signedIn.token, signedIn.user, false, false)
             }}
           >
             Dùng tài khoản này

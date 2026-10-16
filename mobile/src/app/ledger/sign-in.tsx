@@ -1,7 +1,7 @@
-import { CLOUD_PRIVACY_NOTE, ApiError, type LedgerSnapshot } from '@nhanong/shared';
+import { CLOUD_PRIVACY_NOTE, ApiError, previousAccount, type AccountUser, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { Button, Card, Chip, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { setAuth, useAuth } from '../../lib/auth';
@@ -31,6 +31,8 @@ function SignInForm({ data }: { data: LedgerSnapshot }) {
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // Đăng nhập tài khoản khác trên máy đang có sổ của tài khoản trước: hỏi gộp hay bỏ sổ trên máy
+  const [conflict, setConflict] = useState<{ token: string; user: AccountUser; previous: string; fresh: boolean } | null>(null);
   const hasData = data.transactions.length > 0 || data.gardens.length > 0;
 
   const submit = async () => {
@@ -40,13 +42,38 @@ function SignInForm({ data }: { data: LedgerSnapshot }) {
     try {
       const input = { phone: phone.trim(), password, device_name: deviceName() };
       const { token, user } = tab === 'register' ? await api.register({ ...input, name: name.trim() }) : await api.login(input);
-      await getSync().enable(token, user);
-      // Dùng luôn tài khoản này để xem lịch sử giá dài hơn
-      setAuth({ token, user, shared: true });
-      showToast({ message: `Đã bật lưu cả trên mạng cho tài khoản ${user.phone ?? user.name}.` });
-      router.back();
+      const previous = previousAccount(data, user);
+      if (previous) setConflict({ token, user, previous, fresh: true });
+      else await finish(token, user);
     } catch (error) {
       if (error instanceof ApiError) setErrors(error.errors);
+      setMessage((error as Error).message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const finish = async (token: string, user: AccountUser, discardLocal = false, fresh = true) => {
+    await getSync().enable(token, user, { discardLocal });
+    // Dùng luôn tài khoản này để xem lịch sử giá dài hơn
+    setAuth(fresh || !signedIn ? { token, user, shared: true } : { ...signedIn, shared: true });
+    showToast({ message: `Đã bật lưu cả trên mạng cho tài khoản ${user.phone ?? user.name}.` });
+    router.back();
+  };
+
+  const choose = async (discardLocal: boolean | null) => {
+    if (!conflict) return;
+    setSending(true);
+    setMessage(null);
+    try {
+      if (discardLocal === null) {
+        // Thôi: không đổi gì, hủy phiên vừa đăng nhập (trừ khi đó là phiên đang dùng để xem giá)
+        if (conflict.fresh) await api.logout(conflict.token).catch(() => {});
+        setConflict(null);
+        return;
+      }
+      await finish(conflict.token, conflict.user, discardLocal, conflict.fresh);
+    } catch (error) {
       setMessage((error as Error).message);
     } finally {
       setSending(false);
@@ -72,18 +99,49 @@ function SignInForm({ data }: { data: LedgerSnapshot }) {
 
   const enableWithSignedIn = async () => {
     if (!signedIn) return;
+    const previous = previousAccount(data, signedIn.user);
+    if (previous) {
+      setConflict({ token: signedIn.token, user: signedIn.user, previous, fresh: false });
+      return;
+    }
     setSending(true);
     setMessage(null);
     try {
-      await getSync().enable(signedIn.token, signedIn.user);
-      setAuth({ ...signedIn, shared: true });
-      showToast({ message: `Đã bật lưu cả trên mạng cho tài khoản ${signedIn.user.phone ?? signedIn.user.name}.` });
-      router.back();
+      await finish(signedIn.token, signedIn.user, false, false);
     } catch (error) {
       setMessage((error as Error).message);
       setSending(false);
     }
   };
+
+  if (conflict) {
+    const next = conflict.user.phone ?? conflict.user.name;
+    return (
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
+        <Stack.Screen options={{ title: 'Máy đang có sổ khác' }} />
+        <Text style={styles.body}>
+          Sổ trên máy đang gắn với tài khoản <Text style={{ fontWeight: '700' }}>{conflict.previous}</Text>. Bạn vừa đăng nhập{' '}
+          <Text style={{ fontWeight: '700' }}>{next}</Text>. Bạn muốn làm gì với sổ đang có trên máy?
+        </Text>
+        <Button label={`Gộp sổ trên máy vào tài khoản ${next}`} onPress={() => choose(false)} disabled={sending} />
+        <Text style={styles.muted}>Các khoản thu chi trên máy được gửi lên tài khoản {next}, cộng chung với sổ đã có của tài khoản đó.</Text>
+        <Button
+          label={`Bỏ sổ trên máy, chỉ dùng sổ của ${next}`}
+          variant="danger"
+          disabled={sending}
+          onPress={() =>
+            Alert.alert('Bỏ sổ trên máy?', `Xóa sổ đang có trên máy này và chỉ dùng sổ của tài khoản ${next}? Sổ của ${conflict.previous} đã lưu trên mạng vẫn còn, đăng nhập lại là có.`, [
+              { text: 'Không', style: 'cancel' },
+              { text: 'Bỏ sổ trên máy', style: 'destructive', onPress: () => void choose(true) },
+            ])
+          }
+        />
+        <Text style={styles.muted}>Hợp khi máy này dùng chung, hoặc sổ trên máy là của người khác.</Text>
+        <Button label="Thôi, không đổi gì" variant="outline" onPress={() => choose(null)} disabled={sending} />
+        {message && <Text style={[styles.body, { color: colors.error }]}>{message}</Text>}
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 6 }} keyboardShouldPersistTaps="handled">

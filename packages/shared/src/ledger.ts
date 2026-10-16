@@ -81,6 +81,8 @@ export interface LedgerMeta {
   last_garden_id?: string;
   /** Tài khoản khi bật "lưu cả trên mạng" */
   account?: { token: string; name: string; phone: string | null };
+  /** Tài khoản gần nhất sổ này đã gửi lên (giữ lại cả khi tắt lưu trên mạng), để hỏi lại khi đăng nhập tài khoản khác */
+  linked_phone?: string | null;
   /** Đã nhận từ server tới version này */
   sync_version?: number;
   /** Mọi thay đổi trên máy có updated_at trước mốc này đã gửi lên server */

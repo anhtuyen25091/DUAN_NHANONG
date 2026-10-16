@@ -11,6 +11,32 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 16/10/2026 (tối): Lái còn nợ ở đợt cắt; tự gửi sổ khi có mạng lại; hỏi khi đổi tài khoản ✅
+
+### Bán cho lái: lái còn nợ (web + app)
+- Mỗi đợt cắt có ô **"Lái trả đợt này"**, kèm nút nhanh **Trả đủ / Chưa trả**. Trả đủ thì lưu trống (`paid = null`), nên đợt cũ coi như đã trả đủ.
+- Lái còn nợ hiện ở 3 chỗ: từng đợt, từng hợp đồng, tổng tất cả hợp đồng.
+- Thẻ **"Ghi lái trả"**: lái trả thêm thì số tiền được chia vào các đợt cũ trước (`Ledger.payContractOwing`).
+
+### Tự gửi sổ khi có mạng lại (web + app)
+- `SyncEngine`: gửi không được (mất mạng / server lỗi) thì **tự thử lại** sau 5 giây, 15 giây, 30 giây, rồi mỗi phút cho tới khi gửi được.
+  - App không cần NetInfo, có mạng lại là sổ tự lên.
+  - Web vẫn nghe thêm sự kiện `online`.
+
+### Hỏi lại khi đăng nhập tài khoản khác trên máy đang có sổ (web + app)
+- Sổ nhớ tài khoản gần nhất đã gửi lên (`meta.linked_phone`), kể cả khi đã tắt lưu trên mạng.
+- Đăng nhập tài khoản khác mà máy đang có sổ (có vườn hoặc khoản thu chi) thì hiện màn hỏi:
+  - **Gộp sổ trên máy vào tài khoản mới** (như trước)
+  - **Bỏ sổ trên máy, chỉ dùng sổ của tài khoản mới** (hỏi xác nhận; sổ của tài khoản cũ trên mạng vẫn còn)
+  - **Thôi, không đổi gì** (hủy phiên vừa đăng nhập)
+
+### Kiểm tra
+- Shared: thêm 2 test (tự thử lại khi có mạng; hỏi khi đổi tài khoản + bỏ sổ trên máy), **104 test pass**.
+- Typecheck web + app, lint web sạch.
+- Bấm thử trên Chrome bằng 2 tài khoản tạo tạm (đã xóa sau khi thử): A có vườn → đăng nhập B thì hiện màn hỏi → "Thôi" quay lại form → "Bỏ sổ trên máy" thì sổ B không còn vườn của A.
+
+---
+
 ## 16/10/2026 (chiều): Xuất lại file giá, lọc điểm bán theo tỉnh, tổng hợp cho thương lái ✅
 
 ### Xuất lại file dữ liệu giá
@@ -898,8 +924,8 @@ gunzip -c exports/nhanong-gia-….sql.gz | mysql --default-character-set=utf8mb4
 | 10 | Quên mật khẩu | Cần OTP qua SMS (trả phí); lái con thì chủ đặt lại được |
 | 11 | Bản đồ điểm bán | Hiện danh sách + chỉ đường |
 | 12 | Ghi chú giọng nói, chụp ảnh hóa đơn | |
-| 13 | Đợt cắt bán cho lái: "lái còn nợ" | Hiện giả định lái trả đủ mỗi đợt |
-| 14 | App tự gửi sổ khi có mạng lại (NetInfo); hỏi lại khi đổi tài khoản trên máy đang có sổ | |
+| 13 | ~~Đợt cắt bán cho lái: "lái còn nợ"~~ | ✅ Đã làm 16/10 |
+| 14 | ~~App tự gửi sổ khi có mạng lại; hỏi lại khi đổi tài khoản trên máy đang có sổ~~ | ✅ Đã làm 16/10 |
 | 15 | Chủ doanh nghiệp mở thẳng trang đơn chung của lái | Hiện xem số liệu + tải quyết toán |
 
 ### C. Phát hành (cần bạn chuẩn bị)

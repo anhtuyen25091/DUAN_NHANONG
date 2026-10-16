@@ -8,7 +8,7 @@ let engine: SyncEngine | null = null;
 
 /**
  * Bộ đồng bộ dùng chung cho cả app (tạo 1 lần khi mở sổ).
- * Tự gửi sau mỗi lần ghi; đồng bộ lại mỗi khi app quay lại màn hình.
+ * Tự gửi sau mỗi lần ghi; mất mạng thì SyncEngine tự thử lại (giãn dần tới mỗi phút); đồng bộ lại khi app quay lại màn hình.
  */
 export function startSync(ledger: Ledger): SyncEngine {
   if (engine) return engine;
