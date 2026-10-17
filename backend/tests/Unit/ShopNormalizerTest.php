@@ -36,6 +36,14 @@ class ShopNormalizerTest extends TestCase
         $this->assertSame('đại lý phân bón', ShopNormalizer::nameCore('Đại lý phân bón'));
     }
 
+    public function test_generic_names(): void
+    {
+        $this->assertTrue(ShopNormalizer::isGeneric('Cửa hàng buôn bán thuốc bảo vệ thực vật'));
+        $this->assertTrue(ShopNormalizer::isGeneric('Đại lý phân bón'));
+        $this->assertFalse(ShopNormalizer::isGeneric('Nguyễn Trường Sanh'));
+        $this->assertFalse(ShopNormalizer::isGeneric('CH VTNN Tân Trang 2'));
+    }
+
     public function test_display_name(): void
     {
         $this->assertSame('Đại Lý Hai Lúa', ShopNormalizer::displayName('  ĐẠI LÝ   HAI LÚA. '));
@@ -59,5 +67,8 @@ class ShopNormalizerTest extends TestCase
         $this->assertSame(['Mỹ Hiệp', 'Cao Lãnh'], $geocoder->parse('Ấp 3, Mỹ Hiệp, Cao Lãnh, Đồng Tháp'));
         $this->assertSame(['Phố Châu', 'Hương Sơn'], $geocoder->parse('Khối 9, thị trấn Phố Châu, huyện Hương Sơn'));
         $this->assertSame([null, null], $geocoder->parse('Thôn 5'));
+        $this->assertSame(['Máy Tơ', 'Ngô Quyền'], $geocoder->parse('Phường Máy Tơ, Q.Ngô Quyền'));
+        $this->assertSame(['Thạnh An', 'Vĩnh Thạnh'], $geocoder->parse('2729, Phụng Lợi, TT. Thạnh An, huyện Vĩnh Thạnh'));
+        $this->assertSame(['Tân An', 'Thanh Hà'], $geocoder->parse('Xóm 1, thôn Đông Phan,Tân An, H. Thanh Hà'));
     }
 }

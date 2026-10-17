@@ -69,9 +69,29 @@ final class ShopNormalizer
      */
     public static function nameCore(string $name): string
     {
-        $tokens = array_values(array_filter(preg_split('/[\s.,;:\/\-–()]+/u', mb_strtolower(self::displayName($name))) ?: []));
+        [$tokens, $kept] = self::splitGeneric($name);
+
+        return $kept !== [] ? implode(' ', $kept) : implode(' ', $tokens);
+    }
+
+    /** Tên chỉ gồm từ chung ("Cửa hàng buôn bán thuốc bảo vệ thực vật", "Đại lý phân bón") */
+    public static function isGeneric(string $name): bool
+    {
+        [$tokens, $kept] = self::splitGeneric($name);
+
+        return $tokens !== [] && $kept === [];
+    }
+
+    /**
+     * Tách tên thành các chữ (giữ dấu, chữ thường) và phần còn lại sau khi bỏ từ chung.
+     *
+     * @return array{0: list<string>, 1: list<string>}
+     */
+    private static function splitGeneric(string $name): array
+    {
+        $tokens = array_values(array_filter(preg_split('/[\s.,;:\/\-–()&]+/u', mb_strtolower(self::displayName($name))) ?: []));
         $ascii = array_map(fn (string $t): string => Text::normalize($t), $tokens);
-        $phrases = array_map(fn (string $g): array => explode(' ', $g), self::GENERIC);
+        $phrases = array_map(fn (string $g): array => explode(' ', $g), [...self::GENERIC, 'buon ban', 'bao ve thuc vat', 'thuoc', 'phan', 'nong nghiep', 'vat tu nong nghiep']);
         // Cụm dài khớp trước ("cua hang" trước "ch")
         usort($phrases, fn (array $a, array $b): int => count($b) <=> count($a));
 
@@ -88,7 +108,7 @@ final class ShopNormalizer
             $i++;
         }
 
-        return $kept !== [] ? implode(' ', $kept) : implode(' ', $tokens);
+        return [$tokens, $kept];
     }
 
     /** Khóa địa chỉ: không dấu, bỏ chữ "ấp/thôn/xã/huyện…" */

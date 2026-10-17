@@ -33,10 +33,12 @@ class LicenseSheetSource implements ShopSource
         private array $types,
         private int $trust = 85,
         private ?string $page = null,
+        /** @var array{host: string, dataset: string}|null bộ dữ liệu trên cổng CKAN: lấy file mới nhất mỗi lần chạy */
+        private ?array $ckan = null,
     ) {}
 
     /**
-     * @param  array{url: string, province: string, types: list<string>, label: string, trust?: int, page?: string}  $config
+     * @param  array{url?: string, ckan?: array{host: string, dataset: string}, province: string, types: list<string>, label: string, trust?: int, page?: string}  $config
      */
     public static function fromConfig(string $key, array $config): self
     {
@@ -44,11 +46,12 @@ class LicenseSheetSource implements ShopSource
             fetcher: app(Fetcher::class),
             key: $key,
             label: $config['label'],
-            url: $config['url'],
+            url: $config['url'] ?? '',
             province: $config['province'],
             types: array_map(fn (string $t): ShopType => ShopType::from($t), $config['types']),
             trust: $config['trust'] ?? 85,
             page: $config['page'] ?? null,
+            ckan: $config['ckan'] ?? null,
         );
     }
 
@@ -69,8 +72,9 @@ class LicenseSheetSource implements ShopSource
 
     public function collect(): iterable
     {
+        $url = $this->ckan !== null ? CkanResolver::latest($this->fetcher, $this->ckan['host'], $this->ckan['dataset'], ['XLSX']) : $this->url;
         $file = tempnam(sys_get_temp_dir(), 'shops').'.xlsx';
-        file_put_contents($file, $this->fetcher->get($this->url));
+        file_put_contents($file, $this->fetcher->get($url));
 
         try {
             yield from $this->read($file);
@@ -89,26 +93,19 @@ class LicenseSheetSource implements ShopSource
 
         try {
             foreach ($reader->getSheetIterator() as $sheet) {
-                $columns = null;
+                $rows = [];
                 $district = null;
-                $previous = [];
+                $headerSeen = false;
                 foreach ($sheet->getRowIterator() as $row) {
                     $cells = array_map(fn ($cell): string => $this->text($cell->getValue()), $row->getCells());
-                    if ($columns === null) {
-                        $columns = LicenseTable::header($cells);
-                        if ($columns !== null) {
-                            $district = $this->district($previous);
-                        }
-                        $previous[] = implode(' ', $cells);
-
-                        continue;
+                    // Tên huyện cũ ở dòng tiêu đề phía trên bảng ("HUYỆN THẠCH HÀ (đến tháng 05/2025)")
+                    $headerSeen = $headerSeen || LicenseTable::header($cells) !== null;
+                    if (! $headerSeen) {
+                        $district = $this->district([trim(implode(' ', $cells))]) ?? $district;
                     }
-
-                    $candidate = LicenseTable::candidate($cells, $columns, $district, $this->province, $this->types, $this->page ?? $this->url, $sheet->getName());
-                    if ($candidate !== null) {
-                        yield $candidate;
-                    }
+                    $rows[] = $cells;
                 }
+                yield from LicenseTable::candidates($rows, $this->province, $this->types, $this->page ?? $this->url, $sheet->getName(), $district);
             }
         } finally {
             $reader->close();

@@ -5,6 +5,7 @@ namespace App\Shops\Collect\Sources;
 use App\Crawling\Extraction\Text;
 use App\Enums\ShopType;
 use App\Shops\Collect\CandidateData;
+use App\Shops\Collect\ShopNormalizer;
 
 /**
  * Đọc bảng "danh sách cơ sở được cấp giấy đủ điều kiện buôn bán" của các Sở (Excel hoặc bảng HTML):
@@ -14,8 +15,10 @@ final class LicenseTable
 {
     /** Tên cột (không dấu, chữ đầu của ô tiêu đề) → trường */
     private const COLUMNS = [
-        'name' => ['ten co so', 'ten to chuc', 'ho va ten', 'ten doanh nghiep', 'ten cua hang', 'ten chu'],
-        'owner' => ['chu co so', 'ten chu co so', 'nguoi dai dien'],
+        'name' => ['ten co so', 'ten to chuc', 'ho va ten', 'ten doanh nghiep', 'ten cua hang', 'ten diem', 'ten chu'],
+        'owner' => ['chu co so', 'ten chu co so', 'nguoi dai dien', 'ten nguoi dai dien', 'thong tin chu co so'],
+        'goods' => ['loai nong san', 'mat hang', 'nong san thu mua'],
+        'coords' => ['toa do'],
         'address' => ['dia chi'],
         'hamlet' => ['thon', 'ban', 'to dan pho', 'ap'],
         'commune' => ['xa', 'phuong'],
@@ -85,8 +88,8 @@ final class LicenseTable
         if ($address === '') {
             $address = implode(', ', array_filter([
                 $get('hamlet'),
-                self::withPrefix($get('commune'), 'xã', '/^(xã|phường|thị trấn|tt\.?|p\.)\s/iu'),
-                self::withPrefix($get('district'), 'huyện', '/^(huyện|thị xã|thành phố|tp\.?|tx\.?|quận)\s/iu'),
+                self::withPrefix($get('commune'), 'xã', '/^(xã|phường|thị trấn|tt\.|tt|p\.|x\.)\s?/iu'),
+                self::withPrefix($get('district'), 'huyện', '/^(huyện|thị xã|thành phố|tp\.|tp|tx\.|tx|quận|q\.|h\.)\s?/iu'),
             ]));
         }
         if ($address === '') {
@@ -99,6 +102,16 @@ final class LicenseTable
         }
 
         $certificate = $get('certificate');
+        // Tên chỉ là chữ chung ("Cửa hàng buôn bán thuốc bảo vệ thực vật"): ghép tên chủ cho dễ nhận
+        $owner = $get('owner');
+        if ($owner !== '' && ShopNormalizer::isGeneric($name)) {
+            $name = "{$name} {$owner}";
+        }
+        // Tọa độ "20.070353, 105.609434" (chỉ nhận trong Việt Nam)
+        $lat = $lng = null;
+        if (preg_match('/(-?\d{1,2}\.\d+)\s*[,;]\s*(-?\d{2,3}\.\d+)/', $get('coords'), $m) === 1 && (float) $m[1] >= 6 && (float) $m[1] <= 24 && (float) $m[2] >= 101 && (float) $m[2] <= 118) {
+            [$lat, $lng] = [(float) $m[1], (float) $m[2]];
+        }
 
         return new CandidateData(
             // Số giấy chỉ duy nhất trong 1 huyện / 1 năm và nguồn có khi ghi trùng số: ghép tiền tố + số + tên.
@@ -109,9 +122,12 @@ final class LicenseTable
             province: $province,
             phone: $get('phone') ?: null,
             types: $types,
+            goods: $get('goods') ?: null,
+            lat: $lat,
+            lng: $lng,
             url: $url,
             raw: array_filter([
-                'ten' => $name, 'chu_co_so' => $get('owner'), 'dia_chi' => $address, 'huyen_cu' => $district,
+                'ten' => $name, 'chu_co_so' => $owner, 'dia_chi' => $address, 'huyen_cu' => $district, 'mat_hang' => $get('goods'),
                 'so_gcn' => $certificate, 'ngay_cap' => $get('issued'), 'dien_thoai' => $get('phone'),
             ]),
         );
@@ -139,7 +155,7 @@ final class LicenseTable
      * @param  list<ShopType>  $types
      * @return iterable<CandidateData>
      */
-    public static function candidates(array $rows, string $province, array $types, ?string $url, string $refPrefix = 'r'): iterable
+    public static function candidates(array $rows, string $province, array $types, ?string $url, string $refPrefix = 'r', ?string $district = null): iterable
     {
         $columns = null;
         $header = null;
@@ -160,7 +176,7 @@ final class LicenseTable
                     continue;
                 }
             }
-            $candidate = self::candidate($cells, $columns, null, $province, $types, $url, $refPrefix);
+            $candidate = self::candidate($cells, $columns, $district, $province, $types, $url, $refPrefix);
             if ($candidate !== null) {
                 yield $candidate;
             }

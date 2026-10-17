@@ -31,9 +31,11 @@ class ShopGeocoder
     /** Cách tâm huyện xa hơn mức này thì coi là nơi khác trùng tên (km) */
     private const MAX_FROM_DISTRICT_KM = 25;
 
-    private const COMMUNE = '(?:xã|phường|thị trấn|tt\.?|p\.)';
+    /** Chữ "xã / phường…" (cả viết tắt "TT.", "P.", "X.") và khoảng cách sau nó */
+    private const COMMUNE = '(?:xã|phường|thị trấn|tt|p|x)(?:\.\s*|\s+)';
 
-    private const DISTRICT = '(?:huyện|thị xã|thành phố|tx\.?|tp\.?|quận)';
+    /** Chữ "huyện / quận…" (cả viết tắt "TP.", "TX.", "Q.", "H.") */
+    private const DISTRICT = '(?:huyện|thị xã|thành phố|quận|tx|tp|q|h)(?:\.\s*|\s+)';
 
     /** Phần đầu của địa chỉ không phải tên xã (thôn, xóm, tổ, khối, số nhà…) */
     private const LOCAL = '/^(?:thôn|xóm|xón|tổ|tdp|tổ dân phố|khối|khối phố|kp|ấp|khóm|bản|đội|số|ngõ|kiệt|hẻm|đường|chợ|dp)\b/iu';
@@ -105,9 +107,9 @@ class ShopGeocoder
         $district = null;
         $plain = [];
         foreach ($parts as $part) {
-            if (preg_match('/^'.self::COMMUNE.'\s+(.+)$/iu', $part, $m) === 1) {
+            if (preg_match('/^'.self::COMMUNE.'(.+)$/iu', $part, $m) === 1) {
                 $commune ??= trim($m[1]);
-            } elseif (preg_match('/^'.self::DISTRICT.'\s+(.+)$/iu', $part, $m) === 1) {
+            } elseif (preg_match('/^'.self::DISTRICT.'(.+)$/iu', $part, $m) === 1) {
                 $district ??= trim($m[1]);
             } elseif (preg_match(self::LOCAL, $part) !== 1 && Provinces::detect($part) === null && preg_match('/\d/', $part) !== 1) {
                 $plain[] = $part;

@@ -29,10 +29,12 @@ class LicenseDocxSource implements ShopSource
         private array $types,
         private int $trust = 85,
         private ?string $page = null,
+        /** @var array{host: string, dataset: string}|null bộ dữ liệu trên cổng CKAN: lấy file mới nhất mỗi lần chạy */
+        private ?array $ckan = null,
     ) {}
 
     /**
-     * @param  array{url: string, province: string, types: list<string>, label: string, trust?: int, page?: string}  $config
+     * @param  array{url?: string, ckan?: array{host: string, dataset: string}, province: string, types: list<string>, label: string, trust?: int, page?: string}  $config
      */
     public static function fromConfig(string $key, array $config): self
     {
@@ -40,11 +42,12 @@ class LicenseDocxSource implements ShopSource
             fetcher: app(Fetcher::class),
             key: $key,
             label: $config['label'],
-            url: $config['url'],
+            url: $config['url'] ?? '',
             province: $config['province'],
             types: array_map(fn (string $t): ShopType => ShopType::from($t), $config['types']),
             trust: $config['trust'] ?? 85,
             page: $config['page'] ?? null,
+            ckan: $config['ckan'] ?? null,
         );
     }
 
@@ -65,7 +68,9 @@ class LicenseDocxSource implements ShopSource
 
     public function collect(): iterable
     {
-        return $this->read($this->fetcher->get($this->url));
+        $url = $this->ckan !== null ? CkanResolver::latest($this->fetcher, $this->ckan['host'], $this->ckan['dataset'], ['DOCX']) : $this->url;
+
+        return $this->read($this->fetcher->get($url));
     }
 
     /**
