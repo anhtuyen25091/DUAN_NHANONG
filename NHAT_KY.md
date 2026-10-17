@@ -11,6 +11,24 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: App: nút lọc trên bản đồ điểm bán quá cao (chiếm 1/3 màn hình) ✅
+
+**Nguyên nhân**
+- Điện thoại vẫn chạy **bản cũ**: Metro chạy ở chế độ `CI=1` nên không tự nạp lại code sau lần sửa trước.
+- Ở bản cũ, các hàng chip cuộn ngang ("Tất cả", "Thu mua nông sản"…, "Mọi tỉnh") nằm trong khung `flex: 1`. ScrollView mặc định `flexGrow: 1` nên mỗi hàng bị kéo giãn cao.
+
+**Đã làm**
+- Mọi hàng chip cuộn ngang ở chế độ bản đồ: `flexGrow: 0` + `alignItems: 'center'`, nên không thể giãn cao nữa.
+- `Chip` có thêm kiểu `small` (cao 36, chữ 15). Ở chế độ bản đồ dùng chip nhỏ cho cả hàng chọn tỉnh, ô tìm cao 40.
+- Khởi động lại Metro.
+
+**Kiểm tra**
+- Typecheck mobile qua.
+- Bundle Android lấy theo đúng URL trong manifest (có `transform.routerRoot=src/app`) nặng 8,0 MB và có code mới.
+- Lưu ý: gọi `entry.bundle` thiếu tham số `routerRoot` sẽ ra bundle 6,7 MB không có màn hình nào. Đây không phải lỗi build.
+
+---
+
 ## 17/10/2026: Bản đồ điểm bán: chỉ Việt Nam, có Hoàng Sa / Trường Sa, không "đường lưỡi bò"; nút lọc gọn ✅
 
 **Yêu cầu:** khi xem bản đồ, nút lọc quá to, khó kéo xuống phần bản đồ. Bản đồ chỉ hiện Việt Nam, không kéo ra nước ngoài; phải có Hoàng Sa, Trường Sa; không được có "đường lưỡi bò".

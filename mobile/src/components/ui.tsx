@@ -21,15 +21,16 @@ export function Card({ children, style }: { children: ReactNode; style?: StylePr
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-export function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+/** small: chip thấp hơn (36), dùng ở chỗ cần nhường chỗ, vd thanh lọc trên bản đồ */
+export function Chip({ label, active, onPress, small }: { label: string; active: boolean; onPress: () => void; small?: boolean }) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      style={[styles.chip, active && styles.chipActive]}
+      style={[styles.chip, small && { minHeight: 36, paddingHorizontal: 12 }, active && styles.chipActive]}
     >
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+      <Text style={[styles.chipText, small && { fontSize: font.small + 1 }, active && styles.chipTextActive]}>{label}</Text>
     </Pressable>
   );
 }

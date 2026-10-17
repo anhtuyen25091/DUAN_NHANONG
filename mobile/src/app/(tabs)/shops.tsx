@@ -74,16 +74,19 @@ export default function ShopsScreen() {
   const meta = page?.meta ?? null;
   const shops = page ? [...page.data, ...(more?.shops ?? [])] : [];
 
-  const provinceChips = !position && provinces.state.status === 'ok' && (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0 }}>
-      <Chip label="Mọi tỉnh" active={province === ''} onPress={() => setProvince('')} />
-      {provinces.state.data
-        .filter((p) => p.shops > 0 || p.code === province)
-        .map((p) => (
-          <Chip key={p.code} label={`${p.name} (${p.shops})`} active={p.code === province} onPress={() => setProvince(p.code)} />
-        ))}
-    </ScrollView>
-  );
+  // flexGrow 0: hàng cuộn ngang không bị kéo giãn cao khi nằm trong khung flex (lỗi nút cao 1/3 màn hình)
+  const provinceChips = (small = false) =>
+    !position &&
+    provinces.state.status === 'ok' && (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }} style={{ flexGrow: 0 }}>
+        <Chip small={small} label="Mọi tỉnh" active={province === ''} onPress={() => setProvince('')} />
+        {provinces.state.data
+          .filter((p) => p.shops > 0 || p.code === province)
+          .map((p) => (
+            <Chip small={small} key={p.code} label={`${p.name} (${p.shops})`} active={p.code === province} onPress={() => setProvince(p.code)} />
+          ))}
+      </ScrollView>
+    );
 
   const controls = (
     <>
@@ -106,7 +109,7 @@ export default function ShopsScreen() {
       />
       <Button label={position ? '📍 Đang xem gần tôi (bấm để tắt)' : '📍 Tìm gần tôi'} variant={position ? 'primary' : 'outline'} onPress={nearMe} />
       {locating && <Text style={styles.muted}>{locating}</Text>}
-      {provinceChips}
+      {provinceChips()}
     </>
   );
 
@@ -114,15 +117,15 @@ export default function ShopsScreen() {
     const filtered = q !== '' || province !== '';
     return (
       <View style={{ flex: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12, gap: 8 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0 }}>
-          <Chip label="📋 Danh sách" active={false} onPress={() => setOnMap(false)} />
-          <Chip label={position ? '📍 Gần tôi ✓' : '📍 Gần tôi'} active={!!position} onPress={nearMe} />
-          <Chip label={`🔎 Lọc${filtered ? ' ✓' : ''} ${showFilters ? '▴' : '▾'}`} active={showFilters} onPress={() => setShowFilters(!showFilters)} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }} style={{ flexGrow: 0 }}>
+          <Chip small label="📋 Danh sách" active={false} onPress={() => setOnMap(false)} />
+          <Chip small label={position ? '📍 Gần tôi ✓' : '📍 Gần tôi'} active={!!position} onPress={nearMe} />
+          <Chip small label={`🔎 Lọc${filtered ? ' ✓' : ''} ${showFilters ? '▴' : '▾'}`} active={showFilters} onPress={() => setShowFilters(!showFilters)} />
         </ScrollView>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0 }}>
-          <Chip label="Tất cả" active={type === ''} onPress={() => setType('')} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }} style={{ flexGrow: 0 }}>
+          <Chip small label="Tất cả" active={type === ''} onPress={() => setType('')} />
           {TYPES.map((t) => (
-            <Chip key={t} label={SHOP_TYPE_LABELS[t]} active={t === type} onPress={() => setType(t)} />
+            <Chip small key={t} label={SHOP_TYPE_LABELS[t]} active={t === type} onPress={() => setType(t)} />
           ))}
         </ScrollView>
         {showFilters && (
@@ -132,9 +135,9 @@ export default function ShopsScreen() {
               placeholderTextColor={colors.muted}
               value={search}
               onChangeText={setSearch}
-              style={{ minHeight: 44, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: font.body, backgroundColor: colors.surface, color: colors.text }}
+              style={{ minHeight: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: font.body, backgroundColor: colors.surface, color: colors.text }}
             />
-            {provinceChips}
+            {provinceChips(true)}
           </>
         )}
         {locating && <Text style={styles.muted}>{locating}</Text>}
@@ -203,7 +206,7 @@ function ShopCard({ shop }: { shop: Shop }) {
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
         <Text style={{ flex: 1, fontSize: font.body + 1, fontWeight: '700', color: colors.text }}>
           {shop.name}
-          {shop.is_verified && <Text style={{ color: colors.primary, fontSize: font.small }}>  ✓ Đã xác minh</Text>}
+          {shop.is_verified && <Text style={{ color: colors.primary, fontSize: font.small }}>{'  '}✓ Đã xác minh</Text>}
         </Text>
         {shop.distance_km !== undefined && <Text style={styles.muted}>{formatDistance(shop.distance_km)}</Text>}
       </View>
@@ -214,11 +217,7 @@ function ShopCard({ shop }: { shop: Shop }) {
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
         {shop.phone && <Button label={`📞 ${shop.phone}`} onPress={() => Linking.openURL(telHref(shop.phone!))} />}
         <Button label="🧭 Chỉ đường" variant="outline" onPress={() => Linking.openURL(directionsUrl(shop))} />
-        <Button
-          label="Báo sai"
-          variant="outline"
-          onPress={() => router.push({ pathname: '/shop/new', params: { shopId: String(shop.id), name: shop.name } })}
-        />
+        <Button label="Báo sai" variant="outline" onPress={() => router.push({ pathname: '/shop/new', params: { shopId: String(shop.id), name: shop.name } })} />
       </View>
       {shop.source && <Text style={[styles.muted, { marginTop: 6 }]}>Nguồn: {shop.source}</Text>}
     </Card>
