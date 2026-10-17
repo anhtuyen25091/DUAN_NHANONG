@@ -11,7 +11,7 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
-## 17/10/2026: Mục A5: cập nhật tức thì qua Ably ✅ (chờ khóa Ably để chạy thật)
+## 17/10/2026: Mục A5: cập nhật tức thì qua Ably ✅ (đã chạy với Ably thật)
 
 **Đánh giá Ably** (người dùng đề xuất): gói miễn phí 6 triệu tin / tháng, **200 kết nối cùng lúc**, 200 kênh, 500 tin / giây, không cần thẻ; vượt mức thì kết nối mới bị chặn (không tự tính tiền). Đủ cho giai đoạn đầu nếu app vẫn chạy khi Ably không dùng được. Người dùng đồng ý thêm phụ thuộc.
 
@@ -39,7 +39,13 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 - App: bundle Android đóng gói được ably (8,77 MB).
 - **Chưa thử với Ably thật** (chưa có khóa) và chưa thử trên điện thoại.
 
-**Cần người dùng:** tạo tài khoản miễn phí ở ably.com, tạo API key (quyền publish + subscribe), tự điền `ABLY_KEY=...` vào `backend/.env` (không gửi qua chat), rồi `php artisan config:clear`.
+**Thử với Ably thật** (người dùng đã điền `ABLY_KEY` vào `backend/.env`; khóa không in ra, `.env` không commit)
+- Tạo tạm 2 tài khoản A, B và 1 đơn chung. Một chương trình Node (ably-js) đóng vai app của B, xin vé tạm từ `/realtime/token`.
+- Vé chỉ có quyền `{"user:16":["subscribe"]}`. Thử nghe kênh người khác (`user:1`) thì Ably **từ chối** (lỗi 40160): đúng.
+- A kết thúc đơn qua API (`PATCH /deals/{id}`) thì **B nhận tin sau 173 ms**, có tiêu đề và mã đơn.
+- Đã xóa tài khoản, đơn, token tạm.
+- Chưa thử trên điện thoại thật.
+- Lưu ý khi đưa lên server: đặt `ABLY_KEY` trong `.env` của server; gói miễn phí tối đa 200 máy mở app cùng lúc.
 
 ---
 
