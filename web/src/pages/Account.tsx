@@ -186,6 +186,11 @@ function SignInForm({ memberDays, guestDays, back }: { memberDays: number; guest
       <button type="submit" className="wide primary" disabled={sending}>
         {sending ? 'Đang gửi…' : tab === 'register' ? 'Tạo tài khoản' : 'Đăng nhập'}
       </button>
+      {tab === 'login' && (
+        <a className="center small" href={href('tai-khoan/quen-mat-khau')}>
+          Quên mật khẩu?
+        </a>
+      )}
     </form>
   )
 }

@@ -10,12 +10,14 @@ use App\Http\Controllers\Api\V1\DealEntryController;
 use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\LedgerSyncController;
 use App\Http\Controllers\Api\V1\LocalPriceController;
+use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\PriceAlertController;
 use App\Http\Controllers\Api\V1\PriceController;
 use App\Http\Controllers\Api\V1\PurchaseController;
 use App\Http\Controllers\Api\V1\ReceiptPhotoController;
 use App\Http\Controllers\Api\V1\ShopController;
+use App\Http\Controllers\Api\V1\SmsInboundController;
 use App\Http\Controllers\Api\V1\TransactionController;
 use App\Http\Middleware\ResolveDevice;
 use Illuminate\Support\Facades\Route;
@@ -55,7 +57,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::middleware('throttle:10,1')->group(function () {
         Route::post('/auth/register', [AuthController::class, 'register'])->name('auth.register');
         Route::post('/auth/login', [AuthController::class, 'login'])->name('auth.login');
+        // Quên mật khẩu: xác minh số bằng SMS ngược (người dùng nhắn mã tới số của hệ thống)
+        Route::post('/auth/password/forgot', [PasswordResetController::class, 'start'])->name('auth.password.forgot');
+        Route::post('/auth/password/reset', [PasswordResetController::class, 'reset'])->name('auth.password.reset');
     });
+    // App hỏi 3 giây 1 lần trong lúc chờ người dùng nhắn tin
+    Route::get('/auth/password/forgot/{verification}', [PasswordResetController::class, 'status'])->middleware('throttle:60,1')->name('auth.password.status');
+    // Webhook nhận SMS (thiết bị chuyển tiếp / dịch vụ SMS 2 chiều), khóa bằng header X-Sms-Secret
+    Route::post('/sms/inbound', SmsInboundController::class)->middleware('throttle:120,1')->name('sms.inbound');
 
     Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
         Route::get('/user', [AuthController::class, 'me'])->name('user');

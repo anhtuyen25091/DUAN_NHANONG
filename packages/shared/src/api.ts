@@ -277,6 +277,22 @@ export interface Province {
 }
 
 /** Bản đồ theo khung đang xem: ít điểm thì shops, nhiều thì clusters (tâm + số điểm, bấm vào để phóng to) */
+/** Quên mật khẩu: xác minh số bằng SMS ngược (người dùng nhắn sms_text tới sms_to từ chính số của mình) */
+export interface PasswordResetRequest {
+  id: string;
+  /** Số đã che: 09****5678 */
+  phone: string;
+  status: 'pending' | 'verified' | 'used' | 'expired';
+  expires_at: string;
+  sms_to?: string;
+  sms_text?: string;
+}
+
+/** Đường dẫn mở sẵn tin nhắn (Android dùng "?body=", iPhone dùng "&body=") */
+export function smsHref(to: string, body: string, ios = false): string {
+  return `sms:${to}${ios ? '&' : '?'}body=${encodeURIComponent(body)}`;
+}
+
 export interface ShopMapView {
   shops: Shop[];
   clusters: Array<{ lat: number; lng: number; count: number }>;
@@ -478,6 +494,9 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
       request<AuthResult>('POST', '/auth/register', { body: input }),
     login: (input: { phone: string; password: string; device_name?: string }) => request<AuthResult>('POST', '/auth/login', { body: input }),
     logout: (token: string) => request<void>('POST', '/auth/logout', { token }),
+    forgotPassword: (phone: string) => request<{ data: PasswordResetRequest }>('POST', '/auth/password/forgot', { body: { phone } }).then((r) => r.data),
+    forgotPasswordStatus: (id: string) => request<{ data: PasswordResetRequest }>('GET', `/auth/password/forgot/${id}`).then((r) => r.data),
+    resetPassword: (input: { id: string; password: string; device_name?: string }) => request<AuthResult>('POST', '/auth/password/reset', { body: input }),
     me: (token: string) => request<{ data: AccountUser }>('GET', '/user', { token }).then((r) => r.data),
     syncPush: (token: string, records: SyncPushRecord[]) =>
       request<{ accepted: number; version: number }>('POST', '/sync/push', { token, body: { records } }),

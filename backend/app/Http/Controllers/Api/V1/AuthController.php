@@ -74,7 +74,7 @@ class AuthController extends Controller
     /**
      * @return array{id: int, name: string, phone: ?string, tier: string, premium_until: ?string}
      */
-    private static function userData(User $user): array
+    public static function userData(User $user): array
     {
         return [
             'id' => $user->id,

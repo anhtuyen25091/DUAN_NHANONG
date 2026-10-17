@@ -63,6 +63,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="product/[code]" options={{ title: '' }} />
         <Stack.Screen name="account" options={{ title: 'Tài khoản' }} />
+        <Stack.Screen name="forgot-password" options={{ title: 'Quên mật khẩu' }} />
         <Stack.Screen name="local-prices" options={{ title: '📍 Giá quanh tôi' }} />
         <Stack.Screen name="buyer" options={{ title: '🏪 Điểm mua đăng giá' }} />
         <Stack.Screen name="shop/new" options={{ title: 'Thêm điểm' }} />

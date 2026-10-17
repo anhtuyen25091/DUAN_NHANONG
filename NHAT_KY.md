@@ -11,6 +11,42 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Mục A3: quên mật khẩu bằng SMS ngược ✅
+
+**Cách làm** (phương án đã đề xuất: người dùng tự trả phí tin nhắn, không cần nhà cung cấp gửi OTP)
+1. Nhập số điện thoại của tài khoản, máy chủ tạo mã 6 số (hết hạn sau 15 phút).
+2. Người dùng **nhắn "NN 482913" từ chính số đó** tới số của hệ thống. Có nút "✉️ Mở tin nhắn soạn sẵn" (đường dẫn `sms:` có sẵn số và nội dung).
+3. Thiết bị / dịch vụ nhận SMS gọi webhook `POST /api/v1/sms/inbound {from, text}` kèm header `X-Sms-Secret`. Máy chủ khớp **số gửi + mã** của yêu cầu đang chờ.
+4. App hỏi trạng thái 3 giây 1 lần. Đã xác nhận thì cho đặt mật khẩu mới (trong 15 phút): đăng nhập luôn, **đăng xuất mọi máy khác**; mỗi lần xác nhận chỉ dùng 1 lần.
+
+**Đã làm**
+- Backend:
+  - bảng `phone_verifications`, `App\Auth\PhoneVerifier`
+  - `PasswordResetController` (`/auth/password/forgot`, `/auth/password/forgot/{id}`, `/auth/password/reset`)
+  - `SmsInboundController` (webhook)
+  - cấu hình `nhanong.sms` (`SMS_INBOUND_NUMBER`, `SMS_INBOUND_SECRET`, từ khóa `NN`); để trống số thì tắt chức năng (503)
+  - lệnh `php artisan sms:inbound <số> "NN <mã>"` để giả lập tin đến khi chạy thử
+- Web: trang `#/tai-khoan/quen-mat-khau`, link "Quên mật khẩu?" ở tab Đăng nhập.
+- App: màn hình `forgot-password`, link ở tab Đăng nhập.
+- `.env` local: `SMS_INBOUND_NUMBER=0900000999` + khóa ngẫu nhiên (không commit). `.env.example` có 2 biến mới.
+
+**Kiểm tra**
+- 5 test:
+  - đủ quy trình, kể cả tin từ số khác / sai mã không khớp, số dạng +84, chữ thường, chữ thừa
+  - mỗi lần xác nhận chỉ dùng 1 lần, máy cũ bị đăng xuất
+  - webhook bắt buộc khóa
+  - hết hạn, số chưa có tài khoản
+  - tắt khi chưa cấu hình số
+  - lệnh giả lập
+- Chạy thử trên web với tài khoản tạm (đã xóa sau khi thử): nhắn giả lập thì trang tự chuyển bước, đặt mật khẩu mới thì đăng nhập được, mật khẩu mới đúng.
+
+**Khi chạy thật cần**
+- Một số nhận tin + thiết bị / dịch vụ chuyển tiếp SMS về webhook. Rẻ nhất: điện thoại Android cắm SIM, cài app chuyển tiếp SMS sang URL (vd "SMS Forwarder", gửi POST JSON có header), hoặc dịch vụ SMS 2 chiều / đầu số.
+- Đặt `SMS_INBOUND_NUMBER`, `SMS_INBOUND_SECRET` trên server.
+- Lưu ý: bước 1 cho biết số đó có tài khoản hay không (đã giới hạn 10 lần / phút).
+
+---
+
 ## 17/10/2026: Mục A2: thông báo đẩy khi app đóng (đơn mua bán, phiếu) ✅ phần máy chủ + app
 
 **Đã làm**

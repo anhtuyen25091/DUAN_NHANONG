@@ -8,6 +8,7 @@ import { LocalPrices } from './pages/LocalPrices'
 import { PriceBoard } from './pages/PriceBoard'
 import { ProductDetail } from './pages/ProductDetail'
 import { ShopList } from './pages/ShopList'
+import { ForgotPassword } from './pages/ForgotPassword'
 import { ShopRemove } from './pages/ShopRemove'
 import { ShopSubmit } from './pages/ShopSubmit'
 
@@ -73,6 +74,8 @@ export default function App() {
           <LocalPrices query={query} />
         ) : path[0] === 'diem-mua' ? (
           <BuyerArea />
+        ) : path[0] === 'tai-khoan' && path[1] === 'quen-mat-khau' ? (
+          <ForgotPassword />
         ) : path[0] === 'tai-khoan' ? (
           <Account query={query} />
         ) : path[0] === 'diem-ban' && path[1] === 'xin-go' ? (

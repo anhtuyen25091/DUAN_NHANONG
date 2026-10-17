@@ -192,6 +192,11 @@ function SignInForm({ memberDays, guestDays, onDone }: { memberDays: number; gue
 
       {generalMessage && <Text style={[styles.body, { color: colors.error, marginBottom: 6 }]}>{generalMessage}</Text>}
       <Button label={sending ? 'Đang gửi…' : tab === 'register' ? 'Tạo tài khoản' : 'Đăng nhập'} onPress={submit} disabled={!canSubmit} />
+      {tab === 'login' && (
+        <Pressable onPress={() => router.push('/forgot-password')} accessibilityRole="link" style={{ minHeight: 44, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: colors.primary, fontSize: font.body }}>Quên mật khẩu?</Text>
+        </Pressable>
+      )}
     </Card>
   );
 }
