@@ -54,7 +54,12 @@ class ShopSubmissionResource extends Resource
                     ->sortable(),
                 TextColumn::make('kind')
                     ->label('Loại đề xuất')
-                    ->state(fn (ShopSubmission $record): string => $record->shop_id ? 'Sửa: '.$record->shop?->name : 'Điểm mới')
+                    ->state(fn (ShopSubmission $record): string => match (true) {
+                        $record->isRemoval() => 'Xin gỡ: '.$record->shop?->name,
+                        $record->shop_id !== null => 'Sửa: '.$record->shop?->name,
+                        default => 'Điểm mới',
+                    })
+                    ->color(fn (ShopSubmission $record): ?string => $record->isRemoval() ? 'danger' : null)
                     ->wrap(),
                 TextColumn::make('data')
                     ->label('Thông tin')
@@ -81,6 +86,9 @@ class ShopSubmissionResource extends Resource
                     ->color('success')
                     ->visible(fn (ShopSubmission $record): bool => $record->status === SubmissionStatus::Pending)
                     ->requiresConfirmation()
+                    ->modalDescription(fn (ShopSubmission $record): string => $record->isRemoval()
+                        ? 'Điểm sẽ bị ẩn khỏi danh sách và bản đồ. Nên gọi lại số người gửi để chắc là chủ điểm.'
+                        : 'Thông tin đề xuất sẽ được lưu vào điểm bán.')
                     ->action(fn (ShopSubmission $record) => $record->approve()),
                 Action::make('reject')
                     ->label('Loại')
@@ -95,6 +103,13 @@ class ShopSubmissionResource extends Resource
     private static function summary(ShopSubmission $record): string
     {
         $data = $record->data;
+        if ($record->isRemoval()) {
+            return collect([
+                ShopSubmission::REMOVE_REASONS[$data['remove_reason'] ?? 'other'] ?? null,
+                isset($data['contact']) ? 'Gọi lại: '.$data['contact'] : null,
+                $record->shop !== null ? 'Nguồn điểm: '.($record->shop->source ?? '–') : null,
+            ])->filter()->join(' · ');
+        }
         $types = collect($data['types'] ?? [])->map(fn (string $type): string => ShopType::tryFrom($type)?->getLabel() ?? $type)->join(', ');
 
         return collect([

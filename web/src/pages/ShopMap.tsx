@@ -44,6 +44,7 @@ function popupHtml(shop: Shop): string {
     `<a class="button" href="${escape(directionsUrl(shop))}" target="_blank" rel="noreferrer">🧭 Chỉ đường</a>`,
     `<a class="button subtle" href="${escape(href('diem-ban/de-xuat', { sua: String(shop.id), ten: shop.name }))}">Báo sai</a>`,
     `</div>`,
+    shop.source && `<div class="small muted">Nguồn: ${escape(shop.source)} · <a href="${escape(href('diem-ban/xin-go', { id: String(shop.id), ten: shop.name }))}">Chủ điểm? Xin gỡ</a></div>`,
   ]
     .filter(Boolean)
     .join('')

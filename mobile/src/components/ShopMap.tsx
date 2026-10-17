@@ -34,6 +34,7 @@ export function ShopMap({ filters, position }: { filters: ShopFilters; position:
           province_name: s.province_name,
           goods: s.goods,
           note: geoNote(s.geo_precision),
+        source: s.source,
           is_verified: s.is_verified,
           color: SHOP_TYPE_COLORS[s.types[0] ?? 'thu_mua'],
           types: s.types.map((t) => SHOP_TYPE_LABELS[t]).join(' · '),
@@ -49,6 +50,7 @@ export function ShopMap({ filters, position }: { filters: ShopFilters; position:
     if (action === 'call' && shop.phone) void Linking.openURL(telHref(shop.phone));
     if (action === 'directions') void Linking.openURL(directionsUrl(shop));
     if (action === 'report') router.push({ pathname: '/shop/new', params: { shopId: String(shop.id), name: shop.name } });
+    if (action === 'remove') router.push({ pathname: '/shop/remove', params: { shopId: String(shop.id), name: shop.name } });
   };
 
   return (

@@ -220,7 +220,14 @@ function ShopCard({ shop }: { shop: Shop }) {
         <Button label="Báo sai" variant="outline" onPress={() => router.push({ pathname: '/shop/new', params: { shopId: String(shop.id), name: shop.name } })} />
       </View>
       {geoNote(shop.geo_precision) && <Text style={[styles.muted, { marginTop: 6 }]}>{geoNote(shop.geo_precision)}</Text>}
-      {shop.source && <Text style={[styles.muted, { marginTop: 6 }]}>Nguồn: {shop.source}</Text>}
+      {shop.source && (
+        <Text style={[styles.muted, { marginTop: 6 }]}>
+          Nguồn: {shop.source} ·{' '}
+          <Text style={{ color: colors.primary }} onPress={() => router.push({ pathname: '/shop/remove', params: { shopId: String(shop.id), name: shop.name } })}>
+            Chủ điểm? Xin gỡ
+          </Text>
+        </Text>
+      )}
     </Card>
   );
 }

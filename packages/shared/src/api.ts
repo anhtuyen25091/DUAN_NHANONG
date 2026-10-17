@@ -306,7 +306,20 @@ export interface ShopSubmission {
   lat?: number | null;
   lng?: number | null;
   note?: string | null;
+  /** Chủ điểm xin gỡ điểm khỏi danh sách (cần shop_id, remove_reason, contact) */
+  remove?: boolean;
+  remove_reason?: ShopRemoveReason;
+  /** Số điện thoại để kiểm tra lại người xin gỡ */
+  contact?: string | null;
 }
+
+export type ShopRemoveReason = 'owner' | 'closed' | 'other';
+
+export const SHOP_REMOVE_REASONS: Record<ShopRemoveReason, string> = {
+  owner: 'Tôi là chủ điểm, không muốn hiện ở đây',
+  closed: 'Điểm đã đóng cửa / không còn bán',
+  other: 'Lý do khác',
+};
 
 export interface AccountUser {
   id: number;

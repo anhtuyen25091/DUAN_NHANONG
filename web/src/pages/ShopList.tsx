@@ -188,7 +188,11 @@ function ShopCard({ shop }: { shop: Shop }) {
         </a>
       </div>
       {geoNote(shop.geo_precision) && <p className="small muted">{geoNote(shop.geo_precision)}</p>}
-      {shop.source && <p className="small muted">Nguồn: {shop.source}</p>}
+      {shop.source && (
+        <p className="small muted">
+          Nguồn: {shop.source} · <a href={href('diem-ban/xin-go', { id: String(shop.id), ten: shop.name })}>Chủ điểm? Xin gỡ</a>
+        </p>
+      )}
     </article>
   )
 }

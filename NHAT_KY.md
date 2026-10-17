@@ -11,6 +11,29 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Chủ điểm xin gỡ điểm khỏi danh sách ✅ (phần 4)
+
+**Đã làm**
+- Backend:
+  - `POST /shop-submissions` nhận thêm `remove: true` + `remove_reason` (owner / closed / other) + `contact` (số để gọi lại, bắt buộc); bắt buộc có `shop_id`
+  - admin duyệt thì điểm bị **ẩn** (`is_active = false`), không xóa, nên lần thu thập sau khớp đúng điểm này và vẫn để ẩn
+  - trang admin "Đề xuất điểm bán": loại "Xin gỡ: …" (màu đỏ), hiện lý do, số gọi lại, nguồn của điểm; hộp xác nhận nhắc gọi lại trước khi ẩn
+- Web:
+  - trang `#/diem-ban/xin-go?id=…&ten=…` (chọn lý do, số điện thoại, ghi chú)
+  - dòng "Nguồn: … · Chủ điểm? Xin gỡ" ở thẻ điểm bán và ô thông tin trên bản đồ
+- App: màn hình `shop/remove`, cùng đường dẫn ở thẻ điểm bán và ô thông tin trên bản đồ (WebView gửi lệnh `remove`).
+
+**Kiểm tra**
+- Test mới: thiếu lý do / số / điểm thì báo lỗi; chưa duyệt vẫn hiện; duyệt xong thì ẩn, giữ nguyên dữ liệu.
+- Chụp màn hình trang web; HTML bản đồ của app bấm "Xin gỡ" gửi đúng `{action: remove}`.
+- Typecheck web + app qua.
+
+**Sự cố môi trường:** Metro không chạy được vì file `node_modules/@babel/parser/lib/index.js` bị **hỏng dữ liệu** (dòng 10700 có ký tự rác "topicTokef 9==", so với gói gốc 7.29.9 thì khác). Đã thay bằng file gốc.
+- Có thể đây cũng là nguyên nhân Metro / PHP hay sập ngẫu nhiên trên máy này.
+- Nên cài lại `node_modules` (`rm -rf node_modules && npm ci`) và kiểm tra ổ đĩa (Disk Utility → First Aid).
+
+---
+
 ## 17/10/2026: Thu thập điểm bán, giai đoạn 1: thử các tỉnh ✅
 
 **Kết quả tìm nguồn 3 tỉnh thử**

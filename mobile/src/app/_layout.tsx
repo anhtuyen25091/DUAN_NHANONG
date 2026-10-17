@@ -48,6 +48,7 @@ export default function RootLayout() {
         <Stack.Screen name="local-prices" options={{ title: '📍 Giá quanh tôi' }} />
         <Stack.Screen name="buyer" options={{ title: '🏪 Điểm mua đăng giá' }} />
         <Stack.Screen name="shop/new" options={{ title: 'Thêm điểm' }} />
+        <Stack.Screen name="shop/remove" options={{ title: 'Xin gỡ điểm' }} />
         <Stack.Screen name="ledger/add" options={{ title: 'Ghi tiền' }} />
         <Stack.Screen name="ledger/entries" options={{ title: 'Tất cả khoản thu chi' }} />
         <Stack.Screen name="ledger/garden/[id]" options={{ title: '' }} />

@@ -8,6 +8,7 @@ import { LocalPrices } from './pages/LocalPrices'
 import { PriceBoard } from './pages/PriceBoard'
 import { ProductDetail } from './pages/ProductDetail'
 import { ShopList } from './pages/ShopList'
+import { ShopRemove } from './pages/ShopRemove'
 import { ShopSubmit } from './pages/ShopSubmit'
 
 const LedgerRoutes = lazy(() => import('./pages/ledger/LedgerRoutes'))
@@ -74,6 +75,8 @@ export default function App() {
           <BuyerArea />
         ) : path[0] === 'tai-khoan' ? (
           <Account query={query} />
+        ) : path[0] === 'diem-ban' && path[1] === 'xin-go' ? (
+          <ShopRemove query={query} />
         ) : path[0] === 'diem-ban' && path[1] === 'de-xuat' ? (
           <ShopSubmit query={query} />
         ) : path[0] === 'diem-ban' ? (

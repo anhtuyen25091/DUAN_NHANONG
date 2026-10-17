@@ -112,6 +112,33 @@ class ShopApiTest extends TestCase
         $this->assertSame(SubmissionStatus::Approved, $submission->fresh()->status);
     }
 
+    public function test_owner_removal_request_hides_shop_after_approval(): void
+    {
+        $shop = Shop::factory()->create(['name' => 'Nguyễn Văn A', 'is_verified' => false]);
+        $device = ['X-Device-Id' => '0b7c1f0e-8a2e-4c55-9d1e-3f4a5b6c7d8e'];
+
+        // Thiếu lý do và số để gọi lại
+        $this->postJson(route('api.v1.shops.submit'), ['shop_id' => $shop->id, 'remove' => true], $device)
+            ->assertJsonValidationErrors(['remove_reason', 'contact']);
+        // Xin gỡ phải chỉ rõ điểm
+        $this->postJson(route('api.v1.shops.submit'), ['remove' => true, 'remove_reason' => 'owner', 'contact' => '0912345678'], $device)
+            ->assertJsonValidationErrors(['shop_id']);
+
+        $this->postJson(route('api.v1.shops.submit'), ['shop_id' => $shop->id, 'remove' => true, 'remove_reason' => 'owner', 'contact' => '0912 345 678', 'note' => 'Tôi không bán nữa'], $device)
+            ->assertCreated();
+
+        // Chưa duyệt: vẫn hiện
+        $this->getJson(route('api.v1.shops.index'))->assertJsonCount(1, 'data');
+
+        $submission = ShopSubmission::query()->sole();
+        $this->assertTrue($submission->isRemoval());
+        $submission->approve();
+
+        $this->assertFalse($shop->fresh()->is_active);
+        $this->assertSame('Nguyễn Văn A', $shop->fresh()->name);
+        $this->getJson(route('api.v1.shops.index'))->assertJsonCount(0, 'data');
+    }
+
     public function test_submission_validation(): void
     {
         $this->postJson(route('api.v1.shops.submit'), ['types' => ['khac'], 'phone' => 'abc'], ['X-Device-Id' => '0b7c1f0e-8a2e-4c55-9d1e-3f4a5b6c7d8e'])

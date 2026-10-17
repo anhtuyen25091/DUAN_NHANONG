@@ -3,7 +3,7 @@ import { MAP_LABELS, MAP_MAX_ZOOM, MAP_MIN_ZOOM, mapTiles, PROVINCE_LABEL_MAX_ZO
 const TILES = mapTiles(process.env.EXPO_PUBLIC_MAP_TILE_URL, process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION);
 const LEAFLET = 'https://unpkg.com/leaflet@1.9.4/dist';
 
-export type MapShop = Pick<Shop, 'id' | 'name' | 'lat' | 'lng' | 'phone' | 'address' | 'province_name' | 'goods' | 'is_verified'> & { color: string; types: string; note: string | null };
+export type MapShop = Pick<Shop, 'id' | 'name' | 'lat' | 'lng' | 'phone' | 'address' | 'province_name' | 'goods' | 'is_verified'> & { color: string; types: string; note: string | null; source: string | null };
 
 /**
  * Trang bản đồ chạy trong WebView: Leaflet + nền không chữ; bấm nút trong ô thông tin thì báo về app.
@@ -51,7 +51,8 @@ for(const s of D.shops){
   const place=[s.address,s.province_name].filter(Boolean).join(', ');
   const html='<b>'+esc(s.name)+'</b>'+(s.is_verified?' ✓':'')+'<div class="muted">'+esc(s.types)+'</div>'+(place?'<div>'+esc(place)+'</div>':'')+(s.goods?'<div class="muted">Mặt hàng: '+esc(s.goods)+'</div>':'')+(s.note?'<div class="muted">'+esc(s.note)+'</div>':'')
     +'<div class="acts">'+(s.phone?'<button class="primary" onclick="send(\\'call\\','+s.id+')">📞 '+esc(s.phone)+'</button>':'')
-    +'<button onclick="send(\\'directions\\','+s.id+')">🧭 Chỉ đường</button><button onclick="send(\\'report\\','+s.id+')">Báo sai</button></div>';
+    +'<button onclick="send(\\'directions\\','+s.id+')">🧭 Chỉ đường</button><button onclick="send(\\'report\\','+s.id+')">Báo sai</button></div>'
+    +(s.source?'<div class="muted">Nguồn: '+esc(s.source)+' · <a href="#" onclick="send(\\'remove\\','+s.id+');return false">Chủ điểm? Xin gỡ</a></div>':'');
   L.circleMarker([s.lat,s.lng],{radius:11,color:'#fff',weight:2,fillColor:s.color,fillOpacity:.95}).bindPopup(html,{maxWidth:260}).addTo(map);
   pts.push([s.lat,s.lng]);
 }
