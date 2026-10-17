@@ -11,6 +11,30 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Thay bảng tọa độ xã cũ bằng Wikidata (CC0) ✅ (phần 3)
+
+**Vì sao:** bảng cũ (`legacy_wards.csv`, github vietnamadminunits) theo tác giả lấy tọa độ qua Google Geocoding nên không rõ quyền dùng. Đã tìm nguồn chính thức: HDX (OCHA) và Open Development Mekong chỉ có tới cấp huyện (ODM còn cấm dùng thương mại); ranh giới xã của Cục Đo đạc, Bản đồ không cho tải kèm giấy phép.
+
+**Đã làm**
+- Lấy từ **Wikidata** (giấy phép **CC0**, dùng thương mại được, không cần ghi nguồn): xã (Q2389082), phường (Q687188), thị trấn (Q1070942, Q16481437) có tọa độ; huyện / quận / thị xã / thành phố thuộc tỉnh theo P131; tỉnh theo P131 của huyện. Lưu ở `database/data/wards_wikidata.csv` (15.652 dòng), cách tạo ghi ở `database/data/README-wards.txt`.
+- Bỏ 309 xã cách tâm huyện > 30 km: mục Wikidata bị gắn nhầm nơi trùng tên. `LegacyWards` cũng tự bỏ kết quả xã xa tâm huyện > 30 km.
+- **Xóa** `legacy_wards.csv` khỏi repo.
+
+**So sánh trên địa chỉ thật (2.561 điểm Hà Tĩnh + Sơn La)**
+
+| | Ra tâm xã | Ra tâm huyện |
+|---|---|---|
+| Bảng cũ (Google) | 2.137 | 417 |
+| Wikidata | 1.945 | 613 |
+
+- Chỗ cả 2 cùng ra xã: lệch trung vị 0,9 km.
+- Trong 145 cặp lệch > 10 km thì 122 lỗi là do Wikidata, nên mới thêm bước lọc 30 km ở trên.
+- Đã nhập lại 2 tỉnh: Hà Tĩnh 1.179 điểm (913 tâm xã, 265 tâm huyện), Sơn La 902 điểm (730 tâm xã, 172 tâm huyện).
+
+**Lưu ý môi trường:** ở 1 lệnh truy vấn Wikidata đã lỡ gửi email người dùng trong chuỗi nhận diện (User-Agent). Các truy vấn sau chỉ dùng tên bot + đường dẫn repo.
+
+---
+
 ## 17/10/2026: Đọc danh sách dạng PDF ✅ (phần 1)
 
 **Đã làm**

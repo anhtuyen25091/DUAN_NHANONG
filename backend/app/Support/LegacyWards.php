@@ -5,9 +5,9 @@ namespace App\Support;
 use App\Crawling\Extraction\Text;
 
 /**
- * Xã / phường / thị trấn và huyện **cũ** (trước sáp nhập 01/07/2025, 10.040 xã) kèm tọa độ tâm,
+ * Xã / phường / thị trấn và huyện **cũ** (trước sáp nhập 01/07/2025) kèm tọa độ tâm,
  * để đặt điểm bán theo địa chỉ cũ (danh sách của Sở vẫn ghi xã cũ; OSM đã bỏ tên các xã này).
- * Dữ liệu: database/data/legacy_wards.csv (nguồn và giấy phép: database/data/LICENSE-legacy_wards.txt).
+ * Dữ liệu: database/data/wards_wikidata.csv, lấy từ Wikidata (CC0), cách tạo ở database/data/README-wards.txt.
  */
 final class LegacyWards
 {
@@ -29,7 +29,7 @@ final class LegacyWards
         if ($district !== null && isset($candidates[self::bare($district)])) {
             [$lat, $lng] = $candidates[self::bare($district)];
 
-            return ['lat' => $lat, 'lng' => $lng];
+            return self::nearDistrict($province, $district, $lat, $lng) ? ['lat' => $lat, 'lng' => $lng] : null;
         }
         if (count($candidates) === 1) {
             [$lat, $lng] = reset($candidates);
@@ -52,6 +52,14 @@ final class LegacyWards
         return $point === null ? null : ['lat' => $point[0], 'lng' => $point[1]];
     }
 
+    /** Tâm xã phải gần tâm huyện ghi trong địa chỉ (≤ 30 km); xa hơn là dữ liệu gắn nhầm nơi trùng tên */
+    private static function nearDistrict(?string $province, string $district, float $lat, float $lng): bool
+    {
+        $center = self::district($province, $district);
+
+        return $center === null || Geo::distanceKm($lat, $lng, $center['lat'], $center['lng']) <= 30;
+    }
+
     /** Tên không dấu, bỏ chữ "xã / phường / huyện…" ở đầu, bỏ số 0 đầu ("Phường 01" = "Phường 1") */
     public static function bare(string $name): string
     {
@@ -71,7 +79,7 @@ final class LegacyWards
         }
 
         $index = [];
-        $handle = fopen(database_path('data/legacy_wards.csv'), 'r');
+        $handle = fopen(database_path('data/wards_wikidata.csv'), 'r');
         if ($handle === false) {
             return self::$index = [];
         }

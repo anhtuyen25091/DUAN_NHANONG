@@ -25,4 +25,11 @@ Schedule::command('alerts:send')
     ->withoutOverlapping(30)
     ->onOneServer();
 
+// Điểm bán: đọc lại danh sách cấp phép của các Sở mỗi tháng (ngày 2, 3 giờ sáng, lúc vắng), điểm mới tự hiện / chờ duyệt
+Schedule::command('shops:collect')
+    ->monthlyOn(2, '03:00')
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping(720)
+    ->onOneServer();
+
 Schedule::command('model:prune', ['--model' => [CrawlLog::class]])->daily();

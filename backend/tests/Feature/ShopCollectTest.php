@@ -167,7 +167,7 @@ class ShopCollectTest extends TestCase
 
         $collector = app(ShopCollector::class);
         $source = $this->source('so-ha-tinh', 85, [
-            new CandidateData(ref: '1', name: 'Đại lý phân bón Bảy Hùng', address: 'xã Thạch Hà', province: 'Hà Tĩnh', types: [ShopType::PhanBon]),
+            new CandidateData(ref: '1', name: 'Đại lý phân bón Bảy Hùng', address: 'xã Không Có Thật', province: 'Hà Tĩnh', types: [ShopType::PhanBon]),
         ]);
         $collector->collect($source);
         $result = $collector->process('so-ha-tinh');

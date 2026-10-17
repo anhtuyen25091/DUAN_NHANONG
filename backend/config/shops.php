@@ -1,5 +1,6 @@
 <?php
 
+use App\Shops\Collect\Sources\LicenseDocxSource;
 use App\Shops\Collect\Sources\LicenseHtmlSource;
 use App\Shops\Collect\Sources\LicenseSheetSource;
 use App\Shops\Collect\Sources\OsmSource;
@@ -47,6 +48,17 @@ return [
             'label' => 'Sở NN&MT Sơn La: buôn bán thuốc BVTV, đến 27/5/2024 (cổng dữ liệu mở)',
             'url' => 'https://data.sonla.gov.vn/detail_data/danh-sach-co-so-duoc-cap-giay-chung-nhan-du-dieu-kien-buon-ban-thuoc-bao-ve-thuc-vat-tren-dia-ban-tinh-son-la-den-ngay-2752024?page={page}',
             'province' => 'son-la',
+            'types' => ['thuoc_bvtv'],
+            'trust' => 85,
+        ],
+
+        // Thanh Hóa: cổng dữ liệu mở, file Word (Chi cục TT&BVTV, ngày 23/8/2024)
+        'so-thanh-hoa-bvtv' => [
+            'class' => LicenseDocxSource::class,
+            'label' => 'Sở NN&MT Thanh Hóa: đại lý buôn bán thuốc BVTV (cổng dữ liệu mở)',
+            'url' => 'https://opendata.thanhhoa.gov.vn/dataset/e91631ee-5cc3-45c4-a3c7-c56ff5e73aca/resource/220894fb-6d42-4c94-8fd8-8a33a4a47cea/download/i-ly-buon-ban-thuc-bvtv-tnh-thanh-hoa.docx',
+            'page' => 'https://opendata.thanhhoa.gov.vn/dataset/du-lieu-ve-co-so-buon-ban-thuoc-bao-ve-thuc-vat',
+            'province' => 'thanh-hoa',
             'types' => ['thuoc_bvtv'],
             'trust' => 85,
         ],

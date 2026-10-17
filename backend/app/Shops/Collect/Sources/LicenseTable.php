@@ -14,8 +14,8 @@ final class LicenseTable
 {
     /** Tên cột (không dấu, chữ đầu của ô tiêu đề) → trường */
     private const COLUMNS = [
-        'name' => ['ten co so', 'ten to chuc', 'ho va ten', 'ten chu', 'ten doanh nghiep', 'ten cua hang'],
-        'owner' => ['chu co so', 'nguoi dai dien'],
+        'name' => ['ten co so', 'ten to chuc', 'ho va ten', 'ten doanh nghiep', 'ten cua hang', 'ten chu'],
+        'owner' => ['chu co so', 'ten chu co so', 'nguoi dai dien'],
         'address' => ['dia chi'],
         'hamlet' => ['thon', 'ban', 'to dan pho', 'ap'],
         'commune' => ['xa', 'phuong'],
@@ -124,7 +124,12 @@ final class LicenseTable
             return '';
         }
 
-        return preg_match($hasPrefix, $value.' ') === 1 ? $value : "{$prefix} {$value}";
+        // Đã có chữ "xã / huyện…", hoặc ô thực ra ghi số nhà / đường / khu ("182 Bà Triệu", "KCN Tây Bắc Ga"): giữ nguyên
+        if (preg_match($hasPrefix, $value.' ') === 1 || preg_match('/\d|^(số|đường|phố|kcn|khu|cụm|thôn|xóm|tổ|ngõ|km|ql|tl|chợ|ngã)\b/iu', $value) === 1) {
+            return $value;
+        }
+
+        return "{$prefix} {$value}";
     }
 
     /**
@@ -137,16 +142,52 @@ final class LicenseTable
     public static function candidates(array $rows, string $province, array $types, ?string $url, string $refPrefix = 'r'): iterable
     {
         $columns = null;
+        $header = null;
         foreach ($rows as $cells) {
             if ($columns === null) {
                 $columns = self::header($cells);
+                $header = $columns === null ? null : $cells;
 
                 continue;
+            }
+            // Tiêu đề 2 tầng: dòng ngay sau tiêu đề là "Xã | Huyện | Tỉnh" (con của ô "Địa chỉ"): gộp lại rồi tìm cột lại
+            if ($header !== null) {
+                $merged = self::mergeSubHeader($header, $cells);
+                $header = null;
+                if ($merged !== null) {
+                    $columns = self::header($merged) ?? $columns;
+
+                    continue;
+                }
             }
             $candidate = self::candidate($cells, $columns, null, $province, $types, $url, $refPrefix);
             if ($candidate !== null) {
                 yield $candidate;
             }
         }
+    }
+
+    /**
+     * Dòng $sub là tầng dưới của tiêu đề (có ≥ 2 ô là tên cột, ô đầu không phải số thứ tự): trả tiêu đề đã gộp, không thì null.
+     * Ô trống ở tầng dưới lấy ô tầng trên; tầng trên có ô gộp ngang (ít ô hơn) thì các ô sau ô gộp lệch sang phải.
+     *
+     * @param  list<string>  $parent
+     * @param  list<string>  $sub
+     * @return list<string>|null
+     */
+    private static function mergeSubHeader(array $parent, array $sub): ?array
+    {
+        $words = count(array_filter($sub, fn (string $cell): bool => trim($cell) !== '' && self::isHeaderWord($cell)));
+        if ($words < 2 || preg_match('/^\d+$/', trim($sub[0] ?? '')) === 1) {
+            return null;
+        }
+        $shift = max(0, count($sub) - count($parent));
+        $firstSub = array_key_first(array_filter($sub, fn (string $cell): bool => trim($cell) !== '')) ?? 0;
+        $merged = [];
+        foreach ($sub as $i => $cell) {
+            $merged[] = trim($cell) !== '' ? $cell : ($parent[$i < $firstSub ? $i : $i - $shift] ?? '');
+        }
+
+        return $merged;
     }
 }
