@@ -18,7 +18,10 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
   - nới khung bằng `tabBarIconStyle` 56×32
   - nền xanh đặt ở 1 `View` riêng, emoji cỡ 22 nằm giữa (`includeFontPadding: false`)
   - bỏ chiều cao cố định 68 px của thanh tab để thanh tự tính theo vùng an toàn (máy có thanh điều hướng)
-- Typecheck qua; bundle Android có bản sửa; đã khởi động lại Metro. Cần người dùng xem lại trên máy Android.
+- Typecheck qua; bundle Android có bản sửa; đã khởi động lại Metro.
+- **Lần 2 (người dùng báo: hiện biểu tượng nhưng mất chữ):** thanh tab Android mặc định cao khoảng 56 px; biểu tượng 32 px + lề đẩy chữ ra ngoài. Sửa:
+  - chiều cao thanh = 62 + vùng an toàn dưới (`useSafeAreaInsets`), lề dưới = vùng an toàn + 6
+  - `tabBarLabelPosition: 'below-icon'`, chữ cách biểu tượng 2 px
 
 ---
 

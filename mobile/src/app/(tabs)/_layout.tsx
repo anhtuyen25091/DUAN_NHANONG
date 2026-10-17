@@ -1,5 +1,6 @@
 import { router, Tabs } from 'expo-router';
 import { Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDealWatch } from '../../lib/dealWatch';
 import { colors } from '../../lib/theme';
 
@@ -18,14 +19,17 @@ const icon = (emoji: string) =>
 
 export default function TabsLayout() {
   const { awaiting } = useDealWatch();
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 13, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 13, fontWeight: '600', marginTop: 2 },
         tabBarIconStyle: ICON_BOX,
-        tabBarStyle: { paddingTop: 6 },
+        // Biểu tượng 32 + chữ ~18 + lề: Android mặc định chỉ cao ~56 nên chữ bị đẩy mất; tính đủ chỗ + vùng thanh điều hướng của máy
+        tabBarStyle: { height: 62 + insets.bottom, paddingTop: 6, paddingBottom: insets.bottom + 6 },
+        tabBarLabelPosition: 'below-icon',
         headerStyle: { backgroundColor: colors.surface },
         headerTitleStyle: { color: colors.text, fontWeight: '700' },
         headerShadowVisible: false,
