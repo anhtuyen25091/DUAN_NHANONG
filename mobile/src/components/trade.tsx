@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime, formatKg, formatVnd, itemsText, purchaseShareText, type Purchase, type PurchaseHistoryItem, type PurchaseLine, type TradeCustomer, type TradeRow, type TradeTotals } from '@nhanong/shared';
+import { formatDate, formatDateTime, formatKg, formatVnd, itemsText, purchaseShareText, webJoinLink, type Purchase, type PurchaseHistoryItem, type PurchaseLine, type TradeCustomer, type TradeRow, type TradeTotals } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Share, Text, View } from 'react-native';
@@ -157,7 +157,7 @@ export function PurchaseShare({ token, purchase: p, onChange }: { token: string;
           <Text selectable style={{ fontSize: 30, fontWeight: '800', letterSpacing: 4, textAlign: 'center', color: colors.text }}>
             {p.share_code}
           </Text>
-          <Button label="📤 Gửi mã cho khách (Zalo, tin nhắn…)" onPress={() => Share.share({ message: purchaseShareText(p, p.share_code!) }).catch(() => {})} />
+          <Button label="📤 Gửi mã cho khách (Zalo, tin nhắn…)" onPress={() => Share.share({ message: purchaseShareText(p, p.share_code!, process.env.EXPO_PUBLIC_WEB_URL ? webJoinLink(process.env.EXPO_PUBLIC_WEB_URL, p.share_code!) : undefined) }).catch(() => {})} />
           <Button
             label="Thu hồi mã"
             variant="danger"

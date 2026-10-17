@@ -1,4 +1,4 @@
-import { formatDate, formatQty, formatVnd, telHref, type Deal, type DealEntry } from '@nhanong/shared';
+import { formatDate, formatQty, formatVnd, telHref, webJoinLink, type Deal, type DealEntry } from '@nhanong/shared';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, RefreshControl, ScrollView, Share, Text, TextInput, View } from 'react-native';
@@ -224,7 +224,9 @@ function Row({ label, value, bold, color }: { label: string; value: string; bold
 
 /** Mã để bên kia tham gia + nút gửi (Zalo, tin nhắn…) */
 function ShareCode({ deal }: { deal: Deal }) {
-  const message = `Mời tham gia đơn "${deal.title}" trên app Nhà Nông. Mã: ${deal.code}`;
+  // Kèm link web (khi đã cấu hình EXPO_PUBLIC_WEB_URL): người nhận bấm là mở trang nhập mã, có nút "Mở trong app"
+  const web = process.env.EXPO_PUBLIC_WEB_URL;
+  const message = `Mời tham gia đơn "${deal.title}" trên app Nhà Nông. Mã: ${deal.code}${web ? ` · ${webJoinLink(web, deal.code)}` : ''}`;
   const share = async () => {
     try {
       if (Platform.OS !== 'web') {

@@ -84,3 +84,11 @@ describe('ảnh hóa đơn', () => {
     expect(fitSize(800, 600)).toEqual({ width: 800, height: 600 });
   });
 });
+
+describe('link mã đơn / phiếu', () => {
+  it('link mở app và link web', async () => {
+    const { appJoinLink, webJoinLink } = await import('./business');
+    expect(appJoinLink('NN7K3P')).toBe('nhanong://deals/join?code=NN7K3P');
+    expect(webJoinLink('https://nhanong.vn/', 'NN7K3P')).toBe('https://nhanong.vn/#/don/tham-gia?ma=NN7K3P');
+  });
+});

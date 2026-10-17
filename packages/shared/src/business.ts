@@ -106,6 +106,16 @@ export interface BusinessActivity {
   at: string;
 }
 
+/** Mở thẳng app (đã cài) ở màn nhập mã đơn / phiếu: nhanong://deals/join?code=… */
+export function appJoinLink(code: string): string {
+  return `nhanong://deals/join?code=${encodeURIComponent(code)}`;
+}
+
+/** Link web nhập mã (mở được trên mọi máy; trên điện thoại có nút "Mở trong app") */
+export function webJoinLink(webBase: string, code: string): string {
+  return `${webBase.replace(/\/+$/, '')}/#/don/tham-gia?ma=${encodeURIComponent(code)}`;
+}
+
 /** Lời nhắn mời lái vào doanh nghiệp bằng mã */
 export function businessInviteText(business: Pick<Business, 'name'>, code: string): string {
   return `Mời bạn vào doanh nghiệp "${business.name}" trên app Nhà Nông để ghi phiếu thu mua. Mở app → Tài khoản → Doanh nghiệp → Nhập mã mời: ${code}`;

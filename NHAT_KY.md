@@ -11,6 +11,29 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Mục A6: link mã đơn / phiếu mở thẳng app ✅ (phần code; mở bằng link https cần build + tên miền)
+
+**Đã làm**
+- App đã có scheme `nhanong`: link `nhanong://deals/join?code=NN7K3P` mở màn "Nhập mã đơn / phiếu" với mã điền sẵn (expo-router tự khớp đường dẫn).
+- Shared: `appJoinLink(code)`, `webJoinLink(webBase, code)`.
+- Web: trang `#/don/tham-gia?ma=…` (cả khi chưa đăng nhập) có nút **"📱 Mở trong app Nhà Nông"** khi mở bằng điện thoại.
+- App: tin mời tham gia đơn và tin gửi mã phiếu kèm link web khi có biến `EXPO_PUBLIC_WEB_URL`. Người nhận bấm link thì mở trang web nhập mã; trên điện thoại có nút mở app.
+
+**Kiểm tra:** test 2 hàm tạo link; trang nhập mã trên web vẫn mở đúng, máy tính không hiện nút mở app; typecheck và lint web / app / shared qua.
+
+**Còn tồn**
+- Link `nhanong://` chỉ chạy với bản build riêng (Expo Go dùng `exp://`).
+- Muốn bấm link **https** là mở thẳng app (App Links / Universal Links) cần tên miền thật và cấu hình khi build:
+  - Android: `intentFilters` + `autoVerify` trong app.json, file `/.well-known/assetlinks.json` trên web
+  - iOS: `associatedDomains` + file `apple-app-site-association`
+- Khi có tên miền thì đặt `EXPO_PUBLIC_WEB_URL`.
+
+**Chưa làm trong mục A** (chờ người dùng quyết)
+- **Thanh toán gói xem giá:** người dùng đã bảo để sau.
+- **Cập nhật tức thì (WebSocket):** cần thêm máy chủ Laravel Reverb chạy riêng và phụ thuộc mới. Hiện đã có thông báo đẩy (app đóng) và hỏi 8 giây / lần (app mở), nên tạm chưa cần.
+
+---
+
 ## 17/10/2026: Mục A3: quên mật khẩu bằng SMS ngược ✅
 
 **Cách làm** (phương án đã đề xuất: người dùng tự trả phí tin nhắn, không cần nhà cung cấp gửi OTP)

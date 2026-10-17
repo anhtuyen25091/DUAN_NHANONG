@@ -1,4 +1,4 @@
-import { ApiError, formatDate, formatVnd, today, type DealRole } from '@nhanong/shared'
+import { ApiError, appJoinLink, formatDate, formatVnd, today, type DealRole } from '@nhanong/shared'
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
@@ -29,6 +29,7 @@ export default function DealRoutes({ path, query }: { path: string[]; query: URL
             Đăng nhập / Đăng ký
           </a>
         </div>
+        {page === 'tham-gia' && query.get('ma') && <OpenInApp code={query.get('ma')!} />}
       </div>
     )
 
@@ -241,6 +242,7 @@ function DealJoin({ token, initialCode }: { token: string; initialCode: string }
         ‹ Đơn mua bán
       </a>
       <h1>🔑 Nhập mã đơn / phiếu</h1>
+      {initialCode && <OpenInApp code={initialCode} />}
       <p className="small muted">
         Nhập mã 6 ký tự bên kia gửi (ví dụ NN7K3P). Mã đơn: 2 bên cùng xem và xác nhận các đợt cân, tiền cọc, tiền trả. Mã phiếu: xem và tải phiếu mua / bán điểm thu mua gửi cho bạn.
       </p>
@@ -253,5 +255,15 @@ function DealJoin({ token, initialCode }: { token: string; initialCode: string }
         {sending ? 'Đang mở…' : 'Mở'}
       </button>
     </form>
+  )
+}
+
+/** Trên điện thoại: mở thẳng app Nhà Nông (nếu đã cài) ở màn nhập mã, mã điền sẵn */
+function OpenInApp({ code }: { code: string }) {
+  if (!/Android|iPhone|iPad/.test(navigator.userAgent)) return null
+  return (
+    <a className="button wide open-in-app" href={appJoinLink(code)}>
+      📱 Mở trong app Nhà Nông (mã {code})
+    </a>
   )
 }
