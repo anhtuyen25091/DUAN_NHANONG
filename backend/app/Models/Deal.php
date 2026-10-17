@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\DealStatus;
+use App\Notifications\PushNotifier;
 use Database\Factories\DealFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -86,7 +87,8 @@ class Deal extends Model
     }
 
     /**
-     * Ghi hoạt động mới nhất (bên kia thấy thông báo khi đang mở app). Mục riêng (chi phí) không ghi.
+     * Ghi hoạt động mới nhất: bên kia thấy thông báo khi đang mở app, và nhận thông báo đẩy khi app đóng.
+     * Mục riêng (chi phí) không ghi.
      */
     public function recordActivity(User $by, string $text): void
     {
@@ -95,6 +97,13 @@ class Deal extends Model
             'last_activity_by' => $by->id,
             'last_activity_at' => now(),
         ])->save();
+
+        PushNotifier::later(
+            array_diff([$this->seller_id, $this->buyer_id], [$by->id]),
+            '🤝 '.($this->title ?: 'Đơn '.$this->code),
+            $this->last_activity,
+            ['dealId' => $this->uuid],
+        );
     }
 
     /** Chủ doanh nghiệp của đơn (lái con tạo / tham gia): được xem số liệu, tải quyết toán */

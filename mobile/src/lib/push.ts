@@ -2,10 +2,13 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { api } from './api';
+import { getAuth } from './auth';
 
 export type NotificationsModule = typeof import('expo-notifications');
 
 export const ALERT_CHANNEL = 'price-alerts';
+/** Kênh cho thông báo đơn mua bán / phiếu (backend PushNotifier::CHANNEL) */
+export const UPDATES_CHANNEL = 'updates';
 
 /**
  * Lý do máy này không dùng được thông báo đẩy (null = dùng được).
@@ -39,7 +42,7 @@ export function notifications(): NotificationsModule | null {
   return loaded;
 }
 
-export type OpenedData = { product?: string; region?: string | null; debtId?: string } | undefined;
+export type OpenedData = { product?: string; region?: string | null; debtId?: string; dealId?: string; purchaseId?: string } | undefined;
 
 /** Bấm vào thông báo (kể cả thông báo đã mở app từ trước): gọi onOpen với data; trả về hàm hủy */
 export function onNotificationOpened(onOpen: (data: OpenedData) => void): () => void {
@@ -70,6 +73,11 @@ export async function registerPush(askPermission: boolean): Promise<PushResult> 
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
     });
+    await Notifications.setNotificationChannelAsync(UPDATES_CHANNEL, {
+      name: 'Đơn mua bán, phiếu',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+    });
   }
 
   if (!Device.isDevice) return { ok: false, reason: 'Cần chạy trên điện thoại thật để nhận thông báo.' };
@@ -87,7 +95,8 @@ export async function registerPush(askPermission: boolean): Promise<PushResult> 
 
   try {
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
-    await api.updateDevice(token, Platform.OS === 'ios' ? 'ios' : 'android');
+    // Kèm token đăng nhập: máy gắn với tài khoản để nhận thông báo đơn / phiếu cả khi app đóng
+    await api.updateDevice(token, Platform.OS === 'ios' ? 'ios' : 'android', getAuth()?.token ?? null);
     return { ok: true };
   } catch (e) {
     return { ok: false, reason: e instanceof Error ? e.message : 'Không lấy được mã thông báo.' };

@@ -4,13 +4,18 @@ import { useEffect } from 'react';
 import { DealNotices } from '../components/DealNotices';
 import { ToastHost } from '../components/ledger';
 import { startDealWatch } from '../lib/dealWatch';
+import { getAuth, subscribeAuth } from '../lib/auth';
 import { openLedger } from '../lib/ledger';
 import { onNotificationOpened, registerPush, type OpenedData } from '../lib/push';
 import { colors } from '../lib/theme';
 
 function openFromNotification(data: OpenedData) {
   // Thông báo nhắc hạn trả nợ: mở khoản nợ
-  if (data?.debtId) {
+  if (data?.dealId) {
+    router.push({ pathname: '/deals/[id]', params: { id: data.dealId } });
+  } else if (data?.purchaseId) {
+    router.push({ pathname: '/trade/received/[id]', params: { id: data.purchaseId } });
+  } else if (data?.debtId) {
     router.push({ pathname: '/ledger/debts/[id]', params: { id: data.debtId } });
   } else if (data?.product) {
     router.push({ pathname: '/product/[code]', params: { code: data.product, region: data.region ?? '' } });
@@ -23,12 +28,25 @@ export default function RootLayout() {
     // Token có thể đổi: cập nhật mỗi lần mở app, không hỏi quyền (chỉ hỏi khi người dùng đặt cảnh báo).
     // Máy không hỗ trợ (web, Expo Go trên Android) thì registerPush / onNotificationOpened không làm gì.
     registerPush(false).catch(() => {});
+    // Đăng nhập / đăng xuất: gửi lại để máy gắn với (hoặc gỡ khỏi) tài khoản
+    let lastToken = getAuth()?.token ?? null;
+    const unsubscribeAuth = subscribeAuth(() => {
+      const token = getAuth()?.token ?? null;
+      if (token === lastToken) return;
+      lastToken = token;
+      // Vừa đăng nhập: hỏi quyền thông báo (để báo đơn / phiếu cả khi app đóng); đăng xuất: chỉ gỡ máy khỏi tài khoản
+      registerPush(token !== null).catch(() => {});
+    });
 
     // Mở sổ ngay khi mở app để đặt lại thông báo nhắc hạn trả nợ (nếu đã bật)
     openLedger().catch(() => {});
 
     // Bấm vào thông báo: mở trang mặt hàng / khoản nợ
-    return onNotificationOpened(openFromNotification);
+    const unsubscribeOpened = onNotificationOpened(openFromNotification);
+    return () => {
+      unsubscribeOpened();
+      unsubscribeAuth();
+    };
   }, []);
 
   return (

@@ -58,7 +58,8 @@ export function getAuth(): StoredAuth | null {
   return current;
 }
 
-function subscribe(listener: () => void) {
+/** Theo dõi đăng nhập / đăng xuất (vd gắn máy với tài khoản để nhận thông báo đẩy) */
+export function subscribeAuth(listener: () => void) {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
@@ -66,5 +67,5 @@ function subscribe(listener: () => void) {
 }
 
 export function useAuth(): StoredAuth | null {
-  return useSyncExternalStore(subscribe, () => current);
+  return useSyncExternalStore(subscribeAuth, () => current);
 }

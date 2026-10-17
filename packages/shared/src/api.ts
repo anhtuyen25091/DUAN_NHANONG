@@ -461,10 +461,12 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
     disputeDealEntry: (token: string, entryUuid: string, reason: string) =>
       request<{ data: Deal }>('POST', `/deal-entries/${entryUuid}/dispute`, { token, body: { reason } }).then((r) => r.data),
 
-    updateDevice: (pushToken: string | null, platform?: 'android' | 'ios' | 'web') =>
+    /** Lưu push token của máy; kèm token đăng nhập thì máy gắn với tài khoản (nhận thông báo đơn / phiếu), không kèm thì gỡ */
+    updateDevice: (pushToken: string | null, platform?: 'android' | 'ios' | 'web', authToken?: string | null) =>
       request<{ data: { uuid: string; push_enabled: boolean } }>('PUT', '/device', {
         body: { push_token: pushToken, platform },
         device: true,
+        token: authToken ?? undefined,
       }).then((r) => r.data),
     alerts: () => request<{ data: PriceAlert[] }>('GET', '/alerts', { device: true }).then((r) => r.data),
     createAlert: (alert: NewPriceAlert) =>

@@ -11,6 +11,34 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Mục A2: thông báo đẩy khi app đóng (đơn mua bán, phiếu) ✅ phần máy chủ + app
+
+**Đã làm**
+- **Gắn máy với tài khoản:**
+  - `PUT /device` gửi kèm token đăng nhập thì lưu `devices.user_id`; không kèm (đã đăng xuất) thì gỡ.
+  - App gửi lại mỗi lần mở app và mỗi khi đăng nhập / đăng xuất (`subscribeAuth`). Vừa đăng nhập thì hỏi quyền thông báo.
+- **`App\Notifications\PushNotifier`:**
+  - gửi tới mọi máy của tài khoản (đã bật thông báo) qua Expo Push, kênh Android `updates`
+  - chạy bằng `defer()` sau khi trả lời request, không làm chậm người đang thao tác
+- **Khi nào báo:**
+  - **Đơn mua bán:** mọi hoạt động ghi qua `Deal::recordActivity` (ghi đợt cân, đồng ý, báo sai, đổi trạng thái…) thì báo **bên còn lại**, không báo người vừa làm. Tiêu đề "🤝 {tên đơn}", nội dung là dòng hoạt động, bấm vào mở đơn.
+  - **Phiếu mua / bán:** gửi phiếu vào app của khách thì báo khách "📄 Phiếu mới từ …"; sửa phiếu đã gửi thì báo các khách đã nhận "✏️ … vừa sửa phiếu" (mã phiếu, ngày, số tiền); bấm vào mở phiếu được gửi.
+- **App:** tạo kênh Android "Đơn mua bán, phiếu"; bấm thông báo có `dealId` / `purchaseId` thì mở đúng màn hình.
+- `ExpoPushClient` nhận kênh theo từng tin (mặc định vẫn `price-alerts` cho cảnh báo giá).
+
+**Kiểm tra**
+- 3 test:
+  - gắn / gỡ máy theo đăng nhập
+  - hoạt động đơn chỉ gửi bên kia (đúng tiêu đề, kênh, `dealId`)
+  - gửi phiếu và sửa phiếu đều báo khách
+- Backend 198 test qua; typecheck shared / web / app qua.
+
+**Còn tồn**
+- **Muốn điện thoại nhận được thật phải có bản build riêng (EAS):** Expo Go trên Android không nhận thông báo đẩy; app cũng cần `eas.projectId` để lấy mã thông báo. Phần máy chủ đã sẵn sàng.
+- Production cần `EXPO_ACCESS_TOKEN` (nếu bật bảo mật push trên Expo).
+
+---
+
 ## 17/10/2026: Mục A1: ảnh hóa đơn + nói ghi chú (sổ thu chi) ✅
 
 **Đã làm** (theo cách làm ghi ở "Dừng giữa chừng" 16/10 tối)

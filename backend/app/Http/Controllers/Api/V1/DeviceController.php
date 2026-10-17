@@ -27,6 +27,8 @@ class DeviceController extends Controller
             'push_token' => $token,
             'platform' => $request->validated('platform') ?? $device->platform,
         ]);
+        // Gửi kèm token đăng nhập: gắn máy với tài khoản để nhận thông báo đơn / phiếu; không kèm (đã đăng xuất) thì gỡ
+        $device->forceFill(['user_id' => auth('sanctum')->id()])->save();
 
         return response()->json(['data' => [
             'uuid' => $device->uuid,

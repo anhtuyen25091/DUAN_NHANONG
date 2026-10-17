@@ -10,6 +10,7 @@ use App\Models\Deal;
 use App\Models\Purchase;
 use App\Models\PurchaseVersion;
 use App\Models\User;
+use App\Notifications\PushNotifier;
 use App\Transactions\TransactionFeed;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -100,6 +101,7 @@ class PurchaseController extends Controller
         }
         $purchase->viewers()->syncWithoutDetaching([$account->id => ['via' => 'phone']]);
         $purchase->markShared();
+        PushNotifier::later([$account->id], '📄 Phiếu mới từ '.$request->user()->name, self::pushSummary($purchase), ['purchaseId' => $purchase->uuid]);
 
         return response()->json(['data' => self::present($purchase->load('customer'), withSharing: true), 'message' => 'Đã gửi phiếu vào app của '.$account->name]);
     }
@@ -167,6 +169,12 @@ class PurchaseController extends Controller
             $purchase->save();
         });
 
+        // Khách đã nhận phiếu: báo phiếu vừa được sửa
+        $viewers = $purchase->viewers()->pluck('users.id');
+        if ($viewers->isNotEmpty()) {
+            PushNotifier::later($viewers, '✏️ '.$request->user()->name.' vừa sửa phiếu', self::pushSummary($purchase), ['purchaseId' => $purchase->uuid]);
+        }
+
         return response()->json(['data' => self::present($purchase->fresh('customer'))]);
     }
 
@@ -181,6 +189,14 @@ class PurchaseController extends Controller
     /**
      * @return array<string, mixed>
      */
+    /** Dòng tóm tắt phiếu trong thông báo: ngày, số tiền */
+    private static function pushSummary(Purchase $p): string
+    {
+        $amount = (int) $p->amount;
+
+        return 'Phiếu '.$p->code().' ngày '.$p->date->format('d/m/Y').($amount > 0 ? ' · '.number_format($amount, 0, ',', '.').' đ' : '');
+    }
+
     public static function present(Purchase $p, bool $withSharing = false): array
     {
         $data = [

@@ -19,7 +19,7 @@ class ExpoPushClient
     private const CHUNK = 100;
 
     /**
-     * @param  list<array{device: Device, title: string, body: string, data?: array<string, mixed>}>  $messages
+     * @param  list<array{device: Device, title: string, body: string, data?: array<string, mixed>, channel?: string}>  $messages
      * @return int số tin Expo nhận
      */
     public function send(array $messages): int
@@ -33,7 +33,8 @@ class ExpoPushClient
                 'body' => $message['body'],
                 'data' => $message['data'] ?? (object) [],
                 'sound' => 'default',
-                'channelId' => 'price-alerts',
+                // Kênh thông báo Android (app tạo sẵn): "price-alerts" báo giá, "updates" đơn / phiếu
+                'channelId' => $message['channel'] ?? 'price-alerts',
             ], $chunk);
 
             try {
