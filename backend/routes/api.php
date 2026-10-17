@@ -27,6 +27,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/prices', [PriceController::class, 'index'])->name('prices.index');
     Route::get('/products/{product:code}/history', [PriceController::class, 'history'])->name('prices.history');
     Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
+    Route::get('/shops/map', [ShopController::class, 'map'])->name('shops.map');
     Route::get('/provinces', [ShopController::class, 'provinces'])->name('provinces');
     Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
     // Giá quanh 1 vị trí do các điểm mua đã duyệt đăng (không cần đăng nhập)

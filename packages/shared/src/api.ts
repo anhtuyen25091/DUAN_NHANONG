@@ -276,6 +276,23 @@ export interface Province {
   shops: number;
 }
 
+/** Bản đồ theo khung đang xem: ít điểm thì shops, nhiều thì clusters (tâm + số điểm, bấm vào để phóng to) */
+export interface ShopMapView {
+  shops: Shop[];
+  clusters: Array<{ lat: number; lng: number; count: number }>;
+  /** Tổng số điểm trong khung đang xem */
+  total: number;
+}
+
+export interface ShopMapQuery {
+  /** nam,tây,bắc,đông */
+  bbox: string;
+  zoom: number;
+  type?: ShopType;
+  province?: string;
+  q?: string;
+}
+
 export interface ShopFilters {
   type?: ShopType;
   province?: string;
@@ -538,6 +555,7 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
     deleteAdvance: (token: string, id: string) => request<void>('DELETE', `/business/advances/${id}`, { token }),
 
     shops: (filters: ShopFilters = {}) => request<ShopPage>('GET', '/shops', { query: filters }),
+    shopMap: (query: ShopMapQuery) => request<ShopMapView>('GET', '/shops/map', { query: { ...query } }),
     provinces: () => request<{ data: Province[] }>('GET', '/provinces').then((r) => r.data),
     submitShop: (submission: ShopSubmission) =>
       request<{ message: string }>('POST', '/shop-submissions', { body: submission, device: true }).then((r) => r.message),

@@ -11,6 +11,40 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Thương nhân xuất khẩu gạo + bản đồ gom cụm theo khung đang xem ✅
+
+**1. Đọc Excel đời cũ (.xls) + danh sách xuất khẩu gạo** (người dùng đồng ý thêm `phpoffice/phpspreadsheet`)
+- `LicenseSheetSource` tự nhận file `.xls` (đầu file OLE) và đọc bằng PhpSpreadsheet; `.xlsx` vẫn đọc bằng OpenSpout.
+- Thêm các tùy chọn nguồn:
+  - `first_sheet_only` (trang tính sau là bản cũ; mã điểm dùng "sheet1" vì tên trang đổi theo bản cập nhật)
+  - `goods` (mặt hàng mặc định)
+  - `province: null` (danh sách nhiều tỉnh, đoán tỉnh từ địa chỉ)
+- Nguồn `bct-xuat-khau-gao`: Bộ Công Thương, thương nhân kinh doanh xuất khẩu gạo đến 28/4/2025, là nguồn công khai. Thêm **149 doanh nghiệp thu mua lúa gạo**: TP.HCM 34, Cần Thơ 33, Tây Ninh 20, Đồng Tháp 19, An Giang 16…
+  - Tổng điểm thu mua: 162.
+  - Bộ đăng bản mới ở bài khác, nên phải sửa `url` trong config khi có bản mới.
+
+**2. Bản đồ gom cụm, chỉ tải phần đang xem** (web + app)
+- API mới `GET /api/v1/shops/map?bbox=nam,tây,bắc,đông&zoom=&type=&province=&q=`:
+  - ≤ 600 điểm trong khung (hoặc phóng ≥ 15): trả từng điểm (`shops`)
+  - nhiều hơn: gom theo ô lưới khoảng 80 px ngay trong SQL (`clusters`: tâm, số điểm)
+  - MySQL dùng `FLOOR`, SQLite (test) dùng `CAST`; kích thước ô ghi thẳng số vì MySQL ONLY_FULL_GROUP_BY
+- Đo trên DB thật: cả nước 8.816 điểm thành 24 cụm, 1 KB, 34 ms; Cần Thơ 72 cụm, 3 KB; phóng gần 440 điểm, 210 KB.
+- **Web:**
+  - kéo / phóng xong 0,25 giây thì tải lại; bỏ kết quả của lần tải cũ
+  - cụm là vòng tròn xanh ghi số, bấm thì phóng to 2 mức
+  - khung xem ban đầu: gần tôi thì quanh vị trí, có chọn tỉnh thì giữa tỉnh, không thì cả nước
+- **App:** WebView báo `{action: 'view', bbox, zoom}` về app; app gọi API rồi `injectJavaScript(window.render(...))`; đổi bộ lọc thì dựng lại WebView.
+- `api.shopMap()` trong shared. API cũ `GET /shops?map=1` vẫn giữ cho app bản cũ.
+
+**Kiểm tra**
+- Test API (ít điểm ra từng điểm, nhiều điểm ra cụm, tổng số khớp, lọc theo loại / khung, bbox sai báo lỗi) và test đọc `.xls`. Backend 191 test, shared 108 test, typecheck + lint web và app đều qua.
+- Chụp màn hình:
+  - web: cả nước, lọc Cần Thơ (4.238 điểm thành 28 cụm), bấm cụm thì phóng to, phóng gần thấy từng chấm
+  - HTML bản đồ của app (trong Chrome, gọi API thật): cả nước 10 cụm, mức 15 ra 28 điểm
+- Đã khởi động lại Metro.
+
+---
+
 ## 17/10/2026: Dò cổng dữ liệu mở các tỉnh (đợt 2, chỉ nguồn công khai)
 
 **Đã làm**

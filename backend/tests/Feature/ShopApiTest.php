@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\ShopType;
 use App\Enums\SubmissionStatus;
+use App\Http\Controllers\Api\V1\ShopController;
 use App\Models\Shop;
 use App\Models\ShopSubmission;
 use App\Shops\OsmShopImporter;
@@ -64,6 +65,35 @@ class ShopApiTest extends TestCase
             ->assertJsonCount(35, 'data')
             ->assertJsonPath('meta.has_more', false)
             ->assertJsonPath('meta.total', 35);
+    }
+
+    public function test_map_returns_points_when_few_and_clusters_when_many(): void
+    {
+        // 3 điểm ở Cần Thơ, 1 điểm ở Hà Nội, 1 điểm không có tọa độ
+        Shop::factory()->count(3)->sequence(fn ($s) => ['lat' => 10.03 + $s->index * 0.001, 'lng' => 105.78, 'province_code' => 'can-tho'])->create();
+        Shop::factory()->create(['lat' => 21.03, 'lng' => 105.85, 'province_code' => 'ha-noi', 'types' => [ShopType::ThuMua]]);
+        Shop::factory()->create(['lat' => null, 'lng' => null]);
+
+        $all = ['bbox' => '6,101.8,23.6,117.9', 'zoom' => 6];
+        $this->getJson(route('api.v1.shops.map', $all))
+            ->assertOk()
+            ->assertJsonPath('total', 4)
+            ->assertJsonCount(4, 'shops')
+            ->assertJsonCount(0, 'clusters');
+
+        // Lọc theo loại / khung đang xem
+        $this->getJson(route('api.v1.shops.map', [...$all, 'type' => 'thu_mua']))->assertJsonPath('total', 1);
+        $this->getJson(route('api.v1.shops.map', ['bbox' => '9,105,11,106', 'zoom' => 9]))->assertJsonPath('total', 3);
+
+        // Nhiều điểm hơn ngưỡng: gom cụm (3 điểm sát nhau ở Cần Thơ thành 1 cụm)
+        $controller = new \ReflectionClassConstant(ShopController::class, 'MAP_POINTS');
+        Shop::factory()->count($controller->getValue())->create(['lat' => 16.0, 'lng' => 108.2]);
+        $response = $this->getJson(route('api.v1.shops.map', $all))->assertJsonCount(0, 'shops');
+        $clusters = collect($response->json('clusters'));
+        $this->assertSame(Shop::query()->whereNotNull('lat')->count(), $clusters->sum('count'));
+        $this->assertSame(3, $clusters->firstWhere(fn ($c) => abs($c['lat'] - 10.031) < 0.01)['count']);
+
+        $this->getJson(route('api.v1.shops.map', ['bbox' => 'abc', 'zoom' => 6]))->assertJsonValidationErrors(['bbox']);
     }
 
     public function test_provinces_with_counts(): void
