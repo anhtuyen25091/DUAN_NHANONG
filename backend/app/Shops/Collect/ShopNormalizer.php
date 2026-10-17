@@ -63,6 +63,34 @@ final class ShopNormalizer
         return $stripped !== '' ? $stripped : trim((string) preg_replace('/\s+/', ' ', $text));
     }
 
+    /**
+     * Phần tên riêng, giữ dấu, chữ thường: bỏ các từ chung ("Đại lý phân bón Hai Lúa" → "hai lúa").
+     * Dùng để so tên có dấu ("Hương" ≠ "Hường"); tên chỉ toàn từ chung thì giữ nguyên.
+     */
+    public static function nameCore(string $name): string
+    {
+        $tokens = array_values(array_filter(preg_split('/[\s.,;:\/\-–()]+/u', mb_strtolower(self::displayName($name))) ?: []));
+        $ascii = array_map(fn (string $t): string => Text::normalize($t), $tokens);
+        $phrases = array_map(fn (string $g): array => explode(' ', $g), self::GENERIC);
+        // Cụm dài khớp trước ("cua hang" trước "ch")
+        usort($phrases, fn (array $a, array $b): int => count($b) <=> count($a));
+
+        $kept = [];
+        for ($i = 0; $i < count($tokens);) {
+            foreach ($phrases as $phrase) {
+                if (array_slice($ascii, $i, count($phrase)) === $phrase) {
+                    $i += count($phrase);
+
+                    continue 2;
+                }
+            }
+            $kept[] = $tokens[$i];
+            $i++;
+        }
+
+        return $kept !== [] ? implode(' ', $kept) : implode(' ', $tokens);
+    }
+
     /** Khóa địa chỉ: không dấu, bỏ chữ "ấp/thôn/xã/huyện…" */
     public static function addressKey(?string $address): string
     {

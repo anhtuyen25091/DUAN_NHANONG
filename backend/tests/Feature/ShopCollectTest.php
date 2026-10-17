@@ -237,4 +237,27 @@ class ShopCollectTest extends TestCase
         $this->assertEqualsWithDelta(18.38, $shops[0]->lat, 0.01);
         $this->assertEqualsWithDelta(105.94, $shops[0]->lng, 0.01);
     }
+
+    public function test_same_person_name_in_different_communes_is_not_merged(): void
+    {
+        Http::fake(['photon.komoot.io/*' => Http::response(['features' => []])]);
+
+        $this->collectAndProcess($this->source('so-ha-tinh-pb', 85, [
+            new CandidateData(ref: '1', name: 'Nguyễn Thị Hương', address: 'Thôn 2, xã Đức Bồng, huyện Vũ Quang', province: 'ha-tinh', types: [ShopType::PhanBon]),
+            new CandidateData(ref: '2', name: 'Nguyễn Thị Hương', address: 'Thôn Phúc Sơn, xã Sơn Lộc, huyện Can Lộc', province: 'ha-tinh', types: [ShopType::PhanBon]),
+            new CandidateData(ref: '3', name: 'Trần Thị Loan', address: 'Thôn Nam Bình, xã Thạch Đài, thành phố Hà Tĩnh', province: 'ha-tinh', types: [ShopType::PhanBon]),
+        ]));
+        $this->collectAndProcess($this->source('so-ha-tinh-bvtv', 85, [
+            // Cùng người ở danh sách BVTV (khác thôn ghi tắt, cùng xã): gộp
+            new CandidateData(ref: 'a', name: 'Nguyễn Thị Hương', address: 'Thôn 1, xã Đức Bồng, huyện Vũ Quang', province: 'ha-tinh', types: [ShopType::ThuocBvtv]),
+            // Cùng thôn nhưng khác họ: không gộp
+            new CandidateData(ref: 'b', name: 'Trương Thị Loan', address: 'Thôn Nam Bình, xã Thạch Đài, thành phố Hà Tĩnh', province: 'ha-tinh', types: [ShopType::ThuocBvtv]),
+            // "Hường" khác "Hương" và khác xã: không gộp
+            new CandidateData(ref: 'c', name: 'Nguyễn Thị Hường', address: 'Thôn Chí Lưu, xã Thạch Kênh, huyện Thạch Hà', province: 'ha-tinh', types: [ShopType::ThuocBvtv]),
+        ]));
+
+        $this->assertSame(5, Shop::query()->count());
+        $merged = Shop::query()->where('address', 'like', '%Đức Bồng%')->sole();
+        $this->assertEqualsCanonicalizing(['phan_bon', 'thuoc_bvtv'], $merged->types->map->value->all());
+    }
 }

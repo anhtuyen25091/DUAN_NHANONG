@@ -69,6 +69,8 @@ class CandidateProcessor
     public function publish(ShopCandidate $candidate, ?Shop $match = null): Shop
     {
         $match ??= $candidate->shop_id !== null ? Shop::query()->find($candidate->shop_id) : $this->matcher->find($candidate);
+        // Bộ so khớp chỉ nạp vài cột: nạp lại đủ (loại điểm…) trước khi gộp, không thì mất loại cũ
+        $match = $match === null ? null : Shop::query()->find($match->id);
 
         return DB::transaction(function () use ($candidate, $match): Shop {
             $shop = $match ?? new Shop([

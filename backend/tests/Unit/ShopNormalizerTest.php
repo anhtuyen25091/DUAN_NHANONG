@@ -28,6 +28,14 @@ class ShopNormalizerTest extends TestCase
         $this->assertSame('dai ly phan bon', ShopNormalizer::nameKey('Đại lý phân bón'));
     }
 
+    public function test_name_core_keeps_accents(): void
+    {
+        $this->assertSame('hai lúa', ShopNormalizer::nameCore('Cửa hàng VTNN Hai Lúa'));
+        $this->assertSame('hai lúa', ShopNormalizer::nameCore('Đại lý phân bón - thuốc BVTV Hai Lúa'));
+        $this->assertSame('nguyễn thị hường', ShopNormalizer::nameCore('Nguyễn Thị Hường'));
+        $this->assertSame('đại lý phân bón', ShopNormalizer::nameCore('Đại lý phân bón'));
+    }
+
     public function test_display_name(): void
     {
         $this->assertSame('Đại Lý Hai Lúa', ShopNormalizer::displayName('  ĐẠI LÝ   HAI LÚA. '));
