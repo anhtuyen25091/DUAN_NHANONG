@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import { useSyncExternalStore } from 'react';
 import { AppState, Platform } from 'react-native';
 import { api } from './api';
+import { syncPhotos } from './receipts';
 
 let engine: SyncEngine | null = null;
 
@@ -12,7 +13,8 @@ let engine: SyncEngine | null = null;
  */
 export function startSync(ledger: Ledger): SyncEngine {
   if (engine) return engine;
-  const sync = new SyncEngine(ledger, api);
+  // Sau mỗi lần đồng bộ sổ: gửi / tải ảnh hóa đơn
+  const sync = new SyncEngine(ledger, api, { afterSync: (token) => syncPhotos(ledger, token) });
   engine = sync;
   sync.start();
   AppState.addEventListener('change', (state) => {

@@ -2116,3 +2116,23 @@ a.button.see-all {
   gap: 8px;
   margin-bottom: 8px;
 }
+
+/* Ảnh hóa đơn + nói ghi chú (màn ghi khoản) */
+.receipt-photo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}
+.receipt-photo img {
+  display: block;
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+button.voice {
+  margin-top: 6px;
+}

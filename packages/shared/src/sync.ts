@@ -54,10 +54,16 @@ export class SyncEngine {
   private retryMs: number[];
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
   private failures = 0;
+  private afterSync: ((token: string) => Promise<void>) | undefined;
 
-  constructor(ledger: Ledger, api: SyncApi, options: { debounceMs?: number; retryMs?: number[] } = {}) {
+  /**
+   * afterSync: việc làm thêm sau mỗi lần đồng bộ sổ xong (gửi / tải ảnh hóa đơn). Lỗi ở đây không làm hỏng đồng bộ sổ,
+   * lần đồng bộ sau làm tiếp.
+   */
+  constructor(ledger: Ledger, api: SyncApi, options: { debounceMs?: number; retryMs?: number[]; afterSync?: (token: string) => Promise<void> } = {}) {
     this.ledger = ledger;
     this.api = api;
+    this.afterSync = options.afterSync;
     this.debounceMs = options.debounceMs ?? 1500;
     this.retryMs = options.retryMs ?? RETRY_MS;
     this.status = this.enabled ? 'saved' : 'off';
@@ -144,6 +150,7 @@ export class SyncEngine {
       this.failures = 0;
       clearTimeout(this.retryTimer);
       this.setStatus('saved');
+      if (this.afterSync) await this.afterSync(token).catch(() => {});
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) this.setStatus('expired');
       else {

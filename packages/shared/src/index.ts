@@ -11,3 +11,4 @@ export * from './sync';
 export * from './trade';
 export * from './types';
 export * from './map';
+export * from './receipts';

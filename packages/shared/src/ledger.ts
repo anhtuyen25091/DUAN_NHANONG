@@ -118,6 +118,8 @@ export interface NewEntry {
   garden_id: string | null;
   date?: string;
   note?: string | null;
+  /** Ảnh hóa đơn đã lưu trên máy (xem receipts.ts) */
+  photo_id?: string | null;
 }
 
 export interface NewGarden {
@@ -474,6 +476,8 @@ export class Ledger {
       category_id: input.category_id,
       supply_id: null,
       note: input.note?.trim() || null,
+      // Chỉ thêm trường khi có ảnh: khoản cũ / không ảnh giữ nguyên dạng bản ghi
+      ...(input.photo_id ? { photo_id: input.photo_id } : {}),
       updated_at: this.stamp(),
       deleted_at: null,
     };

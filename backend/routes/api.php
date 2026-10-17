@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\PriceAlertController;
 use App\Http\Controllers\Api\V1\PriceController;
 use App\Http\Controllers\Api\V1\PurchaseController;
+use App\Http\Controllers\Api\V1\ReceiptPhotoController;
 use App\Http\Controllers\Api\V1\ShopController;
 use App\Http\Controllers\Api\V1\TransactionController;
 use App\Http\Middleware\ResolveDevice;
@@ -73,6 +74,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/sync/push', [LedgerSyncController::class, 'push'])->name('sync.push');
         Route::get('/sync/pull', [LedgerSyncController::class, 'pull'])->name('sync.pull');
         Route::delete('/ledger', [LedgerSyncController::class, 'destroy'])->name('ledger.destroy');
+        // Ảnh hóa đơn của sổ (id = uuid do máy tạo)
+        Route::put('/sync/photos/{photo}', [ReceiptPhotoController::class, 'store'])->whereUuid('photo')->middleware('throttle:60,1')->name('sync.photos.store');
+        Route::get('/sync/photos/{photo}', [ReceiptPhotoController::class, 'show'])->whereUuid('photo')->name('sync.photos.show');
 
         // Đơn mua bán chung 2 bên (thương lái / chi nhánh / nông dân)
         Route::get('/deals', [DealController::class, 'index'])->name('deals.index');

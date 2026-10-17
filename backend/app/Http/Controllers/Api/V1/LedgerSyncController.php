@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 /**
@@ -112,6 +113,7 @@ class LedgerSyncController extends Controller
     public function destroy(Request $request): Response
     {
         $request->user()->ledgerRecords()->delete();
+        Storage::disk('local')->deleteDirectory(ReceiptPhotoController::directory($request->user()->id));
 
         return response()->noContent();
     }

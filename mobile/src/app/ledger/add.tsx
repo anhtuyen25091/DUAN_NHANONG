@@ -1,10 +1,11 @@
 import { extraTexts, fieldsFor, formatVnd, pressAmountKey, readVnd, saveExtra, today, type AmountKey, type EntryType, type QuickTemplate } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { DatePicker } from '../../components/DatePicker';
 import { CustomFieldInputs } from '../../components/extraFields';
 import { CheckRow } from '../../components/fields';
+import { ReceiptPhoto } from '../../components/ReceiptPhoto';
 import { Button, Chip, styles } from '../../components/ui';
 import { useLedger } from '../../lib/ledger';
 import { colors, font } from '../../lib/theme';
@@ -35,6 +36,8 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
   const [saving, setSaving] = useState(false);
   const [extra, setExtra] = useState(() => extraTexts(data.custom_fields, 'transaction', editing?.extra));
   const [keepAsTemplate, setKeepAsTemplate] = useState(false);
+  const [photoId, setPhotoId] = useState<string | null>(editing?.photo_id ?? null);
+  const noteInput = useRef<TextInput>(null);
   const hasFields = fieldsFor(data.custom_fields, 'transaction').length > 0;
 
   /** Bấm 1 khoản hay dùng: điền sẵn mọi thứ, nhảy sang bước số tiền (vẫn sửa được trước khi Lưu) */
@@ -60,7 +63,7 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
     if (!category || amount <= 0) return;
     setSaving(true);
     const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today() ? date : today();
-    const entry = { type, amount, category_id: category.id, garden_id: gardenId, date: validDate, note };
+    const entry = { type, amount, category_id: category.id, garden_id: gardenId, date: validDate, note, photo_id: photoId };
     let id = editing?.id;
     if (editing) await ledger.updateEntry(editing.id, entry);
     else id = (await ledger.addEntry(entry)).id;
@@ -191,6 +194,8 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
         <DatePicker value={date} onChange={setDate} max={today()} />
       </View>
 
+      <ReceiptPhoto photoId={photoId} onChange={setPhotoId} />
+
       <Pressable onPress={() => setMore(!more)} style={{ minHeight: 44, justifyContent: 'center' }}>
         <Text style={{ color: colors.primary, fontSize: font.body }}>
           {more ? '▾' : '▸'} Ghi chú{hasFields ? ' · thông tin thêm' : ''}{note.trim() ? `: ${note.trim()}` : ''}
@@ -198,7 +203,11 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
       </Pressable>
       {more && (
         <View style={{ gap: 10, marginBottom: 12 }}>
-          <TextInput value={note} onChangeText={setNote} placeholder="Ví dụ: 4 bao NPK" maxLength={200} style={inputStyle} />
+          <TextInput ref={noteInput} value={note} onChangeText={setNote} placeholder="Ví dụ: 4 bao NPK" maxLength={200} style={inputStyle} />
+          {/* Expo Go chưa có nhận giọng nói riêng: dùng micro trên bàn phím điện thoại */}
+          <Pressable onPress={() => noteInput.current?.focus()} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Text style={{ color: colors.primary, fontSize: font.body }}>🎤 Nói ghi chú: bấm vào đây rồi bấm nút micro trên bàn phím</Text>
+          </Pressable>
           <CustomFieldInputs fields={data.custom_fields} target="transaction" texts={extra} onChange={setExtra} />
         </View>
       )}

@@ -71,3 +71,16 @@ describe('dàn điểm gần đúng', () => {
     expect(meters([18.3, 105.9], a)).toBeGreaterThanOrEqual(149);
   });
 });
+
+describe('ảnh hóa đơn', () => {
+  it('chỉ gửi ảnh đang dùng chưa gửi, tải ảnh đang dùng máy chưa có', async () => {
+    const { photosToSync, fitSize } = await import('./receipts');
+    const t = (id: string, photo: string | null, deleted = false) => ({ id, photo_id: photo, deleted_at: deleted ? '2026-01-01' : null }) as never;
+    const snapshot = { transactions: [t('1', 'a'), t('2', 'b'), t('3', 'c'), t('4', 'd', true), t('5', null)] };
+    const result = photosToSync(snapshot, { has: new Set(['a', 'b', 'd', 'x']), uploaded: new Set(['a']) });
+    expect(result.upload).toEqual(['b']);
+    expect(result.download).toEqual(['c']);
+    expect(fitSize(4000, 3000)).toEqual({ width: 1280, height: 960 });
+    expect(fitSize(800, 600)).toEqual({ width: 800, height: 600 });
+  });
+});

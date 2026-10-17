@@ -11,6 +11,39 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Mục A1: ảnh hóa đơn + nói ghi chú (sổ thu chi) ✅
+
+**Đã làm** (theo cách làm ghi ở "Dừng giữa chừng" 16/10 tối)
+- **Ảnh không nằm trong bản ghi sổ** (giới hạn 20 KB / bản ghi). Khoản thu chi có thêm `photo_id`, chỉ thêm trường khi có ảnh nên khoản cũ giữ nguyên.
+- **Backend:**
+  - `PUT /api/v1/sync/photos/{uuid}`: ảnh JPG / PNG / WebP ≤ 2 MB; web / app gửi form bằng POST + `_method=PUT`
+  - `GET /api/v1/sync/photos/{uuid}`: chỉ chủ sổ xem được
+  - lưu ở `storage/app/private/receipts/{user_id}/{uuid}`
+  - xóa sổ trên mạng thì xóa luôn ảnh
+- **Shared:**
+  - `receipts.ts`: `fitSize` (cạnh dài ≤ 1280 px), `photosToSync` (ảnh đang dùng, có trên máy, chưa gửi thì gửi; đang dùng mà máy chưa có thì tải)
+  - `api.uploadReceiptPhoto` / `api.receiptPhoto`
+  - `SyncEngine` có tùy chọn `afterSync(token)`: sau mỗi lần đồng bộ sổ thì gửi / tải ảnh; lỗi ảnh không làm hỏng đồng bộ sổ
+- **Web:**
+  - ảnh lưu ở IndexedDB `nhanong-photos`, nén bằng canvas thành JPEG 0,7
+  - màn ghi khoản có "📷 Chụp / chọn ảnh hóa đơn" (điện thoại mở thẳng máy ảnh), ảnh thu nhỏ bấm để xem to, "Xóa ảnh"
+  - nút **🎤 Nói** cạnh ô ghi chú (nhận giọng nói tiếng Việt của Chrome / Edge / Safari; trình duyệt không hỗ trợ thì ẩn)
+  - danh sách khoản có dấu 📷
+- **App:**
+  - cài `expo-image-picker`, `expo-image-manipulator` (có trong Expo Go)
+  - ảnh lưu ở `Paths.document/receipts/{id}.jpg`, danh sách đã gửi ở `uploaded.json`
+  - nút "📷 Chụp hóa đơn" / "🖼 Chọn ảnh"; ảnh thu nhỏ bấm để xem to toàn màn hình; dấu 📷 ở danh sách
+  - **Nói ghi chú:** Expo Go chưa có nhận giọng nói riêng, nên thêm dòng "🎤 Nói ghi chú" đặt con trỏ vào ô ghi chú để dùng micro trên bàn phím. Muốn nút nói riêng thì cần build app riêng.
+
+**Kiểm tra**
+- Backend: 4 test (gửi rồi tải, người khác không xem được, xóa sổ thì xóa ảnh, chặn file không phải ảnh / quá 2 MB / id sai, POST + `_method`). Toàn bộ 195 test qua.
+- Shared: test `photosToSync`, `fitSize`.
+- Web (Chrome): ghi khoản 5.000 đ kèm ảnh 3000×2000 (172 KB) → lưu 1280×853 JPEG 16 KB; danh sách hiện 📷.
+- Gửi / tải thật với máy chủ local bằng token tạm (file tải về giống hệt file gửi); đã xóa token và ảnh thử.
+- **App chưa thử trên điện thoại thật** (chụp ảnh cần máy thật).
+
+---
+
 ## 17/10/2026: Thương nhân xuất khẩu gạo + bản đồ gom cụm theo khung đang xem ✅
 
 **1. Đọc Excel đời cũ (.xls) + danh sách xuất khẩu gạo** (người dùng đồng ý thêm `phpoffice/phpspreadsheet`)

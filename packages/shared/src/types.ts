@@ -50,6 +50,8 @@ export interface Transaction extends SyncRecord {
   category_id: string;
   supply_id: string | null; // khoản chi sinh ra khi mua vật tư
   note: string | null;
+  /** Ảnh hóa đơn (lưu riêng trên máy, gửi lên mạng qua /sync/photos/{id}); không có thì bỏ trống */
+  photo_id?: string | null;
 }
 
 /**

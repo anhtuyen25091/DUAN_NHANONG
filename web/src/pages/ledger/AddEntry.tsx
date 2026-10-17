@@ -5,6 +5,8 @@ import { showToast } from '../../ledger/toast'
 import { DateField } from '../../components/DateField'
 import { extraTexts, saveExtra } from '@nhanong/shared'
 import { CustomFieldInputs } from './extraFields'
+import { ReceiptPhoto } from '../../components/ReceiptPhoto'
+import { VoiceButton } from '../../components/VoiceButton'
 
 const KEYS: AmountKey[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0', 'xóa']
 
@@ -28,6 +30,7 @@ export function AddEntry({ ledger, data, query }: { ledger: Ledger; data: Ledger
   const [fresh, setFresh] = useState(!!editing)
   const [extra, setExtra] = useState(() => extraTexts(data.custom_fields, 'transaction', editing?.extra))
   const [keepAsTemplate, setKeepAsTemplate] = useState(false)
+  const [photoId, setPhotoId] = useState<string | null>(editing?.photo_id ?? null)
 
   /** Bấm 1 khoản hay dùng: điền sẵn mọi thứ, nhảy thẳng sang bước số tiền (vẫn sửa được trước khi Lưu) */
   const applyTemplate = (t: QuickTemplate) => {
@@ -62,7 +65,7 @@ export function AddEntry({ ledger, data, query }: { ledger: Ledger; data: Ledger
   const save = async () => {
     if (!category || amount <= 0) return
     setSaving(true)
-    const entry = { type, amount, category_id: category.id, garden_id: gardenId, date, note }
+    const entry = { type, amount, category_id: category.id, garden_id: gardenId, date, note, photo_id: photoId }
     let id = editing?.id
     if (editing) await ledger.updateEntry(editing.id, entry)
     else id = (await ledger.addEntry(entry)).id
@@ -165,6 +168,8 @@ export function AddEntry({ ledger, data, query }: { ledger: Ledger; data: Ledger
         </fieldset>
       )}
 
+      <ReceiptPhoto photoId={photoId} onChange={setPhotoId} />
+
       <details className="more" open={fieldsFor(data.custom_fields, 'transaction').length > 0 && Object.values(extra).some(Boolean)}>
         <summary>
           Ngày ({date === today() ? 'hôm nay' : date.split('-').reverse().join('/')}) · ghi chú{fieldsFor(data.custom_fields, 'transaction').length > 0 ? ' · thông tin thêm' : ''}
@@ -174,6 +179,7 @@ export function AddEntry({ ledger, data, query }: { ledger: Ledger; data: Ledger
           Ghi chú
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="Ví dụ: 4 bao NPK" />
         </label>
+        <VoiceButton onText={(text) => setNote((n) => (n ? `${n} ${text}` : text).slice(0, 200))} />
         <CustomFieldInputs fields={data.custom_fields} target="transaction" texts={extra} onChange={setExtra} />
       </details>
 

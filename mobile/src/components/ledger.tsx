@@ -49,7 +49,7 @@ export function EntryItemRow({ item, ledger, data, showGarden }: { item: EntryIt
   const t = item.entry;
   const cat = data.categories.find((c) => c.id === t.category_id);
   const garden = showGarden ? (t.garden_id ? data.gardens.find((g) => g.id === t.garden_id)?.name : 'Chi chung') : null;
-  const sub = [garden, t.note, ...fieldLines(data.custom_fields, 'transaction', t.extra).map((l) => `${l.label}: ${l.value}`)].filter(Boolean).join(' · ');
+  const sub = [t.photo_id ? '📷' : null, garden, t.note, ...fieldLines(data.custom_fields, 'transaction', t.extra).map((l) => `${l.label}: ${l.value}`)].filter(Boolean).join(' · ');
 
   // Khoản sinh ra khi mua vật tư / ghi nợ: mở vật tư / khoản nợ để sửa, để 2 bên không lệch nhau
   const debtId = data.debts.find((d) => d.transaction_id === t.id)?.id;

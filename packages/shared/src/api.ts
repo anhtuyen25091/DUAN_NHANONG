@@ -392,6 +392,12 @@ export interface ApiOptions {
 export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fetch.bind(globalThis) }: ApiOptions) {
   const root = `${baseUrl.replace(/\/+$/, '')}/api/v1`;
 
+  /** Gửi form kèm file: PHP chỉ đọc file với POST, nên báo phương thức thật qua _method */
+  function withMethod(form: FormData, method: string): FormData {
+    form.append('_method', method);
+    return form;
+  }
+
   async function request<T>(method: string, path: string, options: { query?: object; body?: unknown; device?: boolean; token?: string } = {}): Promise<T> {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(options.query ?? {})) {
@@ -515,6 +521,30 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
       request<{ data: ReceivedPurchase[] }>('GET', '/received-purchases', { token, query: since ? { since } : {} }).then((r) => r.data),
     receivedPurchase: (token: string, id: string) => request<{ data: ReceivedPurchase }>('GET', `/received-purchases/${id}`, { token }).then((r) => r.data),
     /** Tải giấy tờ PDF / Word: trả nội dung file + tên file (web lưu bằng Blob, app ghi file rồi chia sẻ) */
+    /** Gửi ảnh hóa đơn (form có trường "photo": web là Blob, app là { uri, name, type }) */
+    uploadReceiptPhoto: async (token: string, id: string, form: FormData): Promise<void> => {
+      let response: Response;
+      try {
+        response = await fetchFn(`${root}/sync/photos/${id}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, body: withMethod(form, 'PUT') });
+      } catch {
+        throw new ApiError('Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.', 0);
+      }
+      if (!response.ok) {
+        const json = await response.json().catch(() => null);
+        throw new ApiError(json?.message ?? `Lỗi máy chủ (${response.status})`, response.status, json?.errors ?? {});
+      }
+    },
+    /** Tải ảnh hóa đơn (404 = máy chủ chưa có ảnh này) */
+    receiptPhoto: async (token: string, id: string): Promise<ArrayBuffer> => {
+      let response: Response;
+      try {
+        response = await fetchFn(`${root}/sync/photos/${id}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'image/*' } });
+      } catch {
+        throw new ApiError('Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.', 0);
+      }
+      if (!response.ok) throw new ApiError(`Không tải được ảnh (${response.status})`, response.status);
+      return response.arrayBuffer();
+    },
     downloadDocument: async (token: string, target: DocumentTarget, format: DocumentFormat): Promise<{ data: ArrayBuffer; filename: string; mime: string }> => {
       let response: Response;
       try {

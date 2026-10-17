@@ -75,7 +75,15 @@ export function EntryList({ ledger, data, entries, showGarden }: { ledger: Ledge
                     {cat?.icon ?? '📦'}
                   </span>
                   <span className="entry-text">
-                    <span>{cat?.name ?? 'Khác'}</span>
+                    <span>
+                      {cat?.name ?? 'Khác'}
+                      {t.photo_id && (
+                        <span className="has-photo" title="Có ảnh hóa đơn">
+                          {' '}
+                          📷
+                        </span>
+                      )}
+                    </span>
                     <span className="small muted">
                       {[
                         showGarden ? (t.garden_id ? gardens.get(t.garden_id)?.name : 'Chi chung') : null,
