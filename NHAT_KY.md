@@ -11,6 +11,17 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Sửa biểu tượng thanh tab app không hiện trên Android ✅
+
+- **Nguyên nhân:** lần làm mới giao diện đặt biểu tượng tab là emoji cỡ 24 + lề 14 px mỗi bên + nền xanh. Khung biểu tượng của thanh tab trên Android chỉ 24×24 px (expo-router `TabBarIcon`, `ICON_SIZE_MATERIAL`), nên emoji bị cắt mất.
+- **Sửa:**
+  - nới khung bằng `tabBarIconStyle` 56×32
+  - nền xanh đặt ở 1 `View` riêng, emoji cỡ 22 nằm giữa (`includeFontPadding: false`)
+  - bỏ chiều cao cố định 68 px của thanh tab để thanh tự tính theo vùng an toàn (máy có thanh điều hướng)
+- Typecheck qua; bundle Android có bản sửa; đã khởi động lại Metro. Cần người dùng xem lại trên máy Android.
+
+---
+
 ## 17/10/2026: Làm mới giao diện cho nông dân dễ dùng (web + app) ✅
 
 **Yêu cầu:** giao diện trông cũ; người dùng chủ yếu là nông dân nên cần dễ hiểu, dễ thao tác.

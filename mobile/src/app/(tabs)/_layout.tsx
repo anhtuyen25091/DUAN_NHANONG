@@ -1,15 +1,18 @@
 import { router, Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
 import { useDealWatch } from '../../lib/dealWatch';
 import { colors } from '../../lib/theme';
+
+/** Khung biểu tượng tab: Android mặc định chỉ 24×24 nên phải nới ra (tabBarIconStyle) để emoji + nền không bị cắt */
+const ICON_BOX = { width: 56, height: 32 };
 
 const icon = (emoji: string) =>
   function TabIcon({ focused }: { focused: boolean }) {
     // Ô đang chọn có nền xanh nhạt quanh biểu tượng (dễ nhận ra mình đang ở đâu)
     return (
-      <Text style={{ fontSize: 24, opacity: focused ? 1 : 0.6, backgroundColor: focused ? colors.primarySoft : 'transparent', borderRadius: 999, paddingHorizontal: 14, overflow: 'hidden' }}>
-        {emoji}
-      </Text>
+      <View style={{ ...ICON_BOX, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? colors.primarySoft : 'transparent' }}>
+        <Text style={{ fontSize: 22, lineHeight: 28, textAlign: 'center', includeFontPadding: false, opacity: focused ? 1 : 0.65 }}>{emoji}</Text>
+      </View>
     );
   };
 
@@ -21,7 +24,8 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontSize: 13, fontWeight: '600' },
-        tabBarStyle: { height: 68, paddingTop: 6, paddingBottom: 8 },
+        tabBarIconStyle: ICON_BOX,
+        tabBarStyle: { paddingTop: 6 },
         headerStyle: { backgroundColor: colors.surface },
         headerTitleStyle: { color: colors.text, fontWeight: '700' },
         headerShadowVisible: false,
