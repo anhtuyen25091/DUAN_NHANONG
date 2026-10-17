@@ -11,6 +11,38 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Mục A5: cập nhật tức thì qua Ably ✅ (chờ khóa Ably để chạy thật)
+
+**Đánh giá Ably** (người dùng đề xuất): gói miễn phí 6 triệu tin / tháng, **200 kết nối cùng lúc**, 200 kênh, 500 tin / giây, không cần thẻ; vượt mức thì kết nối mới bị chặn (không tự tính tiền). Đủ cho giai đoạn đầu nếu app vẫn chạy khi Ably không dùng được. Người dùng đồng ý thêm phụ thuộc.
+
+**Đã làm**
+- Phụ thuộc: backend `ably/ably-php` (thư viện lõi mà `ably/laravel-broadcaster` dùng; không cần cả hệ thống broadcast của Laravel); web + app `ably` (ably-js, có bản riêng cho React Native).
+- **Backend:**
+  - `App\Realtime\Realtime`: kênh riêng mỗi tài khoản `user:{id}`, tin `update`
+  - gửi cùng chỗ với thông báo đẩy (`PushNotifier::later`): hoạt động đơn mua bán, gửi / sửa phiếu
+  - `GET /api/v1/realtime/token`: cấp **vé tạm 1 giờ chỉ được nghe kênh của chính mình** (khóa Ably không bao giờ gửi về app); chưa cấu hình thì `enabled: false`
+  - cấu hình `services.ably.key` (biến `ABLY_KEY`)
+- **Shared:** `RealtimeLink` (dùng chung web + app): xin vé, tự xin vé mới khi hết hạn, nghe kênh, báo trạng thái kết nối, đổi tài khoản thì nối lại / ngắt.
+- **Web + app:**
+  - bộ theo dõi đơn (`dealWatch`) hỏi máy chủ **ngay khi có tin Ably**
+  - đang nối được Ably thì hỏi định kỳ **60 giây / lần**, không nối được thì **8 giây / lần** như cũ
+  - web chỉ tải thư viện Ably khi chạy (không làm nặng trang đầu)
+
+**Kiểm tra**
+- Backend:
+  - chưa có khóa thì tắt
+  - vé tạm chỉ cho nghe đúng kênh, không lộ khóa
+  - hoạt động đơn thì gửi tin cho bên kia
+  - toàn bộ 206 test qua
+- Shared: test `RealtimeLink` (không bật thì không nối; bật thì nghe đúng kênh, báo trạng thái, nhận tin, đăng xuất thì ngắt). 111 test qua.
+- Web (chưa có khóa): gọi `/realtime/token`, vẫn hỏi 8 giây / lần, không lỗi.
+- App: bundle Android đóng gói được ably (8,77 MB).
+- **Chưa thử với Ably thật** (chưa có khóa) và chưa thử trên điện thoại.
+
+**Cần người dùng:** tạo tài khoản miễn phí ở ably.com, tạo API key (quyền publish + subscribe), tự điền `ABLY_KEY=...` vào `backend/.env` (không gửi qua chat), rồi `php artisan config:clear`.
+
+---
+
 ## 17/10/2026: Mục A6: link mã đơn / phiếu mở thẳng app ✅ (phần code; mở bằng link https cần build + tên miền)
 
 **Đã làm**

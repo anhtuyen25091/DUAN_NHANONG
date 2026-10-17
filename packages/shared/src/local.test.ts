@@ -92,3 +92,45 @@ describe('link mã đơn / phiếu', () => {
     expect(webJoinLink('https://nhanong.vn/', 'NN7K3P')).toBe('https://nhanong.vn/#/don/tham-gia?ma=NN7K3P');
   });
 });
+
+describe('cập nhật tức thì', () => {
+  it('không bật thì không kết nối; bật thì nghe đúng kênh, báo trạng thái, đổi tài khoản thì ngắt', async () => {
+    const { RealtimeLink } = await import('./realtime');
+    let token: string | null = 't1';
+    const events: string[] = [];
+    let stateListener: ((c: { current: string }) => void) | null = null;
+    let messageListener: ((m: { data?: unknown }) => void) | null = null;
+    let closed = 0;
+    let enabled = false;
+    const link = new RealtimeLink({
+      api: { realtimeToken: async () => (enabled ? { enabled: true, channel: 'user:7', token_request: { mac: 'x' } } : { enabled: false }) },
+      getToken: () => token,
+      createClient: (auth) => {
+        auth(null, (_e, tr) => events.push(`vé ${tr?.mac}`));
+        return {
+          connection: { state: 'initialized', on: (l) => (stateListener = l) },
+          channels: { get: (name) => ({ subscribe: (l) => { events.push(`nghe ${name}`); messageListener = l; } }) },
+          close: () => closed++,
+        };
+      },
+      onUpdate: (d) => events.push(`tin ${JSON.stringify(d)}`),
+      onState: (c) => events.push(c ? 'đã nối' : 'mất nối'),
+    });
+
+    await link.refresh();
+    expect(events).toEqual([]);
+
+    enabled = true;
+    token = 't2';
+    await link.refresh();
+    stateListener!({ current: 'connected' });
+    messageListener!({ data: { dealId: 'abc' } });
+    expect(link.connected()).toBe(true);
+
+    token = null;
+    await link.refresh();
+    expect(closed).toBe(1);
+    expect(link.connected()).toBe(false);
+    expect(events).toEqual(['vé x', 'nghe user:7', 'đã nối', 'tin {"dealId":"abc"}', 'mất nối']);
+  });
+});

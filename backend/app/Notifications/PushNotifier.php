@@ -4,11 +4,12 @@ namespace App\Notifications;
 
 use App\Alerts\ExpoPushClient;
 use App\Models\Device;
+use App\Realtime\Realtime;
 
 use function Illuminate\Support\defer;
 
 /**
- * Thông báo đẩy tới tài khoản (mọi máy đang đăng nhập tài khoản đó và đã bật thông báo), để báo cả khi app đóng:
+ * Báo việc mới tới tài khoản: tin Ably (app đang mở thì tải lại ngay) + thông báo đẩy (mọi máy đang đăng nhập tài khoản đó và đã bật thông báo), để báo cả khi app đóng:
  * bên kia ghi / xác nhận / báo sai trong đơn mua bán, khách nhận phiếu mới hoặc phiếu bị sửa.
  * Gửi sau khi trả lời request (không làm chậm người đang thao tác).
  */
@@ -28,7 +29,11 @@ class PushNotifier
         if ($ids === []) {
             return;
         }
-        defer(fn () => app(self::class)->send($ids, $title, $body, $data));
+        defer(function () use ($ids, $title, $body, $data): void {
+            // App đang mở: tin Ably để tải lại ngay; app đóng: thông báo đẩy
+            app(Realtime::class)->publish($ids, ['title' => $title, ...$data]);
+            app(self::class)->send($ids, $title, $body, $data);
+        });
     }
 
     /**

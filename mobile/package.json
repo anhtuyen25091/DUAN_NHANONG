@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@nhanong/shared": "*",
+    "ably": "^2.29.0",
     "expo": "~57.0.28",
     "expo-constants": "~57.0.21",
     "expo-device": "~57.0.2",

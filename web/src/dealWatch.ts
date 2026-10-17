@@ -2,12 +2,16 @@ import { DealWatcher, type DealWatchState } from '@nhanong/shared'
 import { useSyncExternalStore } from 'react'
 import { api } from './api'
 import { getAuth } from './auth'
+import { realtimeConnected, startRealtime } from './realtime'
 
 const SEEN_KEY = 'deal_seen'
 const INTERVAL_MS = 8000
+/** Đang nối Ably (cập nhật tức thì): chỉ cần hỏi lại thưa, phòng lỡ tin */
+const REALTIME_INTERVAL_MS = 60_000
 
 /**
- * Theo dõi đơn mua bán chung trên web: hỏi server 8 giây 1 lần khi tab đang mở (hỏi ngay khi quay lại tab),
+ * Theo dõi đơn mua bán chung trên web: hỏi server 8 giây 1 lần khi tab đang mở (hỏi ngay khi quay lại tab;
+ * có cập nhật tức thì qua Ably thì hỏi ngay khi có tin và chỉ hỏi định kỳ 60 giây / lần),
  * báo khi bên kia vừa ghi / xác nhận / báo sai. Tab đang ẩn và đã cho phép thì hiện thông báo của trình duyệt.
  */
 export const dealWatcher = new DealWatcher(api, {
@@ -54,8 +58,21 @@ export function startDealWatch() {
       }
     }
   }
-  void tick()
-  setInterval(tick, INTERVAL_MS)
+  // Hỏi định kỳ, nhịp tùy có cập nhật tức thì hay không; có tin Ably thì hỏi ngay
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const schedule = () => {
+    clearTimeout(timer)
+    timer = setTimeout(async () => {
+      await tick()
+      schedule()
+    }, realtimeConnected() ? REALTIME_INTERVAL_MS : INTERVAL_MS)
+  }
+  const now = () => {
+    void tick()
+    schedule()
+  }
+  startRealtime(now, schedule)
+  now()
   document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && void tick())
 }
 

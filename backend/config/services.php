@@ -28,6 +28,11 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Cập nhật tức thì (App\Realtime\Realtime). Để trống thì tắt, app hỏi máy chủ định kỳ.
+    'ably' => [
+        'key' => env('ABLY_KEY', ''),
+    ],
+
     'expo' => [
         // Chỉ cần khi bật "enhanced push security" trên EAS Dashboard
         'access_token' => env('EXPO_ACCESS_TOKEN'),

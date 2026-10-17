@@ -42,12 +42,14 @@ export function getAuth(): StoredAuth | null {
   return current
 }
 
+/** Theo dõi đăng nhập / đăng xuất (vd kết nối lại cập nhật tức thì) */
+export function subscribeAuth(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
 export function useAuth(): StoredAuth | null {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l)
-      return () => listeners.delete(l)
-    },
-    () => current,
-  )
+  return useSyncExternalStore(subscribeAuth, () => current)
 }

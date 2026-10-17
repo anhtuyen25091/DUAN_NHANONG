@@ -4,9 +4,12 @@ import { useSyncExternalStore } from 'react';
 import { AppState, Platform } from 'react-native';
 import { api } from './api';
 import { getAuth } from './auth';
+import { realtimeConnected, startRealtime } from './realtime';
 
 const SEEN_KEY = 'deal_seen';
 const INTERVAL_MS = 8000;
+/** Đang nối Ably (cập nhật tức thì): chỉ cần hỏi lại thưa, phòng lỡ tin */
+const REALTIME_INTERVAL_MS = 60_000;
 
 const store =
   Platform.OS === 'web'
@@ -16,7 +19,8 @@ const store =
 /**
  * Theo dõi đơn mua bán chung trên app: hỏi server 8 giây 1 lần khi app đang mở (hỏi ngay khi quay lại app),
  * báo khi bên kia vừa ghi / xác nhận / báo sai; số mục chờ xác nhận hiện trên tab "Đơn".
- * App đóng hẳn thì không báo được (cần thông báo đẩy từ server, làm sau).
+ * Có cập nhật tức thì qua Ably thì hỏi ngay khi có tin và chỉ hỏi định kỳ 60 giây / lần.
+ * App đóng hẳn: máy chủ gửi thông báo đẩy (cần bản build riêng).
  */
 export const dealWatcher = new DealWatcher(api, {
   getToken: () => getAuth()?.token ?? null,
@@ -52,8 +56,21 @@ export function startDealWatch() {
     if (!token || !active) return;
     await dealWatcher.poll().catch(() => {});
   };
-  void tick();
-  setInterval(tick, INTERVAL_MS);
+  // Hỏi định kỳ, nhịp tùy có cập nhật tức thì hay không; có tin Ably thì hỏi ngay
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const schedule = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      await tick();
+      schedule();
+    }, realtimeConnected() ? REALTIME_INTERVAL_MS : INTERVAL_MS);
+  };
+  const now = () => {
+    void tick();
+    schedule();
+  };
+  startRealtime(now, schedule);
+  now();
   AppState.addEventListener('change', (state) => {
     active = state === 'active';
     if (active) void tick();

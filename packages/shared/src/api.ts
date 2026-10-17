@@ -494,6 +494,9 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
       request<AuthResult>('POST', '/auth/register', { body: input }),
     login: (input: { phone: string; password: string; device_name?: string }) => request<AuthResult>('POST', '/auth/login', { body: input }),
     logout: (token: string) => request<void>('POST', '/auth/logout', { token }),
+    /** Vé tạm để kết nối Ably (cập nhật tức thì); enabled = false khi máy chủ chưa bật */
+    realtimeToken: (token: string) =>
+      request<{ enabled: boolean; channel?: string; token_request?: Record<string, unknown> }>('GET', '/realtime/token', { token }),
     forgotPassword: (phone: string) => request<{ data: PasswordResetRequest }>('POST', '/auth/password/forgot', { body: { phone } }).then((r) => r.data),
     forgotPasswordStatus: (id: string) => request<{ data: PasswordResetRequest }>('GET', `/auth/password/forgot/${id}`).then((r) => r.data),
     resetPassword: (input: { id: string; password: string; device_name?: string }) => request<AuthResult>('POST', '/auth/password/reset', { body: input }),

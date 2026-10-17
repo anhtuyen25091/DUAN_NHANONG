@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\PriceAlertController;
 use App\Http\Controllers\Api\V1\PriceController;
 use App\Http\Controllers\Api\V1\PurchaseController;
+use App\Http\Controllers\Api\V1\RealtimeController;
 use App\Http\Controllers\Api\V1\ReceiptPhotoController;
 use App\Http\Controllers\Api\V1\ShopController;
 use App\Http\Controllers\Api\V1\SmsInboundController;
@@ -79,6 +80,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/me/buyer/prices', [BuyerController::class, 'reports'])->name('buyer.prices.index');
         Route::post('/me/buyer/prices', [BuyerController::class, 'storeReport'])->middleware('throttle:buyer-prices')->name('buyer.prices.store');
         Route::delete('/me/buyer/prices/{report}', [BuyerController::class, 'destroyReport'])->name('buyer.prices.destroy');
+
+        Route::get('/realtime/token', [RealtimeController::class, 'token'])->name('realtime.token');
 
         Route::post('/sync/push', [LedgerSyncController::class, 'push'])->name('sync.push');
         Route::get('/sync/pull', [LedgerSyncController::class, 'pull'])->name('sync.pull');
