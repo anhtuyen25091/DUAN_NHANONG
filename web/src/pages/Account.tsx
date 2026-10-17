@@ -145,12 +145,12 @@ function SignInForm({ memberDays, guestDays, back }: { memberDays: number; guest
       <p className="small muted">
         Đăng ký miễn phí bằng số điện thoại để xem giá {memberDays} ngày gần nhất (chưa đăng nhập chỉ xem {guestDays} ngày).
       </p>
-      <nav className="segmented" aria-label="Loại tài khoản">
+      <nav className="segmented switch" aria-label="Loại tài khoản">
         <button type="button" className={tab === 'register' ? 'active' : ''} aria-pressed={tab === 'register'} onClick={() => setTab('register')}>
-          Tạo tài khoản mới
+          📝 Đăng ký mới
         </button>
         <button type="button" className={tab === 'login' ? 'active' : ''} aria-pressed={tab === 'login'} onClick={() => setTab('login')}>
-          Đã có tài khoản
+          🔑 Đăng nhập
         </button>
       </nav>
       {tab === 'register' && (

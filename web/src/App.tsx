@@ -25,7 +25,16 @@ export default function App() {
   useEffect(() => {
     document.title = awaiting > 0 ? `(${awaiting}) Nhà Nông` : 'Nhà Nông'
   }, [awaiting])
-  const section = path[0] === 'diem-ban' ? 'shops' : path[0] === 'so' ? 'ledger' : path[0] === 'don' || path[0] === 'giao-dich' || path[0] === 'doanh-nghiep' ? 'deals' : 'prices'
+  const section =
+    path[0] === 'diem-ban'
+      ? 'shops'
+      : path[0] === 'so'
+        ? 'ledger'
+        : path[0] === 'don' || path[0] === 'giao-dich' || path[0] === 'doanh-nghiep'
+          ? 'deals'
+          : path[0] === 'tai-khoan' || path[0] === 'diem-mua'
+            ? 'account'
+            : 'prices'
 
   return (
     <>
@@ -33,21 +42,37 @@ export default function App() {
         <a href={href('')} className="brand" aria-label="Nhà Nông, về bảng giá">
           🌾 <span className="brand-name">Nhà Nông</span>
         </a>
-        <nav className="topnav">
+        {/* Máy tính: menu trên đầu; điện thoại: thanh dưới đáy, biểu tượng to dễ bấm (CSS) */}
+        <nav className="topnav" aria-label="Mục chính">
           <a href={href('')} aria-current={section === 'prices' ? 'page' : undefined}>
-            Bảng giá
+            <span className="nav-icon" aria-hidden>
+              🌾
+            </span>
+            <span className="nav-label">Bảng giá</span>
           </a>
           <a href={href('so')} aria-current={section === 'ledger' ? 'page' : undefined}>
-            Sổ thu chi
+            <span className="nav-icon" aria-hidden>
+              📒
+            </span>
+            <span className="nav-label">Sổ thu chi</span>
           </a>
           <a href={href('don')} aria-current={section === 'deals' ? 'page' : undefined} aria-label={awaiting > 0 ? `Đơn, ${awaiting} mục chờ bạn xác nhận` : undefined}>
-            Đơn{awaiting > 0 && <span className="nav-badge">{awaiting}</span>}
+            <span className="nav-icon" aria-hidden>
+              🤝{awaiting > 0 && <span className="nav-badge">{awaiting}</span>}
+            </span>
+            <span className="nav-label">Đơn</span>
           </a>
           <a href={href('diem-ban')} aria-current={section === 'shops' ? 'page' : undefined}>
-            Điểm bán
+            <span className="nav-icon" aria-hidden>
+              🏪
+            </span>
+            <span className="nav-label">Điểm bán</span>
           </a>
-          <a href={href('tai-khoan')} aria-current={path[0] === 'tai-khoan' ? 'page' : undefined} aria-label="Tài khoản">
-            👤
+          <a href={href('tai-khoan')} aria-current={section === 'account' ? 'page' : undefined}>
+            <span className="nav-icon" aria-hidden>
+              👤
+            </span>
+            <span className="nav-label">Tài khoản</span>
           </a>
         </nav>
       </header>

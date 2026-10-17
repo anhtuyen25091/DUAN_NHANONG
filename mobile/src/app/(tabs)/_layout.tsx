@@ -5,7 +5,12 @@ import { colors } from '../../lib/theme';
 
 const icon = (emoji: string) =>
   function TabIcon({ focused }: { focused: boolean }) {
-    return <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>;
+    // Ô đang chọn có nền xanh nhạt quanh biểu tượng (dễ nhận ra mình đang ở đâu)
+    return (
+      <Text style={{ fontSize: 24, opacity: focused ? 1 : 0.6, backgroundColor: focused ? colors.primarySoft : 'transparent', borderRadius: 999, paddingHorizontal: 14, overflow: 'hidden' }}>
+        {emoji}
+      </Text>
+    );
   };
 
 export default function TabsLayout() {
@@ -14,16 +19,20 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
-        tabBarLabelStyle: { fontSize: 13 },
+        tabBarInactiveTintColor: colors.muted,
+        tabBarLabelStyle: { fontSize: 13, fontWeight: '600' },
+        tabBarStyle: { height: 68, paddingTop: 6, paddingBottom: 8 },
         headerStyle: { backgroundColor: colors.surface },
-        headerTitleStyle: { color: colors.text },
+        headerTitleStyle: { color: colors.text, fontWeight: '700' },
+        headerShadowVisible: false,
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Bảng giá',
+          title: '🌾 Nhà Nông',
+          tabBarLabel: 'Bảng giá',
           tabBarIcon: icon('🌾'),
           headerRight: () => (
             <Text accessibilityRole="button" accessibilityLabel="Tài khoản" onPress={() => router.push('/account')} style={{ color: colors.primary, fontSize: 16, padding: 12 }}>

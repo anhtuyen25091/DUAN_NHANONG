@@ -1,9 +1,10 @@
-import { CATEGORY_TYPE_LABELS, describeLocation, formatDate, formatPriceRange, groupByProduct, matchesSearch, type CategoryType } from '@nhanong/shared'
+import { CATEGORY_TYPE_LABELS, describeLocation, groupByProduct, matchesSearch, pinFollowed, type CategoryType } from '@nhanong/shared'
 import { useState } from 'react'
 import { api } from '../api'
-import { Change } from '../components/Change'
+import { ProductPriceCard } from '../components/ProductPriceCard'
 import { Status } from '../components/Status'
 import { href, replaceQuery, useAsync } from '../hooks'
+import { useFollowed } from '../followed'
 import { useMyLocation } from '../myLocation'
 
 const TYPES = Object.keys(CATEGORY_TYPE_LABELS) as CategoryType[]
@@ -19,7 +20,9 @@ export function PriceBoard({ query }: { query: URLSearchParams }) {
   const setFilter = (next: { type?: string; region?: string }) => replaceQuery('', { type, region, ...next })
 
   const rows = prices.status === 'ok' ? prices.data.data.filter((row) => matchesSearch(row, search)) : []
-  const groups = groupByProduct(rows)
+  const followed = useFollowed()
+  const groups = pinFollowed(groupByProduct(rows), followed)
+  const followedCount = groups.filter((g) => followed.includes(g.product.code)).length
 
   return (
     <>
@@ -57,41 +60,15 @@ export function PriceBoard({ query }: { query: URLSearchParams }) {
         </div>
       )}
 
-      {groups.map(({ product, rows }) => (
-        <section key={product.code} className="card">
-          <header className="card-head">
-            <h2>
-              <a href={href(`san-pham/${product.code}`, { region })}>{product.name}</a>
-            </h2>
-            <a className="link-chart" href={href(`san-pham/${product.code}`, { region })}>
-              Biểu đồ ›
-            </a>
-          </header>
-          <table className="prices">
-            <thead>
-              <tr>
-                <th>Khu vực</th>
-                <th className="num">Giá (đ/{product.unit})</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.region.code}>
-                  <td>
-                    <a href={href(`san-pham/${product.code}`, { region: row.region.code })}>{row.region.name}</a>
-                    <div className="small muted">
-                      {formatDate(row.date)} · {row.sources.join(', ')}
-                    </div>
-                  </td>
-                  <td className="num">
-                    <div className="price">{formatPriceRange(row)}</div>
-                    <Change value={row.change} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+      {prices.status === 'ok' && groups.length > 0 && followedCount === 0 && !search && (
+        <p className="hint">⭐ Bấm ☆ ở mặt hàng bạn trồng để đưa lên đầu trang, lần sau mở là thấy ngay.</p>
+      )}
+      {groups.map(({ product, rows }, i) => (
+        <div key={product.code}>
+          {followedCount > 0 && i === 0 && <h2 className="section-title">⭐ Mặt hàng bạn theo dõi</h2>}
+          {followedCount > 0 && i === followedCount && <h2 className="section-title">Các mặt hàng khác</h2>}
+          <ProductPriceCard product={product} rows={rows} followed={followed.includes(product.code)} region={region} expanded={search.trim() !== '' || region !== ''} />
+        </div>
       ))}
     </>
   )

@@ -1,11 +1,13 @@
 export const colors = {
-  bg: '#f7f7f2',
+  bg: '#f3f6f1',
   surface: '#ffffff',
-  text: '#1c1917',
-  muted: '#6b665f',
-  border: '#e4e2da',
+  text: '#17201a',
+  muted: '#5f6b62',
+  border: '#e2e8e0',
   primary: '#15803d',
-  primarySoft: '#dcfce7',
+  primarySoft: '#e3f6e8',
+  /** Mặt hàng đang theo dõi */
+  star: '#ca8a04',
   up: '#15803d',
   down: '#c2410c',
   error: '#b91c1c',
@@ -19,3 +21,12 @@ export const colors = {
 
 /** Chữ to cho người lớn tuổi dễ đọc */
 export const font = { small: 14, body: 17, title: 22 };
+
+/** Đổ bóng nhẹ cho thẻ (Android dùng elevation) */
+export const shadow = {
+  shadowColor: '#14281a',
+  shadowOpacity: 0.07,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 3 },
+  elevation: 2,
+} as const;

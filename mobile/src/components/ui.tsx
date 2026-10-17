@@ -1,14 +1,17 @@
-import { formatChange, trendOf } from '@nhanong/shared';
+import { ApiError, formatChange, trendOf } from '@nhanong/shared';
+import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, font } from '../lib/theme';
+import { colors, font, shadow } from '../lib/theme';
+import { setAuth } from '../lib/auth';
 import type { AsyncState } from '../lib/useAsync';
 
 const ARROWS = { up: '▲', down: '▼', flat: '–', none: '' };
 
 export function Change({ value }: { value: number | null }) {
   const trend = trendOf(value);
-  if (trend === 'none') return <Text style={[styles.change, { color: colors.muted }]}>mới</Text>;
+  if (trend === 'none') return <Text style={[styles.change, { color: colors.muted }]}>giá mới</Text>;
+  if (trend === 'flat') return <Text style={[styles.change, { color: colors.muted }]}>giữ giá</Text>;
   const color = trend === 'up' ? colors.up : trend === 'down' ? colors.down : colors.muted;
   return (
     <Text style={[styles.change, { color }]}>
@@ -51,6 +54,20 @@ export function Button({ label, onPress, disabled, variant = 'primary' }: { labe
 /** Đang tải / lỗi; trả null khi đã có dữ liệu */
 export function Status({ state, retry }: { state: AsyncState<unknown>; retry: () => void }) {
   if (state.status === 'loading') return <ActivityIndicator style={{ margin: 24 }} color={colors.primary} />;
+  // Phiên đăng nhập hết hạn: mời đăng nhập lại, không hiện chữ lỗi khó hiểu ("Unauthenticated.")
+  if (state.status === 'error' && state.error instanceof ApiError && state.error.status === 401)
+    return (
+      <Card>
+        <Text style={[styles.body, { marginBottom: 8 }]}>Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại để tiếp tục.</Text>
+        <Button
+          label="Đăng nhập lại"
+          onPress={() => {
+            setAuth(null);
+            router.push('/account');
+          }}
+        />
+      </Card>
+    );
   if (state.status === 'error')
     return (
       <Card style={{ borderColor: colors.error }}>
@@ -67,16 +84,15 @@ export const styles = StyleSheet.create({
   change: { fontSize: font.small, fontWeight: '600' },
   card: {
     backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 12,
+    ...shadow,
   },
   chip: {
     minHeight: 44,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,

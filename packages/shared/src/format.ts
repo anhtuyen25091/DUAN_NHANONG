@@ -76,6 +76,57 @@ export function groupByProduct(rows: PriceRow[]): Array<{ product: PriceRow['pro
   return [...groups.values()];
 }
 
+export interface ProductSummary {
+  /** Giá thấp nhất / cao nhất trong các vùng */
+  min: number;
+  max: number;
+  /** Số vùng giá tăng / giảm / không đổi so với lần trước */
+  up: number;
+  down: number;
+  flat: number;
+  /** Thay đổi điển hình (trung vị các vùng có thay đổi), để hiện 1 mũi tên chung */
+  change: number | null;
+  /** Ngày giá mới nhất */
+  date: string;
+  sources: string[];
+}
+
+/** Tóm tắt 1 mặt hàng cho thẻ thu gọn trên bảng giá: khoảng giá, xu hướng chung, ngày, nguồn */
+export function summarizeProduct(rows: PriceRow[]): ProductSummary {
+  const changes = rows.map((r) => r.change).filter((c): c is number => c !== null);
+  const moved = changes.filter((c) => c !== 0).sort((a, b) => a - b);
+  return {
+    min: Math.min(...rows.map((r) => r.price_min)),
+    max: Math.max(...rows.map((r) => r.price_max)),
+    up: changes.filter((c) => c > 0).length,
+    down: changes.filter((c) => c < 0).length,
+    flat: changes.filter((c) => c === 0).length,
+    change: changes.length === 0 ? null : moved.length === 0 ? 0 : moved[Math.floor(moved.length / 2)],
+    date: rows.map((r) => r.date).sort().at(-1) ?? '',
+    sources: [...new Set(rows.flatMap((r) => r.sources))],
+  };
+}
+
+/** Mặt hàng đang theo dõi lên đầu (theo thứ tự đã chọn), còn lại giữ thứ tự cũ */
+export function pinFollowed<T extends { product: { code: string } }>(groups: T[], followed: string[]): T[] {
+  const rank = (code: string) => {
+    const i = followed.indexOf(code);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  return groups.map((g, i) => ({ g, i })).sort((a, b) => rank(a.g.product.code) - rank(b.g.product.code) || a.i - b.i).map((x) => x.g);
+}
+
+const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** "Hôm nay", "Hôm qua", hoặc ngày tháng */
+export function relativeDay(date: string, todayIso = isoDay(new Date())): string {
+  if (date === todayIso) return 'Hôm nay';
+  const d = new Date(`${todayIso}T00:00:00`);
+  d.setDate(d.getDate() - 1);
+  const yesterday = isoDay(d);
+  return date === yesterday ? 'Hôm qua' : formatDate(date);
+}
+
 /** Link gọi điện: bỏ ký tự thừa, giữ số và dấu + */
 export function telHref(phone: string): string {
   return `tel:${phone.replace(/[^0-9+]/g, '')}`;

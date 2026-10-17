@@ -134,3 +134,19 @@ describe('cập nhật tức thì', () => {
     expect(events).toEqual(['vé x', 'nghe user:7', 'đã nối', 'tin {"dealId":"abc"}', 'mất nối']);
   });
 });
+
+describe('bảng giá thu gọn', () => {
+  it('tóm tắt mặt hàng, ghim mặt hàng theo dõi, ngày tương đối', async () => {
+    const { summarizeProduct, pinFollowed, relativeDay } = await import('./format');
+    const row = (min: number, max: number, change: number | null, date: string, source: string) => ({ price_min: min, price_max: max, change, date, sources: [source] }) as never;
+    const s = summarizeProduct([row(91100, 92000, -1100, '2026-10-17', 'A'), row(91800, 91800, -1500, '2026-10-17', 'A'), row(90000, 90000, 0, '2026-10-16', 'B')]);
+    expect([s.min, s.max, s.up, s.down, s.flat, s.change, s.date]).toEqual([90000, 92000, 0, 2, 1, -1100, '2026-10-17']);
+    expect(s.sources).toEqual(['A', 'B']);
+    expect(summarizeProduct([row(1, 1, null, '2026-10-17', 'A')]).change).toBeNull();
+    const groups = ['ca-phe', 'tieu', 'lua'].map((code) => ({ product: { code } }));
+    expect(pinFollowed(groups, ['lua', 'tieu']).map((g) => g.product.code)).toEqual(['lua', 'tieu', 'ca-phe']);
+    expect(relativeDay('2026-10-17', '2026-10-17')).toBe('Hôm nay');
+    expect(relativeDay('2026-10-16', '2026-10-17')).toBe('Hôm qua');
+    expect(relativeDay('2026-10-01', '2026-10-17')).toBe('01/10/2026');
+  });
+});

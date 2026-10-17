@@ -11,6 +11,47 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Làm mới giao diện cho nông dân dễ dùng (web + app) ✅
+
+**Yêu cầu:** giao diện trông cũ; người dùng chủ yếu là nông dân nên cần dễ hiểu, dễ thao tác.
+
+**Vấn đề thấy khi rà (chụp các màn ở bề ngang 390 px)**
+- Bảng giá rất dài (trang chủ 5.492 px): mỗi mặt hàng liệt kê hết các vùng, dòng nào cũng kèm tên nguồn dài và "– 0".
+- Web: menu chữ nhỏ ở đầu trang; trên điện thoại khó bấm.
+- Lỗi:
+  - trang Đơn hiện tiếng Anh "Unauthenticated." khi phiên đăng nhập hết hạn
+  - trang Tài khoản tô sáng nhầm "Bảng giá"
+- 2 nút "Tạo tài khoản mới / Đã có tài khoản" xếp chồng, không giống chọn 1 trong 2.
+
+**Đã làm**
+- **Bảng giá (web + app) thu gọn theo mặt hàng:**
+  - mỗi thẻ có giá to (khoảng giá các vùng), 1 mũi tên xu hướng chung, "Hôm nay / Hôm qua", số vùng tăng / giảm / giữ giá
+  - bấm "Xem giá N vùng ▾" mới mở từng vùng
+  - mặt hàng 1 vùng: ghi tên vùng ngay dưới giá
+  - tên nguồn chỉ ghi 1 lần ở cuối
+  - đang tìm chữ hoặc lọc vùng thì tự mở hết
+- **☆ Theo dõi mặt hàng:** bấm ☆ thì mặt hàng lên mục "⭐ Mặt hàng bạn theo dõi" ở đầu trang, viền vàng; lưu trên máy (web localStorage, app kv-store). Chưa theo dõi gì thì có dòng gợi ý.
+- "– 0" đổi thành "giữ giá", "mới" đổi thành "giá mới".
+- Shared: `summarizeProduct`, `pinFollowed`, `relativeDay` (có test).
+- **Web:**
+  - điện thoại (≤ 720 px): menu thành **thanh dưới đáy** 5 ô to (biểu tượng + chữ, ô đang chọn có nền xanh nhạt); thanh trên chỉ còn "🌾 Nhà Nông"
+  - máy tính: menu dạng viên thuốc có biểu tượng
+  - nút "＋ Ghi tiền" và thông báo nổi đẩy lên trên thanh dưới
+- **Màu và kiểu (web + app):** nền xanh xám nhạt, thẻ trắng bo 16 px đổ bóng nhẹ (bỏ viền), chip / nút lọc dạng viên thuốc, chữ đậm hơn ở tiêu đề.
+- **App:** thanh tab cao hơn, chữ đậm, ô đang chọn có nền xanh nhạt quanh biểu tượng; tiêu đề tab đầu "🌾 Nhà Nông".
+- **Sửa lỗi:**
+  - hết phiên đăng nhập (401) thì hiện "Phiên đăng nhập đã hết hạn" + nút "Đăng nhập lại" (web + app)
+  - trang Tài khoản sáng đúng mục
+  - công tắc "📝 Đăng ký mới / 🔑 Đăng nhập" chia đôi bề ngang
+
+**Kiểm tra**
+- Shared 112 test; typecheck + lint web, typecheck app qua.
+- Chụp lại web ở 390 px: bảng giá, ☆ theo dõi, mở / thu gọn vùng, sổ thu chi, điểm bán, tài khoản. Trang chủ từ 5.492 px còn 4.055 px.
+- Bundle Android có giao diện mới (8,78 MB).
+- **App chưa xem trên điện thoại thật** (bản web của app làm Metro sập trên máy này).
+
+---
+
 ## 17/10/2026: Quyết định về cập nhật tức thì: dùng Ably miễn phí, khi cần mới chuyển
 
 - Gói miễn phí Ably: tối đa **200 máy mở app cùng lúc** (chỉ tính khi app đang mở trên màn hình). Vượt mức thì máy sau tự quay về hỏi máy chủ 8 giây / lần, không lỗi.
