@@ -71,4 +71,29 @@ class BackfillPricesTest extends TestCase
         Http::assertSentCount(4); // robots + sitemap + bài (lần 1) + sitemap (lần 2)
         $this->assertSame(4, Price::query()->count());
     }
+
+    public function test_recent_option_runs_every_backfill_source_for_this_month_only(): void
+    {
+        $this->travelTo(now()->setDate(2021, 11, 20));
+
+        // Các báo dự phòng khác không có sitemap giả trong test → lỗi, nhưng báo Quốc tế vẫn được chạy
+        $this->artisan('crawl:backfill', ['--recent' => true])
+            ->expectsOutputToContain('11/2021 baoquocte-ca-phe')
+            ->expectsOutputToContain('11/2021 congthuong-lua-gao   lỗi')
+            ->doesntExpectOutputToContain('10/2021')
+            ->assertFailed();
+
+        $this->assertDatabaseHas('prices', ['date' => '2021-11-15']);
+    }
+
+    public function test_recent_option_includes_last_month_in_the_first_days_of_a_month(): void
+    {
+        $this->travelTo(now()->setDate(2021, 12, 2));
+        Http::fake(['baoquocte.vn/stores/lookssitemaps/site_1/sitemap-month-2021-12.xml' => Http::response('<urlset></urlset>')]);
+
+        $this->artisan('crawl:backfill', ['sources' => ['baoquocte-ca-phe'], '--recent' => true])
+            ->expectsOutputToContain('11/2021 baoquocte-ca-phe')
+            ->expectsOutputToContain('12/2021 baoquocte-ca-phe')
+            ->assertSuccessful();
+    }
 }

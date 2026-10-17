@@ -10,6 +10,14 @@ Schedule::command('crawl:run --queue')
     ->withoutOverlapping(30)
     ->onOneServer();
 
+// Bù giá từ các báo dự phòng (báo Quốc tế, Công Thương, agro.gov…) cho những ngày báo chính không đăng bài.
+// Chỉ quét tháng này; bài đã lấy thì bỏ qua nên chạy nhanh.
+Schedule::command('crawl:backfill --recent')
+    ->twiceDailyAt(9, 15, 0)
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping(60)
+    ->onOneServer();
+
 // Sau khi thu thập xong (hàng đợi chạy từ 8:30 / 14:30)
 Schedule::command('alerts:send')
     ->twiceDailyAt(9, 15, 30)

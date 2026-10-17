@@ -11,6 +11,28 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Crawl bù 16–17/10 + tự lấy giá từ báo dự phòng ✅
+
+**Vấn đề:** database dev chỉ có giá tới 15/10.
+- Lịch crawl tự động chỉ chạy khi `schedule:work` + `queue:work` bật, mà chưa máy nào bật (chưa có VPS).
+- Ngày 16/10, Vietbao **không đăng bản tin giá** (sitemap ngày đó có 193 bài nhưng không có bài giá cà phê / tiêu / lúa), nên crawl bù vẫn không có giá.
+
+**Đã làm**
+- Crawl bù:
+  - `crawl:run --date=2026-10-16`: có phân bón sỉ
+  - `crawl:run --date=2026-10-17`: có cà phê, sầu riêng, phân bón sỉ
+- Lấy từ báo dự phòng (`crawl:backfill` tháng 10): báo Quốc tế (cà phê 8 giá, tiêu 7 giá), Công Thương (lúa gạo 11 giá). Ngày 16/10 giờ đã có cà phê, hồ tiêu, lúa, gạo.
+- `crawl:backfill --recent`:
+  - chạy mọi nguồn có cấu hình `backfill`, chỉ cho tháng này; trong 3 ngày đầu tháng thì lấy cả tháng trước
+  - đã đưa vào lịch lúc **9:00 và 15:00**, ngay sau lần crawl chính (8:30 / 14:30), để bù những ngày báo chính không đăng bài
+- **Sửa lỗi:** trước đây 1 báo lỗi (mạng, đổi giao diện) thì `crawl:backfill` dừng hẳn và các báo sau không được chạy. Giờ báo nào lỗi thì in "lỗi: …" rồi chạy tiếp báo khác; lệnh trả mã lỗi để biết có báo bị lỗi.
+
+**Kiểm tra:** 163 test backend qua (thêm 2 test: `--recent` chỉ quét tháng này, đầu tháng thì quét cả tháng trước; 1 báo lỗi không chặn báo khác). Pint sạch.
+
+**Lưu ý:** lịch tự động chỉ chạy khi có `php artisan schedule:work` và `php artisan queue:work` (hoặc cron trên VPS). Máy dev không bật thì phải chạy tay.
+
+---
+
 ## 16/10/2026 (tối): Dừng giữa chừng, việc làm tiếp ⏸️
 
 Đã xong và đã push trong buổi tối: mục 13 (lái còn nợ), 14 (tự gửi sổ khi có mạng lại + hỏi khi đổi tài khoản), 15 (chủ mở đơn của lái, chỉ xem), 11 (bản đồ điểm bán).
