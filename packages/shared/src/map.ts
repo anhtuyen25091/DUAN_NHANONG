@@ -91,3 +91,17 @@ export function geoNote(precision: 'exact' | 'place' | 'district' | 'province' |
   if (precision === 'province') return '📍 Chưa rõ vị trí, chấm trên bản đồ đặt ở giữa tỉnh';
   return null;
 }
+
+/**
+ * Điểm có vị trí gần đúng (tâm xã / huyện / tỉnh) thường chồng lên nhau: dàn nhẹ ra quanh tâm theo id
+ * (cố định, không đổi mỗi lần mở) để bấm được từng điểm. Điểm đúng nhà giữ nguyên.
+ */
+export function spreadPoint(lat: number, lng: number, id: number, precision: 'exact' | 'place' | 'district' | 'province' | null | undefined): [number, number] {
+  const maxMeters = precision === 'place' ? 600 : precision === 'district' ? 2000 : precision === 'province' ? 5000 : 0;
+  if (maxMeters === 0) return [lat, lng];
+  const angle = id * 2.39996; // góc vàng: các điểm không thẳng hàng
+  const meters = maxMeters * (0.25 + 0.75 * (((id * 7919) % 97) / 96));
+  const dLat = (meters * Math.cos(angle)) / 111_320;
+  const dLng = (meters * Math.sin(angle)) / (111_320 * Math.cos((lat * Math.PI) / 180));
+  return [lat + dLat, lng + dLng];
+}

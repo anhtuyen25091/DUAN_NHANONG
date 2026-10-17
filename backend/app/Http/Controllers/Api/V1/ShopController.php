@@ -18,15 +18,15 @@ class ShopController extends Controller
 {
     private const PER_PAGE = 30;
 
-    /** Xem trên bản đồ: lấy tối đa chừng này điểm 1 lần */
-    private const MAP_LIMIT = 500;
+    /** Xem trên bản đồ: lấy tối đa chừng này điểm 1 lần (bản đồ vẽ bằng canvas, vài nghìn chấm vẫn mượt) */
+    private const MAP_LIMIT = 3000;
 
     /** Khi tìm quanh vị trí, mặc định trong bán kính này (km) */
     private const DEFAULT_RADIUS = 30;
 
     /**
      * Danh sách điểm bán; có lat/lng thì lọc theo bán kính và sắp theo khoảng cách.
-     * map=1: chỉ điểm có tọa độ, tối đa 500 điểm / trang (để chấm lên bản đồ).
+     * map=1: chỉ điểm có tọa độ, tối đa 3.000 điểm / trang (để chấm lên bản đồ).
      */
     public function index(ShopIndexRequest $request): JsonResponse
     {

@@ -11,6 +11,7 @@ import {
   provinceLabels,
   SHOP_TYPE_COLORS,
   SHOP_TYPE_LABELS,
+  spreadPoint,
   telHref,
   VIETNAM_BOUNDS,
   VIETNAM_CENTER,
@@ -65,6 +66,8 @@ function createVietnamMap(box: HTMLDivElement, onHint: (text: string) => void): 
     maxZoom: MAP_MAX_ZOOM,
     maxBounds: bounds,
     maxBoundsViscosity: 1,
+    // Vẽ chấm bằng canvas: vài nghìn điểm vẫn mượt
+    preferCanvas: true,
     dragging: !touch,
   })
   for (const t of TILES) L.tileLayer(t.url, { ...t, bounds: bounds.pad(1) }).addTo(m)
@@ -129,11 +132,12 @@ export default function ShopMap({ filters, position }: { filters: ShopFilters; p
     for (const shop of state.data.data) {
       if (shop.lat === null || shop.lng === null) continue
       const color = SHOP_TYPE_COLORS[shop.types[0] ?? 'thu_mua']
-      L.circleMarker([shop.lat, shop.lng], { radius: 9, color: '#fff', weight: 2, fillColor: color, fillOpacity: 0.95 })
+      const at = spreadPoint(shop.lat, shop.lng, shop.id, shop.geo_precision)
+      L.circleMarker(at, { radius: 9, color: '#fff', weight: 2, fillColor: color, fillOpacity: 0.95 })
         .bindPopup(popupHtml(shop), { maxWidth: 280 })
         .bindTooltip(shop.name)
         .addTo(group)
-      points.push([shop.lat, shop.lng])
+      points.push(at)
     }
     if (position) {
       const radiusKm = state.data.meta.radius_km ?? 30
@@ -154,7 +158,7 @@ export default function ShopMap({ filters, position }: { filters: ShopFilters; p
       {state.status === 'ok' && (
         <p className="muted small">
           {state.data.meta.total} điểm có vị trí trên bản đồ
-          {state.data.meta.has_more ? ' (đang hiện 500 điểm đầu, hãy lọc theo tỉnh hoặc loại để xem đủ)' : ''}
+          {state.data.meta.has_more ? ` (đang hiện ${state.data.data.length} điểm đầu, hãy lọc theo tỉnh hoặc loại để xem đủ)` : ''}
         </p>
       )}
       <div className="shop-map-wrap">

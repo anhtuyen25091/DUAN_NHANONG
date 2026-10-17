@@ -183,11 +183,14 @@ class ShopCollectTest extends TestCase
         $shop = Shop::factory()->create(['name' => 'Tên admin sửa', 'phone' => '0912345678', 'province_code' => 'dong-thap', 'types' => [ShopType::ThuMua]]);
 
         $this->collectAndProcess($this->source('hang-b', 80, [
-            new CandidateData(ref: '1', name: 'Tên khác', address: 'Mỹ Hiệp, Đồng Tháp', phone: '0912345678', types: [ShopType::PhanBon]),
+            // Cùng số, tên viết khác kiểu (HOA): cùng điểm, nhưng không được sửa tên / địa chỉ admin đã nhập
+            new CandidateData(ref: '1', name: 'TÊN ADMIN SỬA', address: 'Mỹ Hiệp, Đồng Tháp', phone: '0912345678', types: [ShopType::PhanBon]),
         ]));
 
+        $address = $shop->address;
         $shop->refresh();
         $this->assertSame('Tên admin sửa', $shop->name);
+        $this->assertSame($address, $shop->address);
         $this->assertEqualsCanonicalizing(['thu_mua', 'phan_bon'], $shop->types->map->value->all());
     }
 
@@ -248,16 +251,30 @@ class ShopCollectTest extends TestCase
             new CandidateData(ref: '3', name: 'Trần Thị Loan', address: 'Thôn Nam Bình, xã Thạch Đài, thành phố Hà Tĩnh', province: 'ha-tinh', types: [ShopType::PhanBon]),
         ]));
         $this->collectAndProcess($this->source('so-ha-tinh-bvtv', 85, [
-            // Cùng người ở danh sách BVTV (khác thôn ghi tắt, cùng xã): gộp
-            new CandidateData(ref: 'a', name: 'Nguyễn Thị Hương', address: 'Thôn 1, xã Đức Bồng, huyện Vũ Quang', province: 'ha-tinh', types: [ShopType::ThuocBvtv]),
+            // Cùng người ở danh sách BVTV (cùng thôn, ghi "Thôn2" liền): gộp
+            new CandidateData(ref: 'a', name: 'Nguyễn Thị Hương', address: 'Thôn2, xã Đức Bồng, huyện Vũ Quang', province: 'ha-tinh', types: [ShopType::ThuocBvtv]),
+            // Cùng tên, cùng xã nhưng khác thôn: không gộp
+            new CandidateData(ref: 'd', name: 'Nguyễn Thị Hương', address: 'Thôn 5, xã Đức Bồng, huyện Vũ Quang', province: 'ha-tinh', types: [ShopType::ThuocBvtv]),
             // Cùng thôn nhưng khác họ: không gộp
             new CandidateData(ref: 'b', name: 'Trương Thị Loan', address: 'Thôn Nam Bình, xã Thạch Đài, thành phố Hà Tĩnh', province: 'ha-tinh', types: [ShopType::ThuocBvtv]),
             // "Hường" khác "Hương" và khác xã: không gộp
             new CandidateData(ref: 'c', name: 'Nguyễn Thị Hường', address: 'Thôn Chí Lưu, xã Thạch Kênh, huyện Thạch Hà', province: 'ha-tinh', types: [ShopType::ThuocBvtv]),
         ]));
 
-        $this->assertSame(5, Shop::query()->count());
-        $merged = Shop::query()->where('address', 'like', '%Đức Bồng%')->sole();
+        $this->assertSame(6, Shop::query()->count());
+        $merged = Shop::query()->where('address', 'like', 'Thôn 2, xã Đức Bồng%')->sole();
         $this->assertEqualsCanonicalizing(['phan_bon', 'thuoc_bvtv'], $merged->types->map->value->all());
+    }
+
+    public function test_shared_phone_of_different_people_is_not_merged(): void
+    {
+        Http::fake(['photon.komoot.io/*' => Http::response(['features' => []])]);
+
+        $this->collectAndProcess($this->source('so-son-la-pb', 85, [
+            new CandidateData(ref: '1', name: 'Cà Văn Hà', address: 'Bản Bằng Thịnh, xã Chiềng Mung, huyện Mai Sơn', province: 'son-la', phone: '0912345678', types: [ShopType::PhanBon]),
+            new CandidateData(ref: '2', name: 'Quàng Văn Tuấn', address: 'Bản Nà Trai, xã Mường Bằng, huyện Mai Sơn', province: 'son-la', phone: '0912345678', types: [ShopType::PhanBon]),
+        ]));
+
+        $this->assertSame(2, Shop::query()->count());
     }
 }

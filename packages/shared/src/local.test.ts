@@ -57,3 +57,17 @@ describe('bản đồ Việt Nam', () => {
     expect(MAP_LABELS.filter((l) => l.kind === 'sovereignty').map((l) => l.text)).toEqual(['Quần đảo Hoàng Sa (Việt Nam)', 'Quần đảo Trường Sa (Việt Nam)']);
   });
 });
+
+describe('dàn điểm gần đúng', () => {
+  it('giữ nguyên điểm đúng nhà, dàn điểm tâm xã trong 600 m, cố định theo id', async () => {
+    const { spreadPoint } = await import('./map');
+    // Khoảng cách xấp xỉ (m) đủ dùng cho vài trăm mét
+    const meters = (a: number[], b: number[]) => Math.hypot((a[0] - b[0]) * 111_320, (a[1] - b[1]) * 111_320 * Math.cos((a[0] * Math.PI) / 180));
+    expect(spreadPoint(18.3, 105.9, 1, 'exact')).toEqual([18.3, 105.9]);
+    const a = spreadPoint(18.3, 105.9, 42, 'place');
+    expect(a).toEqual(spreadPoint(18.3, 105.9, 42, 'place'));
+    expect(a).not.toEqual(spreadPoint(18.3, 105.9, 43, 'place'));
+    expect(meters([18.3, 105.9], a)).toBeLessThanOrEqual(601);
+    expect(meters([18.3, 105.9], a)).toBeGreaterThanOrEqual(149);
+  });
+});

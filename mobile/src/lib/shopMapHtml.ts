@@ -38,7 +38,7 @@ const D=${data};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 const send=(action,id)=>window.ReactNativeWebView.postMessage(JSON.stringify({action,id}));
 const B=L.latLngBounds(D.bounds);
-const map=L.map('map',{center:D.center,zoom:D.zoom,minZoom:D.minZoom,maxZoom:D.maxZoom,maxBounds:B,maxBoundsViscosity:1});
+const map=L.map('map',{center:D.center,zoom:D.zoom,minZoom:D.minZoom,maxZoom:D.maxZoom,maxBounds:B,maxBoundsViscosity:1,preferCanvas:true});
 for(const t of D.tiles)L.tileLayer(t.url,Object.assign({},t,{bounds:B.pad(1)})).addTo(map);
 map.setMinZoom(Math.max(4,map.getBoundsZoom(B)));
 const label=(t,k)=>L.marker(t.at,{interactive:false,keyboard:false,icon:L.divIcon({className:'vn-label '+k,html:'<span>'+esc(t.text).replace(' (','<br>(')+'</span>',iconSize:[0,0]})});

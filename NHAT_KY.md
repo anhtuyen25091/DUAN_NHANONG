@@ -11,7 +11,7 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
-## 17/10/2026: Thu thập điểm bán, giai đoạn 1: thử các tỉnh (đang làm)
+## 17/10/2026: Thu thập điểm bán, giai đoạn 1: thử các tỉnh ✅
 
 **Kết quả tìm nguồn 3 tỉnh thử**
 - **Hà Tĩnh** ✅: Sở NN&MT đăng 2 file Excel ngày 02/06/2025 (dữ liệu đến tháng 5/2025): 791 cơ sở phân bón, 577 cơ sở thuốc BVTV. Mỗi huyện cũ 1 trang tính, có tên chủ, địa chỉ, số giấy, ngày cấp; không có số điện thoại.
@@ -53,6 +53,39 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
   - tìm xã cũ trên máy, bỏ kết quả là tòa nhà
 - Backend 181 test, shared 107 test, typecheck web + app đều qua.
 - Hà Tĩnh phân bón: 791 điểm, 740 tâm xã (94%), 50 tâm huyện (phần lớn là số nhà trong TP Hà Tĩnh), 1 tâm tỉnh.
+
+**Lỗi gộp tìm thấy khi rà kết quả thật, đã sửa** (mỗi lần sửa đều xóa dữ liệu 2 tỉnh và nhập lại từ đầu)
+- Người trùng tên phổ biến ("Nguyễn Thị Hương", "Nguyễn Thị Thủy") ở các xã khác nhau bị gộp làm 1, vì vị trí tâm xã được coi là "không xa".
+  - Quy tắc mới (không cùng số điện thoại): chỉ gộp khi **cùng xã** (+ cùng huyện nếu có ghi) theo địa chỉ, **cùng thôn / xóm** nếu cả 2 có ghi, và **tên giống cả dấu** (bỏ từ chung như "cửa hàng, đại lý, VTNN" nhưng giữ dấu: "Hương" ≠ "Hường"; lệch 1–2 ký tự do gõ sai thì vẫn gộp).
+  - Khác xã thì không bao giờ gộp. Thà để trùng 2 dòng còn hơn gộp nhầm 2 người.
+- Sơn La: 2 người khác tên, khác xã nhưng nguồn ghi cùng số điện thoại (có lẽ số người làm hồ sơ) bị gộp. Nay trùng số chỉ gộp khi tên giống hoặc cùng nơi.
+- Khi gộp bị mất loại điểm cũ (bộ so khớp chỉ nạp vài cột): nay nạp lại đầy đủ trước khi gộp.
+- Sau khi sửa: 453 nhóm gộp; 11 nhóm có tên lệch, đều là lỗi gõ cùng 1 người (Thinh/Thịnh, Kỹ/Kỷ, Định/Đinh, "Hộ kinh doanh VTNN Nguyễn Thị Hoa" / "Nguyễn Thị Hoa"…) hoặc cùng số, cùng bản.
+
+**Kết quả cuối (DB local)**
+
+| Tỉnh | Điểm bán | Phân bón | BVTV | Cả 2 | Tâm xã | Tâm huyện | Có SĐT |
+|---|---|---|---|---|---|---|---|
+| Hà Tĩnh | 1.179 | 789 | 576 | 186 | 1.011 | 167 | 0 |
+| Sơn La | 885 | 646 | 488 | 249 | 738 | 147 | 628 |
+
+Tổng điểm bán trong DB: **2.104** (trước đó 40). Thu mua nông sản chưa có nguồn nào (giai đoạn 3).
+
+**Bản đồ**
+- API bản đồ nâng từ 500 lên 3.000 điểm / lần. Leaflet vẽ bằng canvas (`preferCanvas`) nên 1.179 điểm của Hà Tĩnh vẫn mượt.
+- Điểm có vị trí gần đúng bị chồng ở tâm xã: dàn nhẹ ra quanh tâm (`spreadPoint`):
+  - tâm xã ≤ 600 m, tâm huyện ≤ 2 km, tâm tỉnh ≤ 5 km
+  - cố định theo id, điểm đúng nhà giữ nguyên
+  - áp dụng cho cả web và app
+
+**Còn tồn / cần quyết**
+- Đồng Tháp, Đắk Lắk (và các tỉnh không công bố): cần pháp nhân gửi văn bản xin danh sách theo Luật Tiếp cận thông tin.
+- File PDF (Sơn La có bản PDF, nhiều tỉnh khác chỉ có PDF): cần công cụ đọc PDF, tức cài poppler (`pdftotext`) trên máy và server, hoặc thêm thư viện PHP `smalot/pdfparser`. Bản scan thì cần OCR.
+- Bảng xã cũ (`legacy_wards.csv`) theo tác giả là lấy tọa độ qua Google Geocoding. Dùng tạm được (giấy phép MIT), nhưng nên thay bằng dữ liệu ranh giới chính thức khi có.
+- Danh sách có tên chủ hộ (dữ liệu cá nhân, Sở đã công khai): đã ghi nguồn. Còn thiếu nút "Yêu cầu gỡ" cho chủ điểm.
+- Số liệu chỉ là DB local. Production cần chạy `php artisan migrate` rồi `php artisan shops:collect`.
+
+**Tiếp theo (giai đoạn 2):** dò từng tỉnh còn lại (Lâm Đồng đã thấy trang), thêm nguồn vào `config/shops.php`; lên lịch `shops:collect` mỗi tháng.
 
 ## 17/10/2026: Thu thập điểm bán, giai đoạn 0: nền tảng ✅
 

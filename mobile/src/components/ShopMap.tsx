@@ -1,4 +1,4 @@
-import { directionsUrl, geoNote, SHOP_TYPE_COLORS, SHOP_TYPE_LABELS, telHref, type ShopFilters } from '@nhanong/shared';
+import { directionsUrl, geoNote, spreadPoint, SHOP_TYPE_COLORS, SHOP_TYPE_LABELS, telHref, type ShopFilters } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { Linking, Text, View } from 'react-native';
@@ -21,20 +21,24 @@ export function ShopMap({ filters, position }: { filters: ShopFilters; position:
     if (!page) return null;
     const shops: MapShop[] = page.data
       .filter((s) => s.lat !== null && s.lng !== null)
-      .map((s) => ({
-        id: s.id,
-        name: s.name,
-        lat: s.lat,
-        lng: s.lng,
-        phone: s.phone,
-        address: s.address,
-        province_name: s.province_name,
-        goods: s.goods,
-        note: geoNote(s.geo_precision),
-        is_verified: s.is_verified,
-        color: SHOP_TYPE_COLORS[s.types[0] ?? 'thu_mua'],
-        types: s.types.map((t) => SHOP_TYPE_LABELS[t]).join(' · '),
-      }));
+      .map((s) => {
+        // Điểm vị trí gần đúng chồng lên nhau ở tâm xã: dàn nhẹ ra để bấm được từng điểm
+        const [lat, lng] = spreadPoint(s.lat!, s.lng!, s.id, s.geo_precision);
+        return {
+          id: s.id,
+          name: s.name,
+          lat,
+          lng,
+          phone: s.phone,
+          address: s.address,
+          province_name: s.province_name,
+          goods: s.goods,
+          note: geoNote(s.geo_precision),
+          is_verified: s.is_verified,
+          color: SHOP_TYPE_COLORS[s.types[0] ?? 'thu_mua'],
+          types: s.types.map((t) => SHOP_TYPE_LABELS[t]).join(' · '),
+        };
+      });
     return mapHtml(shops, position, page.meta.radius_km ?? 30);
   }, [page, position]);
 
@@ -52,7 +56,7 @@ export function ShopMap({ filters, position }: { filters: ShopFilters; position:
       <Status state={result.state} retry={result.reload} />
       {page && (
         <Text style={styles.muted}>
-          {page.meta.total} điểm có vị trí{page.meta.has_more ? ' (đang hiện 500 điểm đầu, hãy chọn tỉnh hoặc loại)' : ''} · chụm 2 ngón để phóng to
+          {page.meta.total} điểm có vị trí{page.meta.has_more ? ` (đang hiện ${page.data.length} điểm đầu, hãy chọn tỉnh hoặc loại)` : ''} · chụm 2 ngón để phóng to
         </Text>
       )}
       {html && (

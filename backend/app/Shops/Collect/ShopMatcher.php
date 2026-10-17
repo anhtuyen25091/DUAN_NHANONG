@@ -2,6 +2,7 @@
 
 namespace App\Shops\Collect;
 
+use App\Crawling\Extraction\Text;
 use App\Models\Shop;
 use App\Models\ShopCandidate;
 use App\Support\Geo;
@@ -28,10 +29,12 @@ class ShopMatcher
             return $sameRef;
         }
 
+        // Cùng số điện thoại: cùng điểm, nếu tên giống hoặc cùng nơi (nguồn có khi ghi số của người làm hồ sơ cho nhiều hộ)
         if ($candidate->phone !== null) {
-            $byPhone = Shop::query()->where('phone', $candidate->phone)->first();
-            if ($byPhone !== null) {
-                return $byPhone;
+            foreach (Shop::query()->where('phone', $candidate->phone)->get() as $byPhone) {
+                if ($this->samePhoneShop($candidate, $byPhone)) {
+                    return $byPhone;
+                }
             }
         }
 
@@ -40,7 +43,7 @@ class ShopMatcher
         foreach ($this->shopsIn($candidate->province_code) as $shop) {
             if ($candidate->phone !== null && $shop->phone !== null) {
                 // Cùng số (điểm cũ ghi số kiểu khác, vd "0912 345 678"): cùng điểm; khác số: 2 điểm khác nhau
-                if (ShopNormalizer::phone($shop->phone) === $candidate->phone) {
+                if (ShopNormalizer::phone($shop->phone) === $candidate->phone && $this->samePhoneShop($candidate, $shop)) {
                     return $shop;
                 }
 
@@ -57,6 +60,11 @@ class ShopMatcher
         }
 
         return $best;
+    }
+
+    private function samePhoneShop(ShopCandidate $candidate, Shop $shop): bool
+    {
+        return $this->nameScore($candidate->name, $shop->name) !== null || $this->samePlace($candidate, $shop);
     }
 
     /**
@@ -86,7 +94,14 @@ class ShopMatcher
         [$communeA, $districtA] = $this->place((string) $candidate->address);
         [$communeB, $districtB] = $this->place((string) $shop->address);
         if ($communeA !== null && $communeB !== null) {
-            return $communeA === $communeB && ($districtA === null || $districtB === null || $districtA === $districtB);
+            if ($communeA !== $communeB || ($districtA !== null && $districtB !== null && $districtA !== $districtB)) {
+                return false;
+            }
+            // Cùng xã nhưng ghi 2 thôn / xóm khác nhau: 2 người khác nhau (thà để trùng còn hơn gộp nhầm)
+            $hamletA = $this->hamletKey((string) $candidate->address);
+            $hamletB = $this->hamletKey((string) $shop->address);
+
+            return $hamletA === null || $hamletB === null || $hamletA === $hamletB;
         }
 
         if ($candidate->lat === null || $shop->lat === null) {
@@ -104,6 +119,21 @@ class ShopMatcher
         $km = Geo::distanceKm($candidate->lat, (float) $candidate->lng, $shop->lat, (float) $shop->lng);
 
         return $km <= (min($ranks) === 2 ? 0.3 : 3);
+    }
+
+    /** Thôn / xóm / tổ ở đầu địa chỉ, bỏ chữ "thôn / xóm…" và khoảng trắng: "Xóm7" = "Xóm 7", "Nam Văn" = "Thôn Nam Văn" */
+    private function hamletKey(string $address): ?string
+    {
+        return $this->memo['hamlet:'.$address] ??= (function () use ($address): ?string {
+            $first = trim((string) (preg_split('/[,;]|\s[-–]\s/u', $address) ?: [''])[0]);
+            if ($first === '' || preg_match('/^(xã|phường|thị trấn|tt\.?|huyện|thị xã|thành phố|tp\.?)\s/iu', $first.' ') === 1) {
+                return null;
+            }
+            $key = Text::normalize($first);
+            $key = (string) preg_replace('/^(thon|xom|xon|ap|ban|to dan pho|tdp|to|khoi pho|khoi|kp|tieu khu|tk|khom)\s*/', '', $key);
+
+            return str_replace(' ', '', $key);
+        })();
     }
 
     /**
