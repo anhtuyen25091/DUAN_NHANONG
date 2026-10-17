@@ -11,6 +11,26 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Dò cổng dữ liệu mở các tỉnh (đợt 2, chỉ nguồn công khai)
+
+**Đã làm**
+- Thử 4 dạng tên miền (`opendata.`, `data.`, `dulieu.`, `csdl.`) cho 63 tên tỉnh (34 mới + tỉnh cũ). Có **33 cổng** đang chạy.
+- **CKAN** (gọi API tìm kiếm được), tìm "phân bón" / "bảo vệ thực vật" / "thu mua":
+  - Cần Thơ, Hải Phòng, Tây Ninh, Thanh Hóa: đã dùng (Tây Ninh file rỗng)
+  - Quảng Ngãi: chỉ có công văn
+  - Bắc Ninh, An Giang (opendata.angiang = cổng Kiên Giang cũ): không có bộ phù hợp
+- **Phần mềm khác:**
+  - TP.HCM (Drupal): đã dùng
+  - Sơn La: đã dùng
+  - Lào Cai, Vĩnh Long, Điện Biên, Đồng Tháp (cùng một nhà cung cấp, `/dataset?query=`): danh sách tải bằng JavaScript; tìm qua trình duyệt headless không ra bộ phù hợp. **Đồng Tháp có tường lửa chặn trình duyệt tự động ("Web Page Blocked")**, nên đã dừng, không vượt.
+  - Huế, Quảng Trị, Quảng Bình, Khánh Hòa, Gia Lai: phần mềm khác, chưa tìm được cách tra cứu công khai.
+- Tìm đúng tên bộ dữ liệu trong danh mục dữ liệu mở ("Dữ liệu các cơ sở có giấy chứng nhận đủ điều kiện sản xuất, kinh doanh phân bón / thuốc BVTV") trên công cụ tìm kiếm: chỉ ra TP.HCM, vì các cổng tỉnh gần như không được lập chỉ mục.
+- Bỏ qua: "Danh mục điểm bán thuốc BVTV uy tín" (thitruongnongsan.gov.vn, năm 2017, toàn nhà sản xuất lớn).
+
+**Còn lại để dò lần sau:** cổng của Huế, Quảng Trị, Quảng Bình, Khánh Hòa, Gia Lai, Lào Cai, Vĩnh Long, Điện Biên (đọc danh sách bộ dữ liệu bằng cách khác); trang của các Sở NN&MT mới sau sáp nhập (nhiều Sở đang dựng lại web).
+
+---
+
 ## 17/10/2026: Điều chỉnh kế hoạch thu thập điểm bán: chỉ dùng nguồn công khai
 
 **Người dùng quyết định:** không gửi văn bản xin dữ liệu, không gửi email, không dùng số điện thoại để liên hệ. Chỉ lấy các nguồn **đã công bố công khai**.
