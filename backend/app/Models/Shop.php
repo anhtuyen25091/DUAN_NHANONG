@@ -15,9 +15,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Điểm thu mua nông sản / bán phân bón / bán thuốc BVTV.
  *
- * source: osm | import (danh sách của Sở, file CSV) | user (người dùng đề xuất, đã duyệt) | admin
+ * source: osm | import (danh sách của Sở, file CSV) | user (người dùng đề xuất, đã duyệt) | admin | buyer
+ *   | khóa nguồn thu thập (config shops.sources), xem thêm các nguồn khác trong candidates()
+ * geo_precision: exact | place (tâm xã / thôn) | province (tâm tỉnh) | null (chưa rõ)
  */
-#[Fillable(['name', 'types', 'address', 'province_code', 'lat', 'lng', 'phone', 'goods', 'opening_hours', 'source', 'source_ref', 'is_verified', 'is_active'])]
+#[Fillable(['name', 'types', 'address', 'province_code', 'lat', 'lng', 'geo_precision', 'phone', 'goods', 'opening_hours', 'source', 'source_ref', 'is_verified', 'is_active'])]
 class Shop extends Model
 {
     /** @use HasFactory<ShopFactory> */
@@ -64,5 +66,15 @@ class Shop extends Model
     public function submissions(): HasMany
     {
         return $this->hasMany(ShopSubmission::class);
+    }
+
+    /**
+     * Các nguồn đã thu thập ra điểm này
+     *
+     * @return HasMany<ShopCandidate, $this>
+     */
+    public function candidates(): HasMany
+    {
+        return $this->hasMany(ShopCandidate::class);
     }
 }

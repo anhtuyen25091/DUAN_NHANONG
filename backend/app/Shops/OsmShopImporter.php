@@ -100,7 +100,7 @@ class OsmShopImporter
     /**
      * @return list<array<string, mixed>>
      */
-    private function fetch(): array
+    public function fetch(): array
     {
         $query = '[out:json][timeout:120];area["ISO3166-1"="VN"][admin_level=2]->.vn;('
             .'nwr["shop"~"^(agrarian|fertilizer_supplier)$"](area.vn);'

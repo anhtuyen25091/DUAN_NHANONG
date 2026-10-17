@@ -72,7 +72,8 @@ final class Provinces
         }
 
         $haystack = ' '.str_replace('-', ' ', Text::normalize($text)).' ';
-        $haystack = (string) preg_replace('/\b(tinh|thanh pho|tp)\b\.?/', ' ', $haystack);
+        // Bỏ "TP." / "Thành phố" đứng trước tên. Không bỏ chữ "tỉnh": sẽ làm "Hà Tĩnh" thành "Hà" (tên tỉnh vẫn khớp được vì so theo cả từ)
+        $haystack = (string) preg_replace('/\b(thanh pho|tp)\b\.?/', ' ', $haystack);
         $haystack = ' '.trim((string) preg_replace('/\s+/', ' ', $haystack)).' ';
 
         $best = null;

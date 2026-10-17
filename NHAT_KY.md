@@ -11,6 +11,85 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Thu thập điểm bán, giai đoạn 0: nền tảng ✅
+
+**Đã làm** (backend)
+- **Bảng chờ `shop_candidates`:** mỗi dòng là 1 điểm từ 1 nguồn, gồm:
+  - nguồn, mã trong nguồn, độ tin cậy của nguồn, đường dẫn, dữ liệu gốc (`raw`)
+  - điểm tin cậy, trạng thái (chờ duyệt / đã đưa vào / đã bỏ), lý do chờ, điểm bán đã khớp (`shop_id`)
+
+  Bảng `shops` thêm cột `geo_precision`: exact (đúng nhà) / place (tâm xã) / province (tâm tỉnh, vị trí gần đúng).
+- **`app/Shops/Collect/`:**
+  - `ShopSource` (giao diện cho mỗi nguồn) và `CandidateData`
+  - `ShopNormalizer`:
+    - số điện thoại về dạng 0xxxxxxxxx (nhận +84, dấu chấm, nhiều số)
+    - khóa tên bỏ từ chung (cửa hàng, đại lý, VTNN, phân bón…)
+    - tên VIẾT HOA đổi sang Hoa Đầu Chữ
+  - `ShopGeocoder`: Photon (OSM, miễn phí, nghỉ 1,1 giây / lần, cache 90 ngày)
+    - thử địa chỉ đầy đủ rồi bỏ dần phần đầu
+    - chỉ nhận kết quả đúng tỉnh
+    - không ra thì lấy tâm tỉnh
+    - dịch vụ lỗi thì để lần sau, không đoán
+  - `ShopMatcher` (tìm điểm trùng): cùng mã nguồn → cùng số điện thoại → tên giống (≥ 85%) và gần nhau ≤ 300 m hoặc cùng địa chỉ. Tên giống mà cách nhau > 2 km, hoặc khác số điện thoại, thì là 2 điểm khác nhau.
+  - `CandidateProcessor`:
+    - tra ngược tỉnh từ tọa độ nếu thiếu, lấy tọa độ, tìm trùng
+    - điểm tin cậy = độ tin cậy nguồn + có số điện thoại 5 + tọa độ đúng nhà 10 / đúng xã 5 + có ở nguồn khác 20
+    - từ 70 điểm trở lên (`SHOPS_PUBLISH_THRESHOLD`) thì tự đưa vào; thiếu loại / tỉnh / tọa độ thì luôn chờ admin
+    - khi gộp vào điểm đã có: thêm loại, điền chỗ còn trống, lấy tọa độ chính xác hơn; điểm admin đã xác minh thì chỉ thêm loại
+  - `ShopCollector`, nguồn `OsmSource`, `CsvSource`
+- **Lệnh:**
+  - `shops:collect [nguồn…]` (1 nguồn lỗi không dừng các nguồn khác)
+  - `shops:collect-file file.csv --source=… --type=… --trust=85 --url=…` (danh sách của Sở / hãng đã chuyển sang CSV)
+  - `shops:process [--source] [--retry]`
+  - `shops:coverage` (bảng độ phủ theo tỉnh)
+  - cấu hình ở `config/shops.php`
+- **Admin:** trang "Điểm bán thu thập" (nhóm Điểm bán)
+  - có số điểm đang chờ, lọc theo trạng thái / nguồn / tỉnh
+  - xem điểm tin cậy, độ chính xác vị trí, điểm trùng
+  - nút "Đưa vào" / "Bỏ", làm từng điểm hoặc hàng loạt
+- **Sửa lỗi có sẵn:** `Provinces::detect('Hà Tĩnh')` ra null, vì hàm xóa chữ "tỉnh" làm "Hà Tĩnh" thành "Hà". Lỗi này có thể đã làm mất tỉnh của các điểm / giá ở Hà Tĩnh trước đây.
+
+**Kiểm tra**
+- 9 test quy trình (nguồn tin cậy tự đưa vào; 2 danh sách của Sở gộp thành 1 điểm có 2 loại; cùng tên khác nơi; danh bạ chờ duyệt; tâm tỉnh; dịch vụ tọa độ lỗi; giữ dữ liệu admin; lệnh CSV; tra ngược tỉnh) và 4 test chuẩn hóa.
+- Toàn bộ backend 176 test qua.
+- Chạy thật `shops:collect osm`: 33 điểm khớp đúng vào 33 điểm OSM đã có, không tạo trùng; 28 điểm được điền tỉnh. Còn 1 điểm chờ (Kubota Thiên Trường: đại lý máy nông nghiệp, cần bỏ).
+
+**Tiếp theo:** giai đoạn 1, tìm danh sách thật của 3 tỉnh thử (Đồng Tháp, Đắk Lắk, Hà Tĩnh).
+
+---
+
+## 17/10/2026: Kế hoạch thu thập điểm thu mua, phân bón, thuốc BVTV toàn quốc (đang làm)
+
+**Yêu cầu:** thu thập được tất cả điểm thu mua nông sản, đại lý phân bón, thuốc BVTV khắp Việt Nam (dữ liệu quan trọng cho giai đoạn đầu). Người dùng đã đồng ý kế hoạch.
+
+**Hiện trạng:** DB mới có 40 điểm (33 OSM, 7 điểm mua tự đăng). Ước lượng cả nước vài chục nghìn đến 100 nghìn điểm (riêng Hà Tĩnh có 795 cơ sở buôn bán phân bón được cấp phép, số liệu tháng 11/2025).
+
+**Nguồn dữ liệu (xếp theo độ tin cậy)**
+- A. Danh sách cơ sở đủ điều kiện buôn bán phân bón / thuốc BVTV của 34 Sở NN&MT / Chi cục TT&BVTV (PDF, Excel). Tỉnh nào không công bố thì gửi văn bản xin theo Luật Tiếp cận thông tin.
+- B. Danh sách đại lý của các hãng phân bón (Phú Mỹ, Cà Mau, Bình Điền, Baconco, Lâm Thao…) và thuốc BVTV (Syngenta, Bayer, Lộc Trời…).
+- C. Thu mua: hội viên các hiệp hội (VICOFA, VPA, VFA), hợp tác xã, nhà máy, chợ đầu mối.
+- D. Dữ liệu đăng ký doanh nghiệp theo mã ngành 4620 / 4669 / 4773: mua từ Cổng đăng ký doanh nghiệp quốc gia, không thu thập từ các trang cấm việc đó.
+- E. Bản đồ (OSM đã có). Google Places không được lưu lâu dài, chỉ dùng để kiểm tra.
+- F. Người dùng đóng góp (nguồn chính cho vựa, lái nhỏ).
+
+**Quy trình:** lấy về → bảng chờ `shop_candidates` (lưu bản gốc) → chuẩn hóa (số điện thoại, tên, tỉnh mới) → lấy tọa độ → bỏ trùng (số điện thoại / tên + tỉnh / khoảng cách) → chấm điểm tin cậy → tự hiện hoặc chờ admin duyệt → bảng độ phủ theo tỉnh.
+
+**Pháp lý:** số điện thoại hộ kinh doanh là dữ liệu cá nhân (Nghị định 13/2023, Luật Bảo vệ dữ liệu cá nhân 2026). Chỉ lấy thông tin kinh doanh đã công khai, ghi nguồn, có cách cho chủ điểm xin gỡ, không lấy từ Facebook.
+
+**Giai đoạn:**
+- 0: nền tảng
+- 1: thử 3 tỉnh
+- 2: phân bón + BVTV cả nước
+- 3: thu mua
+- 4: người dùng đóng góp
+
+**Mặc định đang dùng** (người dùng chưa chọn):
+- lấy tọa độ miễn phí bằng Photon / OSM (sau có thể cắm VietMap / Goong)
+- 3 tỉnh thử: Đồng Tháp, Đắk Lắk, Hà Tĩnh
+- chưa mua dữ liệu, chưa gửi văn bản (chờ người dùng quyết)
+
+---
+
 ## 17/10/2026: App: nút lọc trên bản đồ điểm bán quá cao (chiếm 1/3 màn hình) ✅
 
 **Nguyên nhân**
