@@ -2,6 +2,7 @@
 
 namespace App\Shops\Collect\Sources;
 
+use App\Crawling\CrawlBlockedException;
 use App\Crawling\Fetcher;
 use RuntimeException;
 
@@ -27,5 +28,23 @@ final class CkanResolver
         }
 
         return $url;
+    }
+
+    /**
+     * Như latest(), nhưng API bị robots.txt chặn mà có sẵn đường dẫn file thì dùng đường dẫn đó.
+     *
+     * @param  list<string>  $formats
+     */
+    public static function latestOr(Fetcher $fetcher, string $host, string $dataset, array $formats, string $fallback): string
+    {
+        try {
+            return self::latest($fetcher, $host, $dataset, $formats);
+        } catch (CrawlBlockedException $e) {
+            if ($fallback === '') {
+                throw $e;
+            }
+
+            return $fallback;
+        }
     }
 }

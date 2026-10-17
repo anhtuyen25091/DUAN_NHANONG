@@ -15,6 +15,9 @@ class ShopNormalizerTest extends TestCase
         $this->assertSame('0912345678', ShopNormalizer::phone('+84 912 345 678'));
         $this->assertSame('02773851234', ShopNormalizer::phone('(0277) 3851 234'));
         $this->assertSame('0912345678', ShopNormalizer::phone('ĐT: 0912 345 678 - 0277 3851 234'));
+        $this->assertSame('0989306892', ShopNormalizer::phone('989306892'));
+        $this->assertSame('0386611369', ShopNormalizer::phone('0168.66.11.369'));
+        $this->assertSame('0763679708', ShopNormalizer::phone('1263679708'));
         $this->assertNull(ShopNormalizer::phone('12345'));
         $this->assertNull(ShopNormalizer::phone(null));
     }

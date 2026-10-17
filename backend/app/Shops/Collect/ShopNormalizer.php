@@ -17,6 +17,14 @@ final class ShopNormalizer
         'va', 'thuong mai', 'dich vu', 'tm', 'dv', 'san xuat', 'sx',
     ];
 
+    /** Đầu số di động 11 số cũ → mới (chuyển đổi năm 2018) */
+    private const OLD_MOBILE = [
+        '0162' => '032', '0163' => '033', '0164' => '034', '0165' => '035', '0166' => '036', '0167' => '037', '0168' => '038', '0169' => '039',
+        '0120' => '070', '0121' => '079', '0122' => '077', '0126' => '076', '0128' => '078',
+        '0123' => '083', '0124' => '084', '0125' => '085', '0127' => '081', '0129' => '082',
+        '0186' => '056', '0188' => '058', '0199' => '059',
+    ];
+
     /**
      * Số điện thoại về dạng 0xxxxxxxxx (lấy số đầu tiên nếu ghi nhiều số). Không ra số hợp lệ thì null.
      */
@@ -30,6 +38,14 @@ final class ShopNormalizer
             $digits = (string) preg_replace('/\D/', '', $part);
             if (str_starts_with($digits, '84') && strlen($digits) >= 11) {
                 $digits = '0'.substr($digits, 2);
+            }
+            // Excel làm mất số 0 đầu: "989306892" → "0989306892"
+            if (preg_match('/^[35789]\d{8}$/', $digits) === 1 || preg_match('/^[12]\d{9}$/', $digits) === 1) {
+                $digits = '0'.$digits;
+            }
+            // Đầu số di động cũ 11 số (đổi năm 2018): 0168… → 038…
+            if (strlen($digits) === 11 && isset(self::OLD_MOBILE[substr($digits, 0, 4)])) {
+                $digits = self::OLD_MOBILE[substr($digits, 0, 4)].substr($digits, 4);
             }
             // Di động 10 số (03, 05, 07, 08, 09), cố định 11 số (02…)
             if (preg_match('/^0[35789]\d{8}$/', $digits) === 1 || preg_match('/^02\d{9}$/', $digits) === 1) {

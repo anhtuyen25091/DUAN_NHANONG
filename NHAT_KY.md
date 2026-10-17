@@ -11,6 +11,58 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Thu thập điểm bán, giai đoạn 2: dò các tỉnh (đợt 1) ✅
+
+**Cách dò**
+- Tìm theo từng tỉnh, và gọi API tìm kiếm (CKAN) trên mọi tên miền `opendata.<tỉnh>.gov.vn` / `data.<tỉnh>.gov.vn` (34 tỉnh mới + các tỉnh cũ).
+- Nhiều tỉnh đã đưa danh sách cấp phép lên **cổng dữ liệu mở** (Đề án dữ liệu mở), nên thường chỉ thấy khi gọi API, tìm trên Google thì không ra.
+
+**Nguồn mới** (đều khai trong `config/shops.php`, chạy lại mỗi tháng)
+
+| Tỉnh | Nguồn | Dạng | Dòng |
+|---|---|---|---|
+| Cần Thơ | data.cantho.gov.vn (CKAN), có số điện thoại | Excel | 3.146 phân bón + 3.003 BVTV |
+| Hải Phòng | data.haiphong.gov.vn (robots.txt cấm `/api/` nên tải thẳng file) | Excel, tiêu đề 2 tầng | 769 phân bón + 406 BVTV |
+| TP.HCM | opendata.hochiminhcity.gov.vn (Drupal), phần lớn là công ty | Excel, cột kiểu `tenCoSo` | 434 phân bón + 325 BVTV |
+| Thanh Hóa | opendata.thanhhoa.gov.vn (CKAN) | Word (.docx), tiêu đề 2 tầng | 639 BVTV |
+| Thanh Hóa, xã Tây Đô | cùng cổng | Excel, **có tọa độ** | 8 **điểm thu mua lúa** (nguồn thu mua đầu tiên) |
+
+**Đã làm thêm**
+- `CkanResolver`: mỗi lần chạy hỏi API CKAN lấy file mới nhất của bộ dữ liệu (đường dẫn file đổi khi tỉnh cập nhật). API bị robots.txt chặn thì quay về đường dẫn file cố định.
+- Đọc file Word (`DocxTable`, `LicenseDocxSource`; `collect-file` nhận `.docx`).
+- Bảng (Excel / Word / HTML / PDF) đọc được:
+  - tiêu đề 2 tầng ("Địa chỉ" → "Xã | Huyện | Tỉnh")
+  - cột mặt hàng thu mua, cột tọa độ (có tọa độ thì vị trí đúng nhà), người đại diện
+  - tên chỉ là chữ chung ("Cửa hàng buôn bán thuốc BVTV") thì ghép tên chủ
+- Ô "Xã" ghi số nhà / đường thì không thêm chữ "xã". Hiểu viết tắt "Q.", "H.", "TT.", "P.".
+- **Số điện thoại:** Excel làm mất số 0 đầu ("989306892"), còn nhiều đầu số 11 số cũ ("0168…" → "038…", "0126…" → "076…"). Đã chuẩn hóa; sửa lại 1.769 điểm chờ và điền số cho 1.198 điểm bán.
+- Lịch: `shops:collect` chạy 3:00 ngày 2 hằng tháng.
+
+**Tỉnh chưa có nguồn**
+- **Đắk Lắk**: Chi cục có danh sách (30/3/2023) nhưng tên miền mới đã chết, tên miền cũ trả 404, Internet Archive đang tạm ngừng.
+- **Lâm Đồng**: trang năm 2019 đã bị gỡ (chuyển về trang chủ).
+- **Danh sách thương nhân xuất khẩu gạo** của Bộ Công Thương (152 doanh nghiệp, 28/4/2025): file `.xls` đời cũ, cần thêm thư viện `phpoffice/phpspreadsheet` (chờ người dùng đồng ý).
+- **Hiệp hội VICOFA, VPSA**: không công bố danh sách hội viên.
+- Các tỉnh còn lại: không thấy trên mạng, cần gửi văn bản xin.
+
+**Kết quả (DB local)**
+- Tổng **8.670 điểm bán**:
+  - Cần Thơ 4.258
+  - Hà Tĩnh 1.179
+  - Hải Phòng 927
+  - Sơn La 902
+  - TP.HCM 733
+  - Thanh Hóa 645
+  - các tỉnh khác lẻ tẻ
+- Phân bón 5.755, BVTV 5.443, thu mua 13; 3.651 điểm có số điện thoại.
+- Cần Thơ: 1.819 nhóm gộp (cùng cửa hàng ở cả 2 danh sách); đã rà các nhóm tên khác nhau, đều là cùng cửa hàng ghi khác kiểu ("CH VTNN An Toàn" / "Cửa hàng VTNN An Toàn").
+
+**Còn tồn**
+- Bản đồ tải tối đa 3.000 điểm / lần, mà Cần Thơ có 4.258 điểm. Cần gom cụm điểm (cluster) hoặc chỉ tải phần đang xem.
+- Backend 189 test qua.
+
+---
+
 ## 17/10/2026: Thay bảng tọa độ xã cũ bằng Wikidata (CC0) ✅ (phần 3)
 
 **Vì sao:** bảng cũ (`legacy_wards.csv`, github vietnamadminunits) theo tác giả lấy tọa độ qua Google Geocoding nên không rõ quyền dùng. Đã tìm nguồn chính thức: HDX (OCHA) và Open Development Mekong chỉ có tới cấp huyện (ODM còn cấm dùng thương mại); ranh giới xã của Cục Đo đạc, Bản đồ không cho tải kèm giấy phép.

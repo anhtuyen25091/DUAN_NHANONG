@@ -24,14 +24,14 @@ final class LicenseTable
         'commune' => ['xa', 'phuong'],
         'district' => ['huyen', 'quan', 'thi xa'],
         'phone' => ['dien thoai', 'so dien thoai', 'sdt', 'dt'],
-        'certificate' => ['so giay', 'so gcn'],
+        'certificate' => ['so giay', 'so gcn', 'giay chung nhan'],
         'issued' => ['ngay cap'],
     ];
 
     /** Ô này có phải tên cột không ("Tên cơ sở", "Bản", "Huyện/Quận", "Ghi chú"…): để nhận dòng tiêu đề trong file PDF */
     public static function isHeaderWord(string $cell): bool
     {
-        $text = Text::normalize($cell);
+        $text = self::headerText($cell);
         foreach ([...array_merge(...array_values(self::COLUMNS)), 'stt', 'tt', 'so tt', 'tinh', 'ghi chu', 'chu ho', 'ma so'] as $word) {
             if ($text === $word || str_starts_with($text, $word.' ') || str_starts_with($text, $word.'/')) {
                 return true;
@@ -39,6 +39,12 @@ final class LicenseTable
         }
 
         return false;
+    }
+
+    /** Tên cột không dấu; tên kiểu "tenCoSo", "diaChi" (dữ liệu xuất từ phần mềm) tách thành "ten co so", "dia chi" */
+    private static function headerText(string $cell): string
+    {
+        return Text::normalize((string) preg_replace('/(?<=\p{Ll})(?=\p{Lu})/u', ' ', $cell));
     }
 
     /**
@@ -51,7 +57,7 @@ final class LicenseTable
     {
         $columns = [];
         foreach ($cells as $i => $cell) {
-            $text = Text::normalize($cell);
+            $text = self::headerText($cell);
             foreach (self::COLUMNS as $field => $words) {
                 if (isset($columns[$field])) {
                     continue;

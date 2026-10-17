@@ -68,7 +68,7 @@ class LicenseDocxSource implements ShopSource
 
     public function collect(): iterable
     {
-        $url = $this->ckan !== null ? CkanResolver::latest($this->fetcher, $this->ckan['host'], $this->ckan['dataset'], ['DOCX']) : $this->url;
+        $url = $this->ckan !== null ? CkanResolver::latestOr($this->fetcher, $this->ckan['host'], $this->ckan['dataset'], ['DOCX'], $this->url) : $this->url;
 
         return $this->read($this->fetcher->get($url));
     }

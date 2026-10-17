@@ -72,7 +72,7 @@ class LicenseSheetSource implements ShopSource
 
     public function collect(): iterable
     {
-        $url = $this->ckan !== null ? CkanResolver::latest($this->fetcher, $this->ckan['host'], $this->ckan['dataset'], ['XLSX']) : $this->url;
+        $url = $this->ckan !== null ? CkanResolver::latestOr($this->fetcher, $this->ckan['host'], $this->ckan['dataset'], ['XLSX'], $this->url) : $this->url;
         $file = tempnam(sys_get_temp_dir(), 'shops').'.xlsx';
         file_put_contents($file, $this->fetcher->get($url));
 
