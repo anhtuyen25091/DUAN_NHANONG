@@ -11,6 +11,17 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Điều chỉnh kế hoạch thu thập điểm bán: chỉ dùng nguồn công khai
+
+**Người dùng quyết định:** không gửi văn bản xin dữ liệu, không gửi email, không dùng số điện thoại để liên hệ. Chỉ lấy các nguồn **đã công bố công khai**.
+
+**Áp dụng**
+- Bỏ khỏi kế hoạch: "gửi văn bản theo Luật Tiếp cận thông tin" (nguồn A), "mua dữ liệu đăng ký doanh nghiệp" (nguồn D).
+- Tỉnh chưa công bố: ghi "chưa có nguồn công khai", dò lại định kỳ (các tỉnh lần lượt đưa dữ liệu lên cổng dữ liệu mở). Lịch `shops:collect` hằng tháng tự lấy bản mới của các nguồn đã có.
+- Nguồn dùng được: cổng dữ liệu mở của tỉnh (CKAN / Drupal…), trang Sở / Chi cục / UBND xã, file đăng sẵn, OpenStreetMap, Wikidata; người dùng tự đăng / báo sai trong app.
+
+---
+
 ## 17/10/2026: Thu thập điểm bán, giai đoạn 2: dò các tỉnh (đợt 1) ✅
 
 **Cách dò**
