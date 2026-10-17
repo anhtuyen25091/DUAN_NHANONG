@@ -11,6 +11,27 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Đọc danh sách dạng PDF ✅ (phần 1)
+
+**Đã làm**
+- Thêm thư viện `smalot/pdfparser` (PHP thuần, không cần cài gì trên server; người dùng đã đồng ý).
+- `PdfTable` dựng lại bảng từ vị trí chữ trong PDF:
+  - cột theo dòng tiêu đề, nhận cả tiêu đề 2 tầng "Địa chỉ" → "Bản | Xã | Huyện"; chỉ coi là ô tiêu đề khi chữ đúng là tên cột
+  - dòng theo số thứ tự ở cột đầu; chữ xuống nhiều hàng, lệch trên / dưới số thứ tự vẫn vào đúng dòng
+  - bỏ phần tên văn bản phía trên bảng; cột STT tính theo số thứ tự dài nhất (tên ở cột sau nằm sát)
+- Nguồn `LicensePdfSource`, dùng chung `LicenseTable::candidates()` với Excel / HTML.
+- Lệnh `shops:collect-file` nhận thêm `.xlsx` / `.pdf` trên máy (`--province=… --type=…`), cho danh sách Sở gửi qua email.
+- **Lỗi tìm thấy:** bảng không có cột số giấy thì mã điểm chỉ dựa vào tên, nên người trùng tên ở nơi khác bị gộp. Sơn La thuốc BVTV mất 31 cơ sở. Nay ghép thêm địa chỉ vào mã; đã nhập lại Sơn La thuốc BVTV, từ 488 lên **516** (Sơn La tổng 902 điểm).
+
+**Kiểm tra**
+- File PDF thật của Sơn La (24 trang) đọc ra đúng 519 dòng như bảng HTML cùng nguồn. Chỗ lệch giữa 2 bản là do dữ liệu 2 bản khác nhau ("Tiểu khu 39" / "TK 39"), không phải đọc sai.
+- Test với PDF tự tạo (tiêu đề 2 tầng, tên 2 hàng, trùng tên khác nơi) và PDF không có chữ (bản scan) thì ra 0 điểm.
+- Backend 186 test qua.
+
+**Còn tồn:** PDF bản scan (ảnh) cần OCR (tesseract), chưa làm.
+
+---
+
 ## 17/10/2026: Chủ điểm xin gỡ điểm khỏi danh sách ✅ (phần 4)
 
 **Đã làm**

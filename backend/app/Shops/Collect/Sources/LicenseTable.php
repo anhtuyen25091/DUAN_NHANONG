@@ -25,6 +25,19 @@ final class LicenseTable
         'issued' => ['ngay cap'],
     ];
 
+    /** Ô này có phải tên cột không ("Tên cơ sở", "Bản", "Huyện/Quận", "Ghi chú"…): để nhận dòng tiêu đề trong file PDF */
+    public static function isHeaderWord(string $cell): bool
+    {
+        $text = Text::normalize($cell);
+        foreach ([...array_merge(...array_values(self::COLUMNS)), 'stt', 'tt', 'so tt', 'tinh', 'ghi chu', 'chu ho', 'ma so'] as $word) {
+            if ($text === $word || str_starts_with($text, $word.' ') || str_starts_with($text, $word.'/')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Vị trí các cột nếu dòng này là dòng tiêu đề (có cột tên và địa chỉ / xã), không thì null.
      *
@@ -88,8 +101,9 @@ final class LicenseTable
         $certificate = $get('certificate');
 
         return new CandidateData(
-            // Số giấy chỉ duy nhất trong 1 huyện / 1 năm và nguồn có khi ghi trùng số: ghép tiền tố + số + tên
-            ref: $refPrefix.'#'.$certificate.'#'.substr(md5(Text::normalize($name)), 0, 8),
+            // Số giấy chỉ duy nhất trong 1 huyện / 1 năm và nguồn có khi ghi trùng số: ghép tiền tố + số + tên.
+            // Không có số giấy thì ghép thêm địa chỉ (người trùng tên ở nơi khác là điểm khác)
+            ref: $refPrefix.'#'.$certificate.'#'.substr(md5(Text::normalize($certificate !== '' ? $name : $name.'|'.$address)), 0, 8),
             name: $name,
             address: $address,
             province: $province,
@@ -111,5 +125,28 @@ final class LicenseTable
         }
 
         return preg_match($hasPrefix, $value.' ') === 1 ? $value : "{$prefix} {$value}";
+    }
+
+    /**
+     * Các dòng của 1 bảng (dòng tiêu đề nằm đâu đó phía trên) → các điểm bán.
+     *
+     * @param  list<list<string>>  $rows
+     * @param  list<ShopType>  $types
+     * @return iterable<CandidateData>
+     */
+    public static function candidates(array $rows, string $province, array $types, ?string $url, string $refPrefix = 'r'): iterable
+    {
+        $columns = null;
+        foreach ($rows as $cells) {
+            if ($columns === null) {
+                $columns = self::header($cells);
+
+                continue;
+            }
+            $candidate = self::candidate($cells, $columns, null, $province, $types, $url, $refPrefix);
+            if ($candidate !== null) {
+                yield $candidate;
+            }
+        }
     }
 }

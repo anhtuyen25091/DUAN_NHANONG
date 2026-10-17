@@ -87,18 +87,7 @@ class LicenseHtmlSource implements ShopSource
      */
     public function parse(array $rows, ?string $url = null): iterable
     {
-        $columns = null;
-        foreach ($rows as $cells) {
-            if ($columns === null) {
-                $columns = LicenseTable::header($cells);
-
-                continue;
-            }
-            $candidate = LicenseTable::candidate($cells, $columns, null, $this->province, $this->types, $url, 'r');
-            if ($candidate !== null) {
-                yield $candidate;
-            }
-        }
+        return LicenseTable::candidates($rows, $this->province, $this->types, $url);
     }
 
     /**

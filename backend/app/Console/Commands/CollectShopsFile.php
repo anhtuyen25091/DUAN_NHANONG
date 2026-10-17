@@ -2,9 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Crawling\Fetcher;
 use App\Enums\ShopType;
 use App\Shops\Collect\ShopCollector;
+use App\Shops\Collect\Sources\CallbackSource;
 use App\Shops\Collect\Sources\CsvSource;
+use App\Shops\Collect\Sources\LicensePdfSource;
+use App\Shops\Collect\Sources\LicenseSheetSource;
+use App\Support\Provinces;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -13,14 +18,15 @@ use Illuminate\Console\Command;
  * Vd danh sách cơ sở buôn bán phân bón của Sở NN&MT Đồng Tháp (đã chuyển sang CSV):
  *   php artisan shops:collect-file dong-thap-phan-bon.csv --source=so-dong-thap-pb --label="Sở NN&MT Đồng Tháp: buôn bán phân bón" --type=phan_bon --url=https://...
  */
-#[Signature('shops:collect-file {file : File CSV (cột: ma, ten, loai, dia_chi, tinh, sdt, mat_hang, lat, lng, url)}
+#[Signature('shops:collect-file {file : File .csv (cột: ma, ten, loai, dia_chi, tinh, sdt, mat_hang, lat, lng, url), hoặc .xlsx / .pdf (danh sách cấp phép của Sở, cần --province)}
+    {--province= : Mã tỉnh (vd dong-thap) khi file là .xlsx / .pdf}
     {--source= : Khóa nguồn, vd so-dong-thap-pb (bắt buộc, giữ nguyên giữa các lần nhập)}
     {--label= : Tên nguồn hiển thị cho admin}
     {--trust=85 : Độ tin cậy 0–100 (danh sách cấp phép của Sở 85, đại lý của hãng 80, danh bạ 50)}
     {--type=* : Loại điểm khi file không có cột "loai": thu_mua, phan_bon, thuoc_bvtv}
     {--url= : Đường dẫn văn bản gốc}
     {--no-process : Chỉ lưu vào bảng chờ}')]
-#[Description('Thu thập điểm bán từ file CSV (danh sách của Sở, của hãng…) vào bảng chờ')]
+#[Description('Thu thập điểm bán từ file CSV / Excel / PDF (danh sách của Sở, của hãng…) vào bảng chờ')]
 class CollectShopsFile extends Command
 {
     public function handle(ShopCollector $collector): int
@@ -42,14 +48,27 @@ class CollectShopsFile extends Command
             $types[] = $parsed;
         }
 
-        $source = new CsvSource(
-            path: (string) $this->argument('file'),
-            key: $key,
-            label: (string) ($this->option('label') ?: $key),
-            trust: max(0, min(100, (int) $this->option('trust'))),
-            defaultTypes: $types,
-            url: $this->option('url') ?: null,
-        );
+        $path = (string) $this->argument('file');
+        $label = (string) ($this->option('label') ?: $key);
+        $trust = max(0, min(100, (int) $this->option('trust')));
+        $url = $this->option('url') ?: null;
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        if ($extension === 'csv') {
+            $source = new CsvSource(path: $path, key: $key, label: $label, trust: $trust, defaultTypes: $types, url: $url);
+        } else {
+            $province = (string) $this->option('province');
+            if (Provinces::name($province) === null || $types === [] || ! in_array($extension, ['xlsx', 'pdf'], true) || ! is_readable($path)) {
+                $this->error('File .xlsx / .pdf cần --province=<mã tỉnh> và ít nhất 1 --type; chỉ nhận .csv, .xlsx, .pdf đọc được.');
+
+                return self::FAILURE;
+            }
+            $fetcher = app(Fetcher::class);
+            $read = $extension === 'xlsx'
+                ? fn (): iterable => (new LicenseSheetSource($fetcher, $key, $label, $url ?? $path, $province, $types, $trust, $url))->read($path)
+                : fn (): iterable => (new LicensePdfSource($fetcher, $key, $label, $url ?? $path, $province, $types, $trust, $url))->read((string) file_get_contents($path));
+            $source = new CallbackSource($key, $label, $trust, $read);
+        }
 
         $counts = $collector->collect($source);
         $this->info("{$source->label()}: mới {$counts['new']}, cập nhật {$counts['updated']}, bỏ qua {$counts['skipped']}.");
