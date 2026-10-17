@@ -11,6 +11,49 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Thu thập điểm bán, giai đoạn 1: thử các tỉnh (đang làm)
+
+**Kết quả tìm nguồn 3 tỉnh thử**
+- **Hà Tĩnh** ✅: Sở NN&MT đăng 2 file Excel ngày 02/06/2025 (dữ liệu đến tháng 5/2025): 791 cơ sở phân bón, 577 cơ sở thuốc BVTV. Mỗi huyện cũ 1 trang tính, có tên chủ, địa chỉ, số giấy, ngày cấp; không có số điện thoại.
+- **Đồng Tháp, Đắk Lắk** ❌: không tìm thấy danh sách công khai (chỉ có thủ tục và tin xử phạt). Cần gửi văn bản xin dữ liệu.
+- **Thay bằng Sơn La** ✅: cổng dữ liệu mở `data.sonla.gov.vn` có bảng HTML chia trang:
+  - 679 cơ sở phân bón (bản 2025, **có số điện thoại**, địa chỉ theo xã mới)
+  - khoảng 550 cơ sở thuốc BVTV (đến 27/5/2024)
+  - Cổng có API JSON nhưng cần khóa (trả 401). Có file PDF nhưng máy chưa có công cụ đọc PDF.
+- **Lâm Đồng**: Chi cục TT&BVTV có trang danh sách cơ sở thuốc BVTV (bảng HTML). Lần thử tải bị chuyển hướng 302, chưa đọc được.
+- Quy định có bắt buộc cơ quan cấp giấy công bố danh sách trên cổng thông tin, nên nhiều tỉnh khác chắc cũng có. Cần dò từng tỉnh.
+- Hãng phân bón (Cà Mau khoảng 2.000 đại lý, Phú Mỹ…) không công bố danh sách đại lý trên web.
+
+**Đã làm**
+- Nguồn `LicenseSheetSource` (Excel của Sở) và `LicenseHtmlSource` (bảng HTML chia trang), dùng chung `LicenseTable`:
+  - nhận cột theo tên (Họ và tên / Tên cơ sở / Thôn, Bản / Xã / Huyện / Điện thoại / Số giấy…)
+  - ghép địa chỉ, lấy tên huyện cũ từ tiêu đề trang tính
+  - mã điểm = trang tính + số giấy + tên (vì nguồn có ghi trùng số giấy)
+- `config/shops.php` thêm 4 nguồn: `so-ha-tinh-pb`, `so-ha-tinh-bvtv`, `so-son-la-pb`, `so-son-la-bvtv`. Lệnh `shops:collect` nhận nguồn dạng mảng cấu hình.
+- **Lỗi lớn khi chạy thật, đã sửa: tọa độ sai.**
+  - Tìm thẳng địa chỉ trên Photon thì ra bừa tòa nhà có chữ giống. Ví dụ "Xóm 3, xã Thạch Khê" ra "Bảo hiểm Xã hội Hà Tĩnh"; có địa chỉ còn ra Hà Nội, Bắc Ninh. 106 điểm đã nhập bị gắn nhãn "đúng nhà" sai.
+  - Sau sáp nhập 7/2025, OSM đã bỏ tên các xã cũ, mà danh sách của Sở vẫn ghi xã cũ. Dữ liệu cũ của OSM (truy vấn theo ngày trên Overpass) thì máy chủ công cộng báo hết bộ nhớ.
+  - **Cách sửa:**
+    - thêm bảng **10.040 xã / huyện cũ kèm tọa độ** `database/data/legacy_wards.csv`, tra trên máy qua `LegacyWards`
+    - nguồn: github.com/tranngocminhhieu/vietnamadminunits, giấy phép MIT, ghi ở `database/data/LICENSE-legacy_wards.txt`
+    - Photon chỉ còn làm dự phòng: chỉ nhận địa danh hành chính trùng tên, cách huyện ≤ 25 km
+    - Đã xóa 117 điểm sai và nhập lại.
+  - Độ chính xác mới: place (tâm xã) / district (tâm huyện cũ) / province (tâm tỉnh). Không bao giờ ghi "đúng nhà" khi nguồn chỉ có thôn / xã.
+- API điểm bán:
+  - `source` trả tên dễ đọc ("© OpenStreetMap", "Sở NN&MT Hà Tĩnh: buôn bán phân bón"…), không còn hiện mã "osm" / "admin"
+  - thêm `geo_precision`
+  - web + app ghi "📍 Vị trí gần đúng (tâm xã), hãy hỏi đường khi đến" ở danh sách và ô thông tin trên bản đồ
+- Sửa lỗi `Provinces::detect('Hà Tĩnh')` (đã ghi ở giai đoạn 0).
+
+**Kiểm tra**
+- Test mới:
+  - đọc Excel theo huyện, bỏ trang tổng hợp
+  - đọc bảng HTML nhiều trang, dừng khi hết
+  - đọc tên xã / huyện từ địa chỉ
+  - tìm xã cũ trên máy, bỏ kết quả là tòa nhà
+- Backend 181 test, shared 107 test, typecheck web + app đều qua.
+- Hà Tĩnh phân bón: 791 điểm, 740 tâm xã (94%), 50 tâm huyện (phần lớn là số nhà trong TP Hà Tĩnh), 1 tâm tỉnh.
+
 ## 17/10/2026: Thu thập điểm bán, giai đoạn 0: nền tảng ✅
 
 **Đã làm** (backend)

@@ -1,5 +1,6 @@
 import {
   directionsUrl,
+  geoNote,
   MAP_GESTURE_HINTS,
   MAP_LABELS,
   MAP_MAX_ZOOM,
@@ -36,6 +37,7 @@ function popupHtml(shop: Shop): string {
     `<div class="small muted">${escape(shop.types.map((t) => SHOP_TYPE_LABELS[t]).join(' · '))}</div>`,
     address && `<div>${escape(address)}</div>`,
     shop.goods && `<div class="small">Mặt hàng: ${escape(shop.goods)}</div>`,
+    geoNote(shop.geo_precision) && `<div class="small muted">${escape(geoNote(shop.geo_precision)!)}</div>`,
     `<div class="map-popup-actions">`,
     shop.phone ? `<a class="button primary" href="${escape(telHref(shop.phone))}">📞 ${escape(shop.phone)}</a>` : '',
     `<a class="button" href="${escape(directionsUrl(shop))}" target="_blank" rel="noreferrer">🧭 Chỉ đường</a>`,

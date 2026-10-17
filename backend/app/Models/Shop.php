@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * source: osm | import (danh sách của Sở, file CSV) | user (người dùng đề xuất, đã duyệt) | admin | buyer
  *   | khóa nguồn thu thập (config shops.sources), xem thêm các nguồn khác trong candidates()
- * geo_precision: exact | place (tâm xã / thôn) | province (tâm tỉnh) | null (chưa rõ)
+ * geo_precision: exact | place (tâm xã) | district (tâm huyện cũ) | province (tâm tỉnh) | null (như exact: OSM, admin, người dùng chấm)
  */
 #[Fillable(['name', 'types', 'address', 'province_code', 'lat', 'lng', 'geo_precision', 'phone', 'goods', 'opening_hours', 'source', 'source_ref', 'is_verified', 'is_active'])]
 class Shop extends Model

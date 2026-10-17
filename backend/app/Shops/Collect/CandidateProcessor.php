@@ -112,6 +112,7 @@ class CandidateProcessor
         $score += match ($candidate->geo_precision) {
             'exact' => 10,
             'place' => 5,
+            'district' => 2,
             default => 0,
         };
         // Có ở nguồn khác (hoặc đã có trong danh sách điểm bán): đáng tin hơn
@@ -147,8 +148,9 @@ class CandidateProcessor
     private function rank(?string $precision): int
     {
         return match ($precision) {
-            'exact', null => 3,
-            'place' => 2,
+            'exact', null => 4,
+            'place' => 3,
+            'district' => 2,
             'province' => 1,
             default => 0,
         };

@@ -26,8 +26,7 @@ class CollectShops extends Command
 
                 continue;
             }
-            /** @var ShopSource $source */
-            $source = app($configured[$key]);
+            $source = self::makeSource($key, $configured[$key]);
 
             // 1 nguồn lỗi không làm dừng các nguồn khác
             try {
@@ -45,5 +44,19 @@ class CollectShops extends Command
         }
 
         return $failed ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Nguồn trong config: tên class, hoặc mảng ['class' => …, …] cho nguồn cần tham số (danh sách của từng Sở)
+     *
+     * @param  class-string<ShopSource>|array<string, mixed>  $config
+     */
+    public static function makeSource(string $key, string|array $config): ShopSource
+    {
+        if (is_string($config)) {
+            return app($config);
+        }
+
+        return $config['class']::fromConfig($key, $config);
     }
 }

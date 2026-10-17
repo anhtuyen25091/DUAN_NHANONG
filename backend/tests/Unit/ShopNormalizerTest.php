@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Shops\Collect\ShopGeocoder;
 use App\Shops\Collect\ShopNormalizer;
 use App\Support\Provinces;
 use PHPUnit\Framework\TestCase;
@@ -39,5 +40,16 @@ class ShopNormalizerTest extends TestCase
         $this->assertSame('ha-tinh', Provinces::detect('Hà Tĩnh'));
         $this->assertSame('ha-tinh', Provinces::detect('xã Thạch Hà, tỉnh Hà Tĩnh'));
         $this->assertSame('ho-chi-minh', Provinces::detect('Q.1, TP.HCM'));
+    }
+
+    public function test_geocoder_reads_commune_and_district_from_address(): void
+    {
+        $geocoder = new ShopGeocoder;
+        $this->assertSame(['Đức Bồng', 'Vũ Quang'], $geocoder->parse('Thôn 2, xã Đức Bồng, huyện Vũ Quang'));
+        $this->assertSame(['Phù Việt', 'Thạch Hà'], $geocoder->parse('Thôn Thống Nhất, Phù Việt, huyện Thạch Hà'));
+        $this->assertSame(['Hà Huy Tập', 'Hà Tĩnh'], $geocoder->parse('Số 359, phường Hà Huy Tập, thành phố Hà Tĩnh'));
+        $this->assertSame(['Mỹ Hiệp', 'Cao Lãnh'], $geocoder->parse('Ấp 3, Mỹ Hiệp, Cao Lãnh, Đồng Tháp'));
+        $this->assertSame(['Phố Châu', 'Hương Sơn'], $geocoder->parse('Khối 9, thị trấn Phố Châu, huyện Hương Sơn'));
+        $this->assertSame([null, null], $geocoder->parse('Thôn 5'));
     }
 }

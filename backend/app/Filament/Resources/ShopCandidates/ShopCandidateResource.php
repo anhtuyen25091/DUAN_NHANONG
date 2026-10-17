@@ -49,7 +49,7 @@ class ShopCandidateResource extends Resource
 
     public static function table(Table $table): Table
     {
-        $precision = ['exact' => 'Đúng nhà', 'place' => 'Tâm xã / thôn', 'province' => 'Tâm tỉnh (gần đúng)'];
+        $precision = ['exact' => 'Đúng nhà', 'place' => 'Tâm xã', 'district' => 'Tâm huyện cũ', 'province' => 'Tâm tỉnh (gần đúng)'];
 
         return $table
             ->defaultSort('confidence', 'desc')

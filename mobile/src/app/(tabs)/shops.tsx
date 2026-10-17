@@ -1,4 +1,4 @@
-import { directionsUrl, formatDistance, SHOP_TYPE_LABELS, telHref, type Shop, type ShopType } from '@nhanong/shared';
+import { directionsUrl, formatDistance, geoNote, SHOP_TYPE_LABELS, telHref, type Shop, type ShopType } from '@nhanong/shared';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -219,6 +219,7 @@ function ShopCard({ shop }: { shop: Shop }) {
         <Button label="🧭 Chỉ đường" variant="outline" onPress={() => Linking.openURL(directionsUrl(shop))} />
         <Button label="Báo sai" variant="outline" onPress={() => router.push({ pathname: '/shop/new', params: { shopId: String(shop.id), name: shop.name } })} />
       </View>
+      {geoNote(shop.geo_precision) && <Text style={[styles.muted, { marginTop: 6 }]}>{geoNote(shop.geo_precision)}</Text>}
       {shop.source && <Text style={[styles.muted, { marginTop: 6 }]}>Nguồn: {shop.source}</Text>}
     </Card>
   );

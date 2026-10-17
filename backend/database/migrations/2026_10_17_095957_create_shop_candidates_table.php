@@ -39,7 +39,7 @@ return new class extends Migration
         });
 
         Schema::table('shops', function (Blueprint $table) {
-            // exact: đúng nhà / đường · place: tâm xã, thôn · province: tâm tỉnh (vị trí gần đúng)
+            // exact: đúng nhà / đường · place: tâm xã · district: tâm huyện (cũ) · province: tâm tỉnh (vị trí gần đúng)
             $table->string('geo_precision', 10)->nullable()->after('lng');
         });
     }

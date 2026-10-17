@@ -83,3 +83,11 @@ export const SHOP_TYPE_COLORS = {
   phan_bon: '#d9822b',
   thuoc_bvtv: '#7b4bb7',
 } as const;
+
+/** Ghi chú khi vị trí điểm bán chưa đúng nhà (lấy theo địa chỉ trong danh sách của Sở…) */
+export function geoNote(precision: 'exact' | 'place' | 'district' | 'province' | null | undefined): string | null {
+  if (precision === 'place') return '📍 Vị trí gần đúng (tâm xã), hãy hỏi đường khi đến';
+  if (precision === 'district') return '📍 Vị trí gần đúng (tâm huyện cũ), hãy hỏi đường khi đến';
+  if (precision === 'province') return '📍 Chưa rõ vị trí, chấm trên bản đồ đặt ở giữa tỉnh';
+  return null;
+}

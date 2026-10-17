@@ -262,7 +262,10 @@ export interface Shop {
   goods: string | null;
   opening_hours: string | null;
   is_verified: boolean;
+  /** Tên nguồn để hiện "Nguồn: …" (null: admin tự thêm) */
   source: string | null;
+  /** exact: đúng nhà · place: tâm xã · district: tâm huyện cũ · province: tâm tỉnh (vị trí gần đúng) */
+  geo_precision?: 'exact' | 'place' | 'district' | 'province' | null;
   /** Chỉ có khi tìm theo vị trí */
   distance_km?: number;
 }

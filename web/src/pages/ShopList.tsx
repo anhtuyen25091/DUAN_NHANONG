@@ -1,4 +1,4 @@
-import { directionsUrl, formatDistance, SHOP_TYPE_LABELS, telHref, type Shop, type ShopPage, type ShopType } from '@nhanong/shared'
+import { directionsUrl, formatDistance, geoNote, SHOP_TYPE_LABELS, telHref, type Shop, type ShopPage, type ShopType } from '@nhanong/shared'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { api } from '../api'
 import { Status } from '../components/Status'
@@ -187,6 +187,7 @@ function ShopCard({ shop }: { shop: Shop }) {
           Báo sai
         </a>
       </div>
+      {geoNote(shop.geo_precision) && <p className="small muted">{geoNote(shop.geo_precision)}</p>}
       {shop.source && <p className="small muted">Nguồn: {shop.source}</p>}
     </article>
   )

@@ -1,4 +1,4 @@
-import { directionsUrl, SHOP_TYPE_COLORS, SHOP_TYPE_LABELS, telHref, type ShopFilters } from '@nhanong/shared';
+import { directionsUrl, geoNote, SHOP_TYPE_COLORS, SHOP_TYPE_LABELS, telHref, type ShopFilters } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { Linking, Text, View } from 'react-native';
@@ -30,6 +30,7 @@ export function ShopMap({ filters, position }: { filters: ShopFilters; position:
         address: s.address,
         province_name: s.province_name,
         goods: s.goods,
+        note: geoNote(s.geo_precision),
         is_verified: s.is_verified,
         color: SHOP_TYPE_COLORS[s.types[0] ?? 'thu_mua'],
         types: s.types.map((t) => SHOP_TYPE_LABELS[t]).join(' · '),

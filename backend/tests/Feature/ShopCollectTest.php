@@ -216,4 +216,25 @@ class ShopCollectTest extends TestCase
 
         $this->assertSame('dak-lak', Shop::query()->sole()->province_code);
     }
+
+    public function test_old_commune_found_offline_and_unrelated_buildings_ignored(): void
+    {
+        // Photon trả bừa 1 tòa nhà có chữ giống: không được lấy
+        Http::fake(['photon.komoot.io/*' => Http::response(['features' => [[
+            'geometry' => ['coordinates' => [105.90, 18.34]],
+            'properties' => ['countrycode' => 'VN', 'state' => 'Hà Tĩnh', 'osm_key' => 'building', 'type' => 'house', 'name' => 'Bảo hiểm Xã hội Hà Tĩnh'],
+        ]]])]);
+
+        $this->collectAndProcess($this->source('so-ha-tinh', 85, [
+            // Xã cũ (đã sáp nhập): lấy tâm xã từ bảng xã cũ
+            new CandidateData(ref: '1', name: 'Nguyễn Văn A', address: 'Xóm 3, xã Thạch Khê, thành phố Hà Tĩnh', province: 'ha-tinh', types: [ShopType::PhanBon]),
+            // Xã không có trong bảng, Photon không ra xã: lấy tâm huyện cũ
+            new CandidateData(ref: '2', name: 'Trần Thị B', address: 'Thôn 1, xã Không Có, huyện Can Lộc', province: 'ha-tinh', types: [ShopType::PhanBon]),
+        ]));
+
+        $shops = Shop::query()->orderBy('name')->get();
+        $this->assertSame(['place', 'district'], [$shops[0]->geo_precision, $shops[1]->geo_precision]);
+        $this->assertEqualsWithDelta(18.38, $shops[0]->lat, 0.01);
+        $this->assertEqualsWithDelta(105.94, $shops[0]->lng, 0.01);
+    }
 }
