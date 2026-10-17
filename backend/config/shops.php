@@ -132,6 +132,20 @@ return [
             'types' => ['thuoc_bvtv'],
             'trust' => 80,
         ],
+
+        // Cả nước: thương nhân kinh doanh xuất khẩu gạo (Bộ Công Thương, Cục Xuất nhập khẩu, cập nhật đến 28/4/2025).
+        // File .xls, trang tính đầu là bản hiện hành; tỉnh đoán từ địa chỉ. Bộ đăng bản mới ở bài khác: cập nhật 'url' khi có.
+        'bct-xuat-khau-gao' => [
+            'class' => LicenseSheetSource::class,
+            'label' => 'Bộ Công Thương: thương nhân xuất khẩu gạo (thu mua lúa gạo)',
+            'url' => 'https://moit.gov.vn/upload/2005517/fck/files/2025_4_28_Danh_sach_TN_KDXK_gao_ff533.xls',
+            'page' => 'https://moit.gov.vn/tin-tuc/cap-nhat-danh-sach-thuong-nhan-kinh-doanh-xuat-khau-gao-den-ngay-28-4-2025.html',
+            'province' => null,
+            'types' => ['thu_mua'],
+            'goods' => 'Lúa gạo (doanh nghiệp xuất khẩu)',
+            'first_sheet_only' => true,
+            'trust' => 85,
+        ],
     ],
 
     /*

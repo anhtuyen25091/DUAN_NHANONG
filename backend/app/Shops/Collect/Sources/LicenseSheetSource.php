@@ -7,6 +7,7 @@ use App\Enums\ShopType;
 use App\Shops\Collect\CandidateData;
 use App\Shops\Collect\ShopSource;
 use OpenSpout\Reader\XLSX\Reader;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
  * Danh sách cơ sở được cấp giấy chứng nhận đủ điều kiện buôn bán phân bón / thuốc BVTV do Sở NN&MT công bố
@@ -29,12 +30,17 @@ class LicenseSheetSource implements ShopSource
         private string $key,
         private string $label,
         private string $url,
-        private string $province,
+        /** null: danh sách nhiều tỉnh, đoán tỉnh từ địa chỉ */
+        private ?string $province,
         private array $types,
         private int $trust = 85,
         private ?string $page = null,
         /** @var array{host: string, dataset: string}|null bộ dữ liệu trên cổng CKAN: lấy file mới nhất mỗi lần chạy */
         private ?array $ckan = null,
+        /** Chỉ đọc trang tính đầu (các trang sau là bản cũ / bản nháp) */
+        private bool $firstSheetOnly = false,
+        /** Mặt hàng ghi cho mọi điểm khi file không có cột mặt hàng, vd "Lúa gạo" */
+        private ?string $goods = null,
     ) {}
 
     /**
@@ -47,11 +53,13 @@ class LicenseSheetSource implements ShopSource
             key: $key,
             label: $config['label'],
             url: $config['url'] ?? '',
-            province: $config['province'],
+            province: $config['province'] ?? null,
             types: array_map(fn (string $t): ShopType => ShopType::from($t), $config['types']),
             trust: $config['trust'] ?? 85,
             page: $config['page'] ?? null,
             ckan: $config['ckan'] ?? null,
+            firstSheetOnly: $config['first_sheet_only'] ?? false,
+            goods: $config['goods'] ?? null,
         );
     }
 
@@ -88,24 +96,62 @@ class LicenseSheetSource implements ShopSource
      */
     public function read(string $file): iterable
     {
+        foreach ($this->sheets($file) as $name => $sheetRows) {
+            $rows = [];
+            $district = null;
+            $headerSeen = false;
+            foreach ($sheetRows as $cells) {
+                // Tên huyện cũ ở dòng tiêu đề phía trên bảng ("HUYỆN THẠCH HÀ (đến tháng 05/2025)")
+                $headerSeen = $headerSeen || LicenseTable::header($cells) !== null;
+                if (! $headerSeen) {
+                    $district = $this->district([trim(implode(' ', $cells))]) ?? $district;
+                }
+                $rows[] = $cells;
+            }
+            // Chỉ đọc trang đầu thì tên trang hay đổi theo bản cập nhật ("DS (3)" → "DS (4)"): mã điểm không ghép tên trang
+            $prefix = $this->firstSheetOnly ? 'sheet1' : (string) $name;
+            foreach (LicenseTable::candidates($rows, $this->province, $this->types, $this->page ?? $this->url, $prefix, $district) as $candidate) {
+                yield $this->goods !== null && $candidate->goods === null
+                    ? new CandidateData($candidate->ref, $candidate->name, $candidate->address, $candidate->province, $candidate->phone, $candidate->types, $this->goods, $candidate->lat, $candidate->lng, $candidate->url, $candidate->raw)
+                    : $candidate;
+            }
+            if ($this->firstSheetOnly) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * Các trang tính (tên → các dòng). File Excel đời mới (.xlsx) đọc bằng OpenSpout (nhẹ);
+     * đời cũ (.xls, vd danh sách của Bộ Công Thương) đọc bằng PhpSpreadsheet.
+     *
+     * @return iterable<string, list<list<string>>>
+     */
+    private function sheets(string $file): iterable
+    {
+        $head = (string) file_get_contents($file, length: 8);
+        if ($head === "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1") {
+            $book = IOFactory::load($file);
+            foreach ($book->getAllSheets() as $sheet) {
+                $rows = [];
+                foreach ($sheet->toArray(null, true, false, false) as $row) {
+                    $rows[] = array_map(fn ($value): string => $this->text($value), array_values($row));
+                }
+                yield $sheet->getTitle() => $rows;
+            }
+
+            return;
+        }
+
         $reader = new Reader;
         $reader->open($file);
-
         try {
             foreach ($reader->getSheetIterator() as $sheet) {
                 $rows = [];
-                $district = null;
-                $headerSeen = false;
                 foreach ($sheet->getRowIterator() as $row) {
-                    $cells = array_map(fn ($cell): string => $this->text($cell->getValue()), $row->getCells());
-                    // Tên huyện cũ ở dòng tiêu đề phía trên bảng ("HUYỆN THẠCH HÀ (đến tháng 05/2025)")
-                    $headerSeen = $headerSeen || LicenseTable::header($cells) !== null;
-                    if (! $headerSeen) {
-                        $district = $this->district([trim(implode(' ', $cells))]) ?? $district;
-                    }
-                    $rows[] = $cells;
+                    $rows[] = array_map(fn ($cell): string => $this->text($cell->getValue()), $row->getCells());
                 }
-                yield from LicenseTable::candidates($rows, $this->province, $this->types, $this->page ?? $this->url, $sheet->getName(), $district);
+                yield $sheet->getName() => $rows;
             }
         } finally {
             $reader->close();

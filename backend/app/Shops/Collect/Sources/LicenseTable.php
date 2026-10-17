@@ -80,7 +80,7 @@ final class LicenseTable
      * @param  array<string, int>  $columns
      * @param  list<ShopType>  $types
      */
-    public static function candidate(array $cells, array $columns, ?string $district, string $province, array $types, ?string $url, string $refPrefix): ?CandidateData
+    public static function candidate(array $cells, array $columns, ?string $district, ?string $province, array $types, ?string $url, string $refPrefix): ?CandidateData
     {
         $get = fn (string $field): string => isset($columns[$field]) ? trim((string) preg_replace('/\s+/u', ' ', $cells[$columns[$field]] ?? '')) : '';
 
@@ -161,7 +161,7 @@ final class LicenseTable
      * @param  list<ShopType>  $types
      * @return iterable<CandidateData>
      */
-    public static function candidates(array $rows, string $province, array $types, ?string $url, string $refPrefix = 'r', ?string $district = null): iterable
+    public static function candidates(array $rows, ?string $province, array $types, ?string $url, string $refPrefix = 'r', ?string $district = null): iterable
     {
         $columns = null;
         $header = null;
