@@ -42,3 +42,18 @@ describe('radiusToReach / placeLabel', () => {
     expect(placeLabel({ ...place, name: 'Phường Buôn Hồ', detail: null })).toBe('Phường Buôn Hồ');
   });
 });
+
+describe('bản đồ Việt Nam', () => {
+  it('khung bản đồ chứa Hoàng Sa, Trường Sa và mọi tỉnh; có nhãn chủ quyền', async () => {
+    const { VIETNAM_BOUNDS, MAP_LABELS } = await import('./map');
+    const { PROVINCE_CENTERS, PROVINCE_NAMES } = await import('./local');
+    const inside = ([lat, lng]: [number, number]) => lat >= VIETNAM_BOUNDS[0][0] && lat <= VIETNAM_BOUNDS[1][0] && lng >= VIETNAM_BOUNDS[0][1] && lng <= VIETNAM_BOUNDS[1][1];
+    // Hoàng Sa (đảo Phú Lâm, đảo Tri Tôn), Trường Sa (đảo Trường Sa Lớn, đá Vành Khăn, đá An Bang) và mũi Cà Mau
+    for (const point of [[16.83, 112.33], [15.78, 111.2], [8.64, 111.92], [9.9, 115.53], [7.88, 112.92], [8.6, 104.72]] as [number, number][]) {
+      expect(inside(point)).toBe(true);
+    }
+    for (const center of Object.values(PROVINCE_CENTERS)) expect(inside(center)).toBe(true);
+    expect(Object.keys(PROVINCE_NAMES).sort()).toEqual(Object.keys(PROVINCE_CENTERS).sort());
+    expect(MAP_LABELS.filter((l) => l.kind === 'sovereignty').map((l) => l.text)).toEqual(['Quần đảo Hoàng Sa (Việt Nam)', 'Quần đảo Trường Sa (Việt Nam)']);
+  });
+});

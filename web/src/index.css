@@ -1973,12 +1973,76 @@ button.linklike.danger {
 }
 
 /* Bản đồ điểm bán */
+.view-switch {
+  margin-bottom: 12px;
+}
+/* Đang xem bản đồ: nút lọc gọn lại để bản đồ lên gần đầu trang */
+.shop-controls.compact .view-switch,
+.shop-controls.compact .tabs,
+.shop-controls.compact .filters {
+  margin-bottom: 8px;
+  gap: 6px;
+}
+.shop-controls.compact button,
+.shop-controls.compact input,
+.shop-controls.compact select {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 0.9rem;
+}
+.shop-controls.compact .filters input {
+  flex-basis: 160px;
+}
+.shop-map-wrap {
+  position: relative;
+  margin: 8px 0;
+}
 .shop-map {
-  height: min(65vh, 560px);
+  height: min(60vh, 520px);
+  min-height: 300px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  margin: 8px 0;
   z-index: 0;
+  background: #dfe3e6;
+}
+.map-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 1000;
+}
+/* Tên tự vẽ trên bản đồ (nền không có chữ) */
+.vn-label span {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+}
+.vn-label.sovereignty span {
+  text-align: center;
+  color: #b3261e;
+  font-weight: 700;
+  font-size: 13px;
+}
+.vn-label.sea span {
+  color: #2f6690;
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+.vn-label.province span {
+  color: #444;
+  font-size: 12px;
 }
 .map-legend {
   display: flex;

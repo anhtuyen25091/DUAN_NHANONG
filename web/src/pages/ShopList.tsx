@@ -80,44 +80,46 @@ export function ShopList({ query }: { query: URLSearchParams }) {
         </a>
       </div>
 
-      <nav className="tabs" aria-label="Loại điểm">
-        <button type="button" className={!type ? 'active' : ''} aria-pressed={!type} onClick={() => setFilter({ type: '' })}>
-          Tất cả
-        </button>
-        {TYPES.map((t) => (
-          <button key={t} type="button" className={t === type ? 'active' : ''} aria-pressed={t === type} onClick={() => setFilter({ type: t })}>
-            {SHOP_TYPE_LABELS[t]}
+      <div className={onMap ? 'shop-controls compact' : 'shop-controls'}>
+        <nav className="segmented view-switch" aria-label="Cách xem">
+          <button type="button" className={!onMap ? 'active' : ''} aria-pressed={!onMap} onClick={() => setFilter({ xem: '' })}>
+            📋 Danh sách
           </button>
-        ))}
-      </nav>
+          <button type="button" className={onMap ? 'active' : ''} aria-pressed={onMap} onClick={() => setFilter({ xem: 'ban-do' })}>
+            🗺 Bản đồ
+          </button>
+        </nav>
 
-      <div className="filters">
-        <input type="search" placeholder="Tìm tên, địa chỉ, mặt hàng…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Tìm kiếm" />
-        <button type="button" className={position ? 'active-toggle' : ''} aria-pressed={!!position} onClick={nearMe}>
-          📍 {position ? 'Đang xem gần tôi' : 'Gần tôi'}
-        </button>
-        {!position && (
-          <select value={province} onChange={(e) => setFilter({ province: e.target.value })} aria-label="Tỉnh/thành">
-            <option value="">Mọi tỉnh/thành</option>
-            {provinces.status === 'ok' &&
-              provinces.data.map((p) => (
-                <option key={p.code} value={p.code}>
-                  {p.name}
-                  {p.shops ? ` (${p.shops})` : ''}
-                </option>
-              ))}
-          </select>
-        )}
+        <nav className="tabs" aria-label="Loại điểm">
+          <button type="button" className={!type ? 'active' : ''} aria-pressed={!type} onClick={() => setFilter({ type: '' })}>
+            Tất cả
+          </button>
+          {TYPES.map((t) => (
+            <button key={t} type="button" className={t === type ? 'active' : ''} aria-pressed={t === type} onClick={() => setFilter({ type: t })}>
+              {SHOP_TYPE_LABELS[t]}
+            </button>
+          ))}
+        </nav>
+
+        <div className="filters">
+          <input type="search" placeholder="Tìm tên, địa chỉ, mặt hàng…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Tìm kiếm" />
+          <button type="button" className={position ? 'active-toggle' : ''} aria-pressed={!!position} onClick={nearMe}>
+            📍 {position ? 'Đang xem gần tôi' : 'Gần tôi'}
+          </button>
+          {!position && (
+            <select value={province} onChange={(e) => setFilter({ province: e.target.value })} aria-label="Tỉnh/thành">
+              <option value="">Mọi tỉnh/thành</option>
+              {provinces.status === 'ok' &&
+                provinces.data.map((p) => (
+                  <option key={p.code} value={p.code}>
+                    {p.name}
+                    {p.shops ? ` (${p.shops})` : ''}
+                  </option>
+                ))}
+            </select>
+          )}
+        </div>
       </div>
-
-      <nav className="segmented" aria-label="Cách xem">
-        <button type="button" className={!onMap ? 'active' : ''} aria-pressed={!onMap} onClick={() => setFilter({ xem: '' })}>
-          📋 Danh sách
-        </button>
-        <button type="button" className={onMap ? 'active' : ''} aria-pressed={onMap} onClick={() => setFilter({ xem: 'ban-do' })}>
-          🗺 Bản đồ
-        </button>
-      </nav>
 
       {locating && <p className="muted small">{locating}</p>}
 

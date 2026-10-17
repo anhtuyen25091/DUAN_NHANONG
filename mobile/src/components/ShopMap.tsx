@@ -51,11 +51,11 @@ export function ShopMap({ filters, position }: { filters: ShopFilters; position:
       <Status state={result.state} retry={result.reload} />
       {page && (
         <Text style={styles.muted}>
-          {page.meta.total} điểm có vị trí trên bản đồ{page.meta.has_more ? ' (đang hiện 500 điểm đầu, hãy chọn tỉnh hoặc loại)' : ''}
+          {page.meta.total} điểm có vị trí{page.meta.has_more ? ' (đang hiện 500 điểm đầu, hãy chọn tỉnh hoặc loại)' : ''} · chụm 2 ngón để phóng to
         </Text>
       )}
       {html && (
-        <View style={{ flex: 1, minHeight: 360, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
+        <View style={{ flex: 1, minHeight: 280, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
           <WebView originWhitelist={['*']} source={{ html }} onMessage={onMessage} style={{ flex: 1 }} setSupportMultipleWindows={false} />
         </View>
       )}

@@ -23,6 +23,8 @@ export default function ShopsScreen() {
   const [more, setMore] = useState<{ shops: Shop[]; page: number; hasMore: boolean } | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [onMap, setOnMap] = useState(false);
+  // Xem bản đồ: ô tìm, chọn tỉnh gấp lại để bản đồ được rộng
+  const [showFilters, setShowFilters] = useState(false);
 
   // Gõ xong 0,4 giây mới tìm
   useEffect(() => {
@@ -72,6 +74,17 @@ export default function ShopsScreen() {
   const meta = page?.meta ?? null;
   const shops = page ? [...page.data, ...(more?.shops ?? [])] : [];
 
+  const provinceChips = !position && provinces.state.status === 'ok' && (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0 }}>
+      <Chip label="Mọi tỉnh" active={province === ''} onPress={() => setProvince('')} />
+      {provinces.state.data
+        .filter((p) => p.shops > 0 || p.code === province)
+        .map((p) => (
+          <Chip key={p.code} label={`${p.name} (${p.shops})`} active={p.code === province} onPress={() => setProvince(p.code)} />
+        ))}
+    </ScrollView>
+  );
+
   const controls = (
     <>
       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -93,23 +106,38 @@ export default function ShopsScreen() {
       />
       <Button label={position ? '📍 Đang xem gần tôi (bấm để tắt)' : '📍 Tìm gần tôi'} variant={position ? 'primary' : 'outline'} onPress={nearMe} />
       {locating && <Text style={styles.muted}>{locating}</Text>}
-      {!position && provinces.state.status === 'ok' && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-          <Chip label="Mọi tỉnh" active={province === ''} onPress={() => setProvince('')} />
-          {provinces.state.data
-            .filter((p) => p.shops > 0 || p.code === province)
-            .map((p) => (
-              <Chip key={p.code} label={`${p.name} (${p.shops})`} active={p.code === province} onPress={() => setProvince(p.code)} />
-            ))}
-        </ScrollView>
-      )}
+      {provinceChips}
     </>
   );
 
   if (onMap) {
+    const filtered = q !== '' || province !== '';
     return (
-      <View style={{ flex: 1, padding: 16, gap: 10 }}>
-        {controls}
+      <View style={{ flex: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12, gap: 8 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0 }}>
+          <Chip label="📋 Danh sách" active={false} onPress={() => setOnMap(false)} />
+          <Chip label={position ? '📍 Gần tôi ✓' : '📍 Gần tôi'} active={!!position} onPress={nearMe} />
+          <Chip label={`🔎 Lọc${filtered ? ' ✓' : ''} ${showFilters ? '▴' : '▾'}`} active={showFilters} onPress={() => setShowFilters(!showFilters)} />
+        </ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0 }}>
+          <Chip label="Tất cả" active={type === ''} onPress={() => setType('')} />
+          {TYPES.map((t) => (
+            <Chip key={t} label={SHOP_TYPE_LABELS[t]} active={t === type} onPress={() => setType(t)} />
+          ))}
+        </ScrollView>
+        {showFilters && (
+          <>
+            <TextInput
+              placeholder="Tìm tên, địa chỉ, mặt hàng…"
+              placeholderTextColor={colors.muted}
+              value={search}
+              onChangeText={setSearch}
+              style={{ minHeight: 44, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: font.body, backgroundColor: colors.surface, color: colors.text }}
+            />
+            {provinceChips}
+          </>
+        )}
+        {locating && <Text style={styles.muted}>{locating}</Text>}
         <ShopMap filters={filters} position={position} />
       </View>
     );

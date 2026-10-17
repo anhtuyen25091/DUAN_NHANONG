@@ -158,6 +158,17 @@ export const PROVINCE_CENTERS: Record<string, [number, number]> = {
   'ca-mau': [9.1769, 105.1524], 'an-giang': [10.0125, 105.0809],
 };
 
+/** Tên 34 tỉnh/thành (để vẽ tên trên bản đồ, không cần gọi API) */
+export const PROVINCE_NAMES: Record<string, string> = {
+  'ha-noi': 'Hà Nội', hue: 'Huế', 'lai-chau': 'Lai Châu', 'dien-bien': 'Điện Biên', 'son-la': 'Sơn La', 'lang-son': 'Lạng Sơn',
+  'quang-ninh': 'Quảng Ninh', 'thanh-hoa': 'Thanh Hóa', 'nghe-an': 'Nghệ An', 'ha-tinh': 'Hà Tĩnh', 'cao-bang': 'Cao Bằng',
+  'tuyen-quang': 'Tuyên Quang', 'lao-cai': 'Lào Cai', 'thai-nguyen': 'Thái Nguyên', 'phu-tho': 'Phú Thọ', 'bac-ninh': 'Bắc Ninh',
+  'hung-yen': 'Hưng Yên', 'hai-phong': 'Hải Phòng', 'ninh-binh': 'Ninh Bình', 'quang-tri': 'Quảng Trị', 'da-nang': 'Đà Nẵng',
+  'quang-ngai': 'Quảng Ngãi', 'gia-lai': 'Gia Lai', 'khanh-hoa': 'Khánh Hòa', 'lam-dong': 'Lâm Đồng', 'dak-lak': 'Đắk Lắk',
+  'ho-chi-minh': 'TP. Hồ Chí Minh', 'dong-nai': 'Đồng Nai', 'tay-ninh': 'Tây Ninh', 'can-tho': 'Cần Thơ', 'vinh-long': 'Vĩnh Long',
+  'dong-thap': 'Đồng Tháp', 'ca-mau': 'Cà Mau', 'an-giang': 'An Giang',
+};
+
 /** Khu vực = trung tâm tỉnh (khi không bật GPS) */
 export function provinceLocation(province: string, radius = 30, provinceName?: string | null): MyLocation | null {
   const center = PROVINCE_CENTERS[province];

@@ -11,6 +11,39 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Bản đồ điểm bán: chỉ Việt Nam, có Hoàng Sa / Trường Sa, không "đường lưỡi bò"; nút lọc gọn ✅
+
+**Yêu cầu:** khi xem bản đồ, nút lọc quá to, khó kéo xuống phần bản đồ. Bản đồ chỉ hiện Việt Nam, không kéo ra nước ngoài; phải có Hoàng Sa, Trường Sa; không được có "đường lưỡi bò".
+
+**Vấn đề của bản đồ cũ:** ô OSM France ghi tên tiếng Pháp, vùng Hoàng Sa có chữ Trung Quốc.
+
+**Đã làm** (web + app, cấu hình chung ở `packages/shared/src/map.ts`)
+- **Nền bản đồ chọn theo mức phóng** (đã chụp thử từng nền):
+  - thu nhỏ (mức ≤ 9, xem cả nước): Esri **World Terrain Base**, không có chữ, không có đường biên, không có đường kẻ trên biển
+  - phóng gần (mức ≥ 10, xem huyện / xã): Esri **Light Gray Base**, có đường sá, tên địa danh tiếng Việt; vùng 2 quần đảo ở các mức này trống, không chữ, không đường kẻ
+  - đã loại: OSM (tên Pháp / chữ Trung Quốc), Esri Light Gray ở mức thấp (có LAOS, Gulf of Tonkin…), CARTO (nay bắt buộc khóa API)
+- **Tên tự vẽ bằng tiếng Việt:** "Quần đảo Hoàng Sa (Việt Nam)", "Quần đảo Trường Sa (Việt Nam)" (chữ đỏ, luôn hiện), "Biển Đông", "Vịnh Bắc Bộ", "Vịnh Thái Lan"; tên 34 tỉnh hiện ở mức phóng 7–9 (`PROVINCE_NAMES` mới trong `local.ts`).
+- **Chỉ trong Việt Nam:** khung `VIETNAM_BOUNDS` [6,0°B–23,6°B; 101,8°Đ–117,9°Đ] gồm đất liền + 2 quần đảo; kéo ra ngoài bị chặn lại, thu nhỏ tối đa = vừa khít cả nước.
+- **Web:**
+  - Nút "Danh sách / Bản đồ" lên đầu; khi xem bản đồ, các nút lọc nhỏ lại (cao 36px); bản đồ cao tối đa 60% màn hình.
+  - Trang vẫn cuộn được khi lướt qua bản đồ: điện thoại kéo bản đồ bằng **2 ngón tay** (1 ngón thì cuộn trang, có lời nhắc), máy tính **giữ Ctrl + lăn chuột** để phóng to (lăn thường thì cuộn trang, có lời nhắc).
+- **App:** khi xem bản đồ chỉ còn 2 hàng chip nhỏ: [📋 Danh sách] [📍 Gần tôi] [🔎 Lọc ▾] và hàng loại điểm; ô tìm + chọn tỉnh gấp vào nút "Lọc". Bản đồ chiếm phần còn lại của màn hình.
+- Đổi nền vẫn được qua biến môi trường (`VITE_MAP_TILE_URL`, `EXPO_PUBLIC_MAP_TILE_URL`).
+
+**Kiểm tra**
+- Test mới: khung bản đồ chứa đảo Phú Lâm, Tri Tôn (Hoàng Sa), Trường Sa Lớn, Vành Khăn, An Bang (Trường Sa), mũi Cà Mau và tâm 34 tỉnh; đủ tên 34 tỉnh; có 2 nhãn chủ quyền. Shared 107 test qua; typecheck web + mobile qua.
+- Chụp màn hình (Chrome headless):
+  - web điện thoại 420px và máy tính 1200px
+  - HTML bản đồ của app ở mức 5, 8, 9, 10, 13
+  - kéo bản đồ ra (30°B, 130°Đ) thì bị chặn lại trong khung Việt Nam
+- **App chưa bấm thử trên điện thoại thật**: chỉ thử trang HTML bản đồ trong Chrome.
+
+**Còn tồn**
+- Khi phát hành: nền Esri dùng thương mại cần tài khoản ArcGIS (có hạn mức miễn phí), hoặc đổi sang nhà cung cấp bản đồ Việt Nam có giấy phép.
+- Trên máy tính, khung rộng vẫn thấy một phần nước láng giềng (không có chữ).
+
+---
+
 ## 17/10/2026: Sổ thu chi: "Ghi gần đây" gọn lại + trang "Tất cả khoản" có phân trang ✅
 
 **Yêu cầu:** "Ghi gần đây" hiện quá nhiều (15 khoản) làm trang sổ dài; cần nút sang xem tất cả, có phân trang.
