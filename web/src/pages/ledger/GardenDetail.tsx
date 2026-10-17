@@ -14,6 +14,7 @@ import {
   formatHarvest,
   formatQtyGrouped,
   harvestTotals,
+  paginate,
   today,
   totals,
   type Ledger,
@@ -23,6 +24,9 @@ import { go, href, replaceQuery } from '../../hooks'
 import { MonthBars } from '../../components/MonthBars'
 import { showToast } from '../../ledger/toast'
 import { EntryList } from './EntryList'
+import { Pager } from '../../components/Pager'
+
+const PER_PAGE = 20
 import { FieldLines } from './extraFields'
 import { ProfitCard } from './LedgerHome'
 
@@ -55,6 +59,7 @@ export function GardenDetail({ ledger, data, id, query }: { ledger: Ledger; data
   // Chế độ Cơ bản: danh sách hiện mọi khoản như trước; Nâng cao: theo vụ / năm đang chọn
   const listRange: { from?: string; to?: string } = advanced && garden ? range : {}
   const entries = filterEntries(data.transactions, { gardenId, ...listRange })
+  const entryPage = paginate(entries, Number(query.get('trang')), PER_PAGE)
   const usages = data.supply_usages.filter(
     (u) => u.garden_id === gardenId && (!listRange.from || u.used_on >= listRange.from) && (!listRange.to || u.used_on <= listRange.to),
   )
@@ -198,8 +203,18 @@ export function GardenDetail({ ledger, data, id, query }: { ledger: Ledger; data
         </>
       )}
 
-      <h2 className="section">Các khoản đã ghi</h2>
-      <EntryList ledger={ledger} data={data} entries={entries} />
+      <h2 className="section" id="cac-khoan">
+        Các khoản đã ghi {entries.length > PER_PAGE && <span className="small muted">({entries.length})</span>}
+      </h2>
+      <EntryList ledger={ledger} data={data} entries={entryPage.items} />
+      <Pager
+        page={entryPage.page}
+        pages={entryPage.pages}
+        onPage={(p) => {
+          replaceQuery(`so/vuon/${id}`, { vu: query.get('vu'), trang: String(p) })
+          document.getElementById('cac-khoan')?.scrollIntoView()
+        }}
+      />
 
       {garden && (
         <button type="button" className="wide danger-outline" onClick={remove}>

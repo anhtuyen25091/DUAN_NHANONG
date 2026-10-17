@@ -11,6 +11,35 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Sổ thu chi: "Ghi gần đây" gọn lại + trang "Tất cả khoản" có phân trang ✅
+
+**Yêu cầu:** "Ghi gần đây" hiện quá nhiều (15 khoản) làm trang sổ dài; cần nút sang xem tất cả, có phân trang.
+
+**Đã làm** (web + app)
+- `paginate(items, page, perPage)` trong `packages/shared/src/format.ts`: trang ngoài khoảng (vd sau khi xóa bớt khoản) tự lùi về trang cuối; danh sách rỗng vẫn có 1 trang.
+- **Trang chính của sổ:** "Ghi gần đây" chỉ hiện **8 khoản**; nhiều hơn thì có nút **"Xem tất cả N khoản ›"**.
+- **Trang "Tất cả khoản thu chi"** (web `#/so/khoan`, app `ledger/entries`):
+  - lọc Tất cả / Tiền vào / Tiền ra và theo vườn (hoặc Chi chung)
+  - hiện số khoản và tổng tiền vào / tiền ra của phần đang lọc
+  - **20 khoản / trang**, nút "‹ Trước · Trang 2/3 · Sau ›"; đổi trang thì cuộn lên đầu danh sách
+  - web lưu bộ lọc và số trang trên đường dẫn (`?loai=thu&vuon=…&trang=2`), nên tải lại trang vẫn giữ
+- **Trang vườn:** "Các khoản đã ghi" cũng chia 20 khoản / trang; đổi vụ / năm đang xem thì về trang 1.
+
+**Kiểm tra**
+- 2 test `paginate`; shared, typecheck web + mobile, lint sạch. Bundle Android build được.
+- Web (Chrome headless, sổ thử 45 khoản):
+  - trang chính 8 khoản + nút "Xem tất cả 45 khoản"
+  - trang Tất cả: trang 1/3 → 2/3 → 3/3 (5 khoản, nút Sau tắt)
+  - lọc Tiền vào: 9 khoản, 2.250.000 đ (đúng), ẩn phân trang
+  - trang vườn: 30 khoản chia 2 trang
+- **App chưa bấm thử tự động** (export web của app hay crash trên máy này); phần tính trang là code dùng chung đã kiểm tra trên web.
+
+**Lỗi tìm thấy khi bấm thử, đã sửa:**
+- Viết `useEffect(() => window.scrollTo(...))` làm trang trắng, vì Chrome bản mới cho `scrollTo` **trả về Promise** và React hiểu nhầm là hàm dọn dẹp. Đã sửa bằng ngoặc nhọn.
+- Đã rà các `useEffect` dạng rút gọn khác: đều trả về hàm hủy đăng ký, đúng cách dùng.
+
+---
+
 ## 17/10/2026: Crawl bù 16–17/10 + tự lấy giá từ báo dự phòng ✅
 
 **Vấn đề:** database dev chỉ có giá tới 15/10.

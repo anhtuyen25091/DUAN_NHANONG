@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PriceRow } from './api';
-import { addDays, calendarCells, directionsUrl, foldVietnamese, formatChange, formatDate, formatDateLong, formatDateTime, formatDistance, formatPriceRange, groupByProduct, matchesSearch, telHref, trendOf } from './format';
+import { addDays, calendarCells, paginate, directionsUrl, foldVietnamese, formatChange, formatDate, formatDateLong, formatDateTime, formatDistance, formatPriceRange, groupByProduct, matchesSearch, telHref, trendOf } from './format';
 
 const row = (code: string, region: string, extra: Partial<PriceRow> = {}): PriceRow => ({
   product: { id: 1, code, name: code === 'ho-tieu' ? 'Hồ tiêu' : 'Cà phê', unit: 'kg' },
@@ -109,5 +109,21 @@ describe('lịch', () => {
   it('calendarCells: tháng bắt đầu Chủ Nhật → 6 ô trống (CN là cột cuối)', () => {
     // 01/02/2026 là Chủ Nhật
     expect(calendarCells(2026, 2).slice(0, 7)).toEqual([null, null, null, null, null, null, 1]);
+  });
+});
+
+describe('paginate', () => {
+  const list = Array.from({ length: 45 }, (_, i) => i + 1);
+
+  it('cắt đúng trang, đếm số trang', () => {
+    expect(paginate(list, 1, 20)).toMatchObject({ page: 1, pages: 3, total: 45 });
+    expect(paginate(list, 3, 20).items).toEqual([41, 42, 43, 44, 45]);
+  });
+
+  it('trang sai / ngoài khoảng thì kẹp lại; danh sách rỗng vẫn có 1 trang', () => {
+    expect(paginate(list, 9, 20).page).toBe(3);
+    expect(paginate(list, 0, 20).page).toBe(1);
+    expect(paginate(list, Number.NaN, 20).page).toBe(1);
+    expect(paginate([], 2, 20)).toEqual({ items: [], page: 1, pages: 1, total: 0 });
   });
 });

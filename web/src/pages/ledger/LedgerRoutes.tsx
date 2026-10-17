@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { refreshLinkedDeals } from '../../ledger/deals'
 import { useLedger } from '../../ledger/useLedger'
 import { AddEntry } from './AddEntry'
+import { AllEntries } from './AllEntries'
 import { ChooseMode } from './ChooseMode'
 import { ContractDetail, ContractForm, ContractList, CutForm } from './Contracts'
 import { DebtDetail, DebtForm, DebtList, PartyDebts } from './Debts'
@@ -97,6 +98,8 @@ export default function LedgerRoutes({ path, query }: { path: string[]; query: U
         <ContractDetail key={id} ledger={ledger} data={data} id={id} />
       ) : page === 'ban' ? (
         <ContractList data={data} />
+      ) : page === 'khoan' ? (
+        <AllEntries ledger={ledger} data={data} query={query} />
       ) : page === 'cai-dat' ? (
         <LedgerSettings ledger={ledger} data={data} />
       ) : (

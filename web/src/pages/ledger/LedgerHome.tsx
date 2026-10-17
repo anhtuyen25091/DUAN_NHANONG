@@ -5,6 +5,9 @@ import { PERIOD_LABELS, periodRange, type Period } from '../../ledger/period'
 import { EntryList } from './EntryList'
 import { SyncBadge } from './SyncBadge'
 
+/** Số khoản hiện ở mục "Ghi gần đây"; nhiều hơn thì có nút "Xem tất cả" */
+const RECENT = 8
+
 export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
   const [period, setPeriod] = useState<Period>('year')
   const range = periodRange(period)
@@ -85,7 +88,12 @@ export function LedgerHome({ ledger, data }: { ledger: Ledger; data: LedgerSnaps
       </div>
 
       <h2 className="section">Ghi gần đây</h2>
-      <EntryList ledger={ledger} data={data} entries={data.transactions.slice(0, 15)} showGarden />
+      <EntryList ledger={ledger} data={data} entries={data.transactions.slice(0, RECENT)} showGarden />
+      {data.transactions.length > RECENT && (
+        <a className="button wide see-all" href={href('so/khoan')}>
+          Xem tất cả {data.transactions.length} khoản ›
+        </a>
+      )}
 
       <a className="fab" href={href('so/ghi')}>
         ＋ Ghi tiền

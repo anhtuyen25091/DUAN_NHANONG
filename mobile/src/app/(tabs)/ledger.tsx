@@ -9,6 +9,9 @@ import { useLedger } from '../../lib/ledger';
 import { getSync, useSyncStatus } from '../../lib/sync';
 import { colors, font } from '../../lib/theme';
 
+/** Số khoản hiện ở mục "Ghi gần đây"; nhiều hơn thì có nút "Xem tất cả" */
+const RECENT = 8;
+
 type Period = 'month' | 'year' | 'all';
 const PERIODS: Record<Period, string> = { month: 'Tháng này', year: 'Năm nay', all: 'Tất cả' };
 
@@ -89,7 +92,7 @@ export default function LedgerScreen() {
   return (
     <View style={{ flex: 1 }}>
       <FlatList
-        data={entryItems(data.transactions.slice(0, 15))}
+        data={entryItems(data.transactions.slice(0, RECENT))}
         keyExtractor={(item) => (item.kind === 'day' ? `d${item.date}` : item.entry.id)}
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         ListHeaderComponent={header}
@@ -99,6 +102,13 @@ export default function LedgerScreen() {
           ) : undefined
         }
         renderItem={({ item }) => <EntryItemRow item={item} ledger={ledger} data={data} showGarden />}
+        ListFooterComponent={
+          data.transactions.length > RECENT ? (
+            <View style={{ marginTop: 8 }}>
+              <Button label={`Xem tất cả ${data.transactions.length} khoản ›`} variant="outline" onPress={() => router.push('/ledger/entries')} />
+            </View>
+          ) : null
+        }
       />
       <Fab label="＋ Ghi tiền" href="/ledger/add" />
     </View>

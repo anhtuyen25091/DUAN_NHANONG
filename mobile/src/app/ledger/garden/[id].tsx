@@ -1,9 +1,9 @@
-import { allocatedEntries, CONTRACT_STATUS_LABELS, contractSummaries, costPerUnit, filterEntries, formatDate, formatHarvest, formatQty, formatQtyGrouped, formatVnd, harvestTotals, monthlyTotals, seasonRange, seasonsOf, supplyUsedValue, today, totals, type LedgerSnapshot } from '@nhanong/shared';
+import { allocatedEntries, paginate, CONTRACT_STATUS_LABELS, contractSummaries, costPerUnit, filterEntries, formatDate, formatHarvest, formatQty, formatQtyGrouped, formatVnd, harvestTotals, monthlyTotals, seasonRange, seasonsOf, supplyUsedValue, today, totals, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { groupDigits } from '../../../components/fields';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
-import { EntryItemRow, entryItems, Fab, ItemRow, MonthBars, ProfitCard, RowCard } from '../../../components/ledger';
+import { EntryItemRow, entryItems, Fab, ItemRow, MonthBars, Pager, ProfitCard, RowCard, type EntryItem } from '../../../components/ledger';
 import { Button, Card, Chip, styles } from '../../../components/ui';
 import { FieldLines } from '../../../components/extraFields';
 import { useLedger } from '../../../lib/ledger';
@@ -14,11 +14,20 @@ import { showToast } from '../../../lib/toast';
  * Một vườn; id = "chung" là các khoản chi chung.
  * Chế độ Nâng cao: chọn xem theo vụ / năm / tất cả, thêm/sửa vụ, vật tư đã dùng.
  */
+const PER_PAGE = 20;
+
 export default function GardenScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const state = useLedger();
   // null = mặc định: vụ đang làm (nếu có), không thì năm nay
   const [picked, setPicked] = useState<string | null>(null);
+  const [entryPageNo, setEntryPageNo] = useState(1);
+  const list = useRef<FlatList<EntryItem>>(null);
+  // Đổi vụ / năm đang xem thì về trang 1 của danh sách khoản
+  const pick = (value: string | null) => {
+    setPicked(value);
+    setEntryPageNo(1);
+  };
   if (!state.ledger) return <ActivityIndicator style={{ margin: 32 }} color={colors.primary} />;
 
   const { ledger, data } = state;
@@ -49,6 +58,7 @@ export default function GardenScreen() {
   // Chế độ Cơ bản: danh sách hiện mọi khoản như trước; Nâng cao: theo vụ / năm đang chọn
   const listRange: { from?: string; to?: string } = advanced && garden ? range : {};
   const entries = filterEntries(data.transactions, { gardenId, ...listRange });
+  const entryPage = paginate(entries, entryPageNo, PER_PAGE);
   const usages = data.supply_usages.filter(
     (u) => u.garden_id === gardenId && (!listRange.from || u.used_on >= listRange.from) && (!listRange.to || u.used_on <= listRange.to),
   );
@@ -91,10 +101,10 @@ export default function GardenScreen() {
         <>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
             {seasons.map((s) => (
-              <Chip key={s.id} label={`${s.ended_on ? '' : '🌱 '}${s.name}`} active={s.id === view} onPress={() => setPicked(s.id)} />
+              <Chip key={s.id} label={`${s.ended_on ? '' : '🌱 '}${s.name}`} active={s.id === view} onPress={() => pick(s.id)} />
             ))}
-            <Chip label={`Năm ${year}`} active={view === 'nam'} onPress={() => setPicked('nam')} />
-            <Chip label="Tất cả" active={view === 'tat-ca'} onPress={() => setPicked('tat-ca')} />
+            <Chip label={`Năm ${year}`} active={view === 'nam'} onPress={() => pick('nam')} />
+            <Chip label="Tất cả" active={view === 'tat-ca'} onPress={() => pick('tat-ca')} />
           </View>
           <ProfitCard label={label} {...totals(filterEntries(allocated, range))} />
           {fromStock > 0 && <Text style={[styles.muted, { marginTop: -4, marginBottom: 10 }]}>Trong đó vật tư lấy từ kho: {formatVnd(fromStock)}</Text>}
@@ -179,12 +189,27 @@ export default function GardenScreen() {
         }}
       />
       <FlatList
-        data={entryItems(entries)}
+        ref={list}
+        data={entryItems(entryPage.items)}
         keyExtractor={(item) => (item.kind === 'day' ? `d${item.date}` : item.entry.id)}
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         ListHeaderComponent={header}
         renderItem={({ item }) => <EntryItemRow item={item} ledger={ledger} data={data} />}
-        ListFooterComponent={garden ? <View style={{ marginTop: 16 }}><Button label="Xóa vườn này" variant="outline" onPress={remove} /></View> : null}
+        ListFooterComponent={
+          <>
+            <Pager
+              page={entryPage.page}
+              pages={entryPage.pages}
+              onPage={(p) => {
+                setEntryPageNo(p);
+                // Về khoản đầu tiên của trang mới (ngay dưới phần tổng kết)
+                setTimeout(() => list.current?.scrollToIndex({ index: 0, viewPosition: 0, animated: false }), 0);
+              }}
+            />
+            {garden ? <View style={{ marginTop: 16 }}><Button label="Xóa vườn này" variant="outline" onPress={remove} /></View> : null}
+          </>
+        }
+        onScrollToIndexFailed={() => list.current?.scrollToOffset({ offset: 0, animated: false })}
       />
       <Fab label="＋ Ghi tiền" href={{ pathname: '/ledger/add', params: gardenId ? { vuon: gardenId } : {} }} />
     </View>

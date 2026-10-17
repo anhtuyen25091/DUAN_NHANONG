@@ -6,7 +6,7 @@ import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { getSync, useSyncStatus } from '../lib/sync';
 import { colors, font } from '../lib/theme';
 import { hideToast, showToast, useToast } from '../lib/toast';
-import { Card, styles } from './ui';
+import { Button, Card, styles } from './ui';
 
 /** Biểu tượng loại nợ: vay ngân hàng / mình nợ / nợ mình */
 export const KIND_ICON: Record<DebtKind, string> = { loan: '🏦', payable: '🔴', receivable: '🟢' };
@@ -276,6 +276,24 @@ export function SyncBadge() {
           <Text style={{ fontSize: font.body, fontWeight: '700', color: colors.primary }}>Đăng nhập</Text>
         </Pressable>
       )}
+    </View>
+  );
+}
+
+/** "‹ Trước · Trang 2/7 · Sau ›"; ẩn khi chỉ có 1 trang */
+export function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (page: number) => void }) {
+  if (pages <= 1) return null;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 12 }}>
+      <View style={{ flex: 1 }}>
+        <Button label="‹ Trước" variant="outline" disabled={page <= 1} onPress={() => onPage(page - 1)} />
+      </View>
+      <Text style={[styles.body, { minWidth: 92, textAlign: 'center' }]}>
+        Trang <Text style={{ fontWeight: '800' }}>{page}</Text>/{pages}
+      </Text>
+      <View style={{ flex: 1 }}>
+        <Button label="Sau ›" variant="outline" disabled={page >= pages} onPress={() => onPage(page + 1)} />
+      </View>
     </View>
   );
 }

@@ -2006,3 +2006,28 @@ button.linklike.danger {
   padding: 6px 10px;
   min-height: 0;
 }
+
+/* ---- Phân trang danh sách khoản ---- */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.pager button {
+  min-width: 104px;
+}
+
+a.button.see-all {
+  justify-content: center;
+  margin: 4px 0 12px;
+}
+
+.filter-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}

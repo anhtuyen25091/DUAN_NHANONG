@@ -115,3 +115,18 @@ export function calendarCells(year: number, month: number): Array<number | null>
   while (cells.length % 7) cells.push(null);
   return cells;
 }
+
+export interface Page<T> {
+  items: T[];
+  /** Trang đang xem (từ 1), đã kẹp trong khoảng hợp lệ */
+  page: number;
+  pages: number;
+  total: number;
+}
+
+/** Cắt danh sách theo trang; trang ngoài khoảng (vd sau khi xóa bớt) tự lùi về trang cuối */
+export function paginate<T>(items: T[], page: number, perPage: number): Page<T> {
+  const pages = Math.max(1, Math.ceil(items.length / perPage));
+  const current = Math.min(Math.max(1, Math.floor(page) || 1), pages);
+  return { items: items.slice((current - 1) * perPage, current * perPage), page: current, pages, total: items.length };
+}
