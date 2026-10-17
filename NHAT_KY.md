@@ -11,6 +11,17 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 17/10/2026: Quyết định về cập nhật tức thì: dùng Ably miễn phí, khi cần mới chuyển
+
+- Gói miễn phí Ably: tối đa **200 máy mở app cùng lúc** (chỉ tính khi app đang mở trên màn hình). Vượt mức thì máy sau tự quay về hỏi máy chủ 8 giây / lần, không lỗi.
+- **Người dùng quyết định:** giai đoạn đầu dùng Ably miễn phí. Khi nào cần (thường xuyên chạm gần 200 kết nối, xem thống kê trên trang quản lý Ably) thì mới chuyển.
+- Hướng chuyển:
+  - **Laravel Reverb** tự chạy trên VPS của dự án: miễn phí phần mềm, 1 VPS chịu được nhiều nghìn kết nối nếu cấu hình
+  - hoặc **Ably trả phí**
+- Việc phải làm khi chuyển: viết lại `backend/app/Realtime/Realtime.php` (gửi tin + cấp vé) và hàm `createClient` ở `web/src/realtime.ts`, `mobile/src/lib/realtime.ts`. Phần còn lại (`RealtimeLink`, bộ theo dõi đơn, thông báo đẩy) giữ nguyên.
+
+---
+
 ## 17/10/2026: Mục A5: cập nhật tức thì qua Ably ✅ (đã chạy với Ably thật)
 
 **Đánh giá Ably** (người dùng đề xuất): gói miễn phí 6 triệu tin / tháng, **200 kết nối cùng lúc**, 200 kênh, 500 tin / giây, không cần thẻ; vượt mức thì kết nối mới bị chặn (không tự tính tiền). Đủ cho giai đoạn đầu nếu app vẫn chạy khi Ably không dùng được. Người dùng đồng ý thêm phụ thuộc.
