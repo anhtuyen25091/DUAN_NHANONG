@@ -11,6 +11,40 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 18/10/2026: Giao diện 2026, đổi màu và kiểu dáng hiện đại hơn (web + app) ✅
+
+**Yêu cầu:** đổi màu, nâng cấp thiết kế cho hợp thời đại; thiết kế cũ đơn giản quá.
+
+**Đã làm**
+- Bộ màu mới (web `index.css`, app `lib/theme.ts` dùng chung giá trị):
+  - xanh lục bảo `#0b7a4b` (đậm `#075c38`), điểm vàng lúa `#e8a10c` cho mục theo dõi / gợi ý
+  - nền kem xanh `#f3f6ef`, nền phụ `#eef3ea`; tăng / giảm có viên màu nhạt
+  - web có đủ bản màu tối
+- Đầu trang dải màu chuyển xanh (`#075c38 → #0b7a4b → #19a06a`), chữ trắng:
+  - web: thanh trên; máy tính có menu viên thuốc trắng cho mục đang mở
+  - app: `headerBackground` vẽ bằng `react-native-svg` (component `BrandGradient`, không cần cài thêm thư viện); nút "Tài khoản" / "Cài đặt" là viên trắng mờ; thanh trạng thái chữ trắng
+- Bảng giá có khung "Giá nông sản hôm nay" (thứ, ngày, số mặt hàng) ở đầu trang, nền dải màu + bông lúa mờ.
+- Thẻ bo 20 px, bóng mềm, viền rất nhạt; ô nhập bo 14 px, viền 1,5 px, có vòng sáng xanh khi chọn.
+- Nút chính và chip đang chọn dùng dải màu + bóng xanh; bấm thì thu nhỏ nhẹ.
+- Web:
+  - phông Be Vietnam Pro (Google Fonts, có đủ dấu tiếng Việt)
+  - trên điện thoại, thanh menu dưới đáy thành thanh nổi bo tròn, kính mờ
+- App: thanh tab bo 2 góc trên, đổ bóng; cao 76 + vùng an toàn để đủ chỗ biểu tượng và chữ.
+
+**Kiểm tra**
+- Typecheck web và mobile qua.
+- Chụp web (390 px và 1280 px) và app (bản chạy trên trình duyệt), đã xem các trang:
+  - web: bảng giá, sổ, ghi tiền, đơn, điểm bán, tài khoản
+  - app: bảng giá, sổ, tài khoản, đơn
+- App: thanh tab ở 68 px vẫn cắt chữ, nâng lên 76 px thì đủ.
+- Bundle Android có bản mới; Metro đã chạy lại.
+
+**Còn tồn**
+- App chưa có màu tối.
+- App chưa dùng phông Be Vietnam Pro (vẫn dùng phông hệ thống).
+
+---
+
 ## 17/10/2026: Sửa biểu tượng thanh tab app không hiện trên Android ✅
 
 - **Nguyên nhân:** lần làm mới giao diện đặt biểu tượng tab là emoji cỡ 24 + lề 14 px mỗi bên + nền xanh. Khung biểu tượng của thanh tab trên Android chỉ 24×24 px (expo-router `TabBarIcon`, `ICON_SIZE_MATERIAL`), nên emoji bị cắt mất.

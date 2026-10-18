@@ -2,14 +2,19 @@ import { CATEGORY_TYPE_LABELS, describeLocation, formatNumber, formatPriceRange,
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { BrandGradient } from '../../components/Gradient';
 import { Card, Change, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
-import { colors, font } from '../../lib/theme';
+import { colors, font, primaryShadow, radius } from '../../lib/theme';
 import { toggleFollow, useFollowed } from '../../lib/followed';
 import { useMyLocation } from '../../lib/myLocation';
 import { useAsync } from '../../lib/useAsync';
 
 const TYPES = Object.keys(CATEGORY_TYPE_LABELS) as CategoryType[];
+
+const WEEKDAYS = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+/** "Thứ bảy, 18/10" (tự ghép, không phụ thuộc Intl của máy) */
+const todayLabel = (d = new Date()) => `${WEEKDAYS[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}`;
 
 export default function PriceBoardScreen() {
   const [type, setType] = useState<CategoryType>('nong_san');
@@ -28,6 +33,15 @@ export default function PriceBoardScreen() {
 
   const header = (
     <View style={{ gap: 10, marginBottom: 12 }}>
+      <View style={{ borderRadius: 24, padding: 18, overflow: 'hidden', ...primaryShadow }}>
+        <BrandGradient radius={24} />
+        <Text style={{ position: 'absolute', right: -4, bottom: -22, fontSize: 96, opacity: 0.18, transform: [{ rotate: '-12deg' }] }}>🌾</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: font.small, fontWeight: '600' }}>{todayLabel()}</Text>
+        <Text style={{ color: '#fff', fontSize: 26, fontWeight: '800', marginVertical: 2 }}>Giá nông sản hôm nay</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: font.small + 1 }}>
+          {groups.length > 0 ? `${groups.length} mặt hàng · cập nhật mỗi ngày` : 'Cập nhật mỗi ngày từ nguồn tin cậy'}
+        </Text>
+      </View>
       <LocalBanner />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {TYPES.map((t) => (
@@ -39,7 +53,7 @@ export default function PriceBoardScreen() {
         placeholderTextColor={colors.muted}
         value={search}
         onChangeText={setSearch}
-        style={{ minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, fontSize: font.body, backgroundColor: colors.surface, color: colors.text }}
+        style={{ minHeight: 50, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.control, paddingHorizontal: 14, fontSize: font.body, backgroundColor: colors.surface, color: colors.text }}
       />
       {regions.state.status === 'ok' && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
@@ -51,7 +65,7 @@ export default function PriceBoardScreen() {
       )}
       <Status state={prices.state} retry={prices.reload} />
       {prices.state.status === 'ok' && groups.length > 0 && followedCount === 0 && !search && (
-        <Text style={{ fontSize: font.small + 1, color: colors.text, backgroundColor: colors.primarySoft, borderRadius: 12, padding: 12, overflow: 'hidden' }}>
+        <Text style={{ fontSize: font.small + 1, color: colors.text, backgroundColor: colors.accentSoft, borderRadius: 16, padding: 12, overflow: 'hidden' }}>
           ⭐ Bấm ☆ ở mặt hàng bạn trồng để đưa lên đầu, lần sau mở là thấy ngay.
         </Text>
       )}
@@ -111,7 +125,7 @@ function LocalBanner() {
 }
 
 function SectionTitle({ text }: { text: string }) {
-  return <Text style={{ fontSize: font.body, fontWeight: '700', color: colors.muted, marginTop: 6, marginBottom: 8 }}>{text}</Text>;
+  return <Text style={{ fontSize: font.small, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted, marginTop: 8, marginBottom: 8, marginLeft: 4 }}>{text}</Text>;
 }
 
 /**
@@ -156,7 +170,7 @@ function ProductCard({ product, rows, followed, expandAll, onOpen }: { product: 
       </View>
 
       {!single && !expandAll && (
-        <Pressable onPress={() => setOpen(!open)} accessibilityRole="button" style={{ marginTop: 10, minHeight: 46, borderRadius: 12, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <Pressable onPress={() => setOpen(!open)} accessibilityRole="button" style={{ marginTop: 10, minHeight: 46, borderRadius: radius.control, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ color: colors.primary, fontSize: font.body, fontWeight: '700' }}>{expanded ? 'Thu gọn ▴' : `Xem giá ${rows.length} vùng ▾`}</Text>
         </Pressable>
       )}

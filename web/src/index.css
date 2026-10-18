@@ -1323,7 +1323,7 @@ dl.deal-totals dd {
 }
 
 .card.deal-entry.pending {
-  border-left-color: #d97706;
+  border-left-color: var(--accent);
 }
 
 .card.deal-entry.confirmed {
@@ -1843,7 +1843,7 @@ a.card.local-banner {
 }
 
 .buyer-status.pending {
-  border-left: 6px solid #ca8a04;
+  border-left: 6px solid var(--accent);
 }
 
 .buyer-status.rejected,
@@ -2299,7 +2299,7 @@ input {
   color: var(--muted);
 }
 .price-card.followed {
-  box-shadow: inset 4px 0 0 #eab308, var(--shadow);
+  box-shadow: inset 4px 0 0 var(--accent), var(--shadow);
 }
 .price-card-head {
   display: flex;
@@ -2321,7 +2321,7 @@ input {
   border: 0;
   background: transparent;
   font-size: 1.5rem;
-  color: #ca8a04;
+  color: var(--accent);
 }
 .chart-link {
   display: inline-flex;
@@ -2360,10 +2360,10 @@ input {
   background: var(--bg);
 }
 .price-meta .change.up {
-  background: #e3f6e8;
+  background: var(--up-soft);
 }
 .price-meta .change.down {
-  background: #fdeee4;
+  background: var(--down-soft);
 }
 .price-card .expand {
   width: 100%;
@@ -2431,4 +2431,321 @@ input {
   background: var(--surface);
   color: var(--primary);
   box-shadow: var(--shadow);
+}
+
+/* ================= Giao diện 2026 (18/10/2026): màu xanh lục bảo + vàng lúa, đầu trang chuyển màu, thẻ bo mềm ================= */
+:root {
+  --bg: #f3f6ef;
+  --surface: #ffffff;
+  --surface-2: #eef3ea;
+  --text: #0f1f17;
+  --muted: #56675c;
+  --border: #e1e8de;
+  --primary: #0b7a4b;
+  --primary-strong: #075c38;
+  --primary-soft: #e0f3e7;
+  --on-primary: #ffffff;
+  --accent: #e8a10c;
+  --accent-soft: #fff3d1;
+  --up: #0b7a4b;
+  --up-soft: #e0f3e7;
+  --down: #d24a12;
+  --down-soft: #fdeadf;
+  --gain: #0b7a4b;
+  --loss: #d24a12;
+  --gain-soft: #e0f3e7;
+  --loss-soft: #fdeadf;
+  --error: #c0262d;
+  --chart-band: rgba(11, 122, 75, 0.14);
+  --brand-gradient: linear-gradient(135deg, #075c38 0%, #0b7a4b 45%, #19a06a 100%);
+  --shadow: 0 1px 2px rgba(15, 31, 23, 0.04), 0 10px 28px -10px rgba(15, 31, 23, 0.16);
+  --shadow-lift: 0 2px 4px rgba(15, 31, 23, 0.05), 0 18px 40px -14px rgba(15, 31, 23, 0.24);
+  --shadow-primary: 0 8px 20px -8px rgba(11, 122, 75, 0.55);
+  --ring: 0 0 0 4px rgba(11, 122, 75, 0.18);
+  --radius: 20px;
+  font-family: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c1310;
+    --surface: #141d18;
+    --surface-2: #1b2620;
+    --text: #ebf2ed;
+    --muted: #9fb2a6;
+    --border: #25332b;
+    --primary: #3ddc97;
+    --primary-strong: #7ceab8;
+    --primary-soft: #113426;
+    --on-primary: #06281a;
+    --accent: #f5c04a;
+    --accent-soft: #3a2c0b;
+    --up: #3ddc97;
+    --up-soft: #113426;
+    --down: #ff8a50;
+    --down-soft: #3d1a0b;
+    --gain: #3ddc97;
+    --loss: #ff8a50;
+    --gain-soft: #113426;
+    --loss-soft: #3d1a0b;
+    --error: #ff7a7f;
+    --chart-band: rgba(61, 220, 151, 0.16);
+    --brand-gradient: linear-gradient(135deg, #06402a 0%, #0a6440 50%, #10885a 100%);
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 28px -12px rgba(0, 0, 0, 0.6);
+    --shadow-lift: 0 18px 40px -14px rgba(0, 0, 0, 0.7);
+    --shadow-primary: 0 8px 20px -8px rgba(61, 220, 151, 0.35);
+    --ring: 0 0 0 4px rgba(61, 220, 151, 0.22);
+  }
+}
+
+body {
+  background:
+    radial-gradient(1200px 420px at 50% -120px, var(--primary-soft), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.015em;
+}
+h1 {
+  font-weight: 800;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+/* ---- Ô nhập, chọn ---- */
+input,
+select,
+.form textarea {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus,
+select:focus,
+.form textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--ring);
+}
+
+/* ---- Nút ---- */
+button,
+a.button {
+  border-radius: 14px;
+  transition: transform 0.1s, box-shadow 0.15s, background-color 0.15s;
+}
+button:active:not(:disabled),
+a.button:active {
+  transform: scale(0.97);
+}
+a.button.primary,
+button.primary,
+button.save,
+.fab {
+  background: var(--brand-gradient);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: var(--shadow-primary);
+}
+.fab {
+  border-radius: 999px;
+  box-shadow: var(--shadow-primary), var(--shadow-lift);
+}
+
+/* Nhóm lựa chọn dạng viên thuốc */
+.tabs button,
+.segmented button {
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  font-weight: 600;
+  color: var(--muted);
+}
+.tabs button.active,
+.segmented button.active,
+button.choice.active {
+  background: var(--brand-gradient);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: var(--shadow-primary);
+}
+.segmented.switch {
+  background: var(--surface-2);
+}
+.segmented.switch button,
+.segmented.switch button.active {
+  border: 0;
+  box-shadow: none;
+}
+.segmented.switch button.active {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: var(--shadow);
+}
+
+/* ---- Thẻ ---- */
+.card {
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+}
+a.card {
+  color: inherit;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+a.card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lift);
+}
+.notice {
+  border-radius: var(--radius);
+  border: 1.5px dashed var(--border);
+}
+.badge,
+.tag {
+  border-radius: 999px;
+}
+.hint {
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent-soft), var(--primary-soft));
+}
+
+/* ---- Thanh trên: dải màu chuyển xanh, chữ trắng ---- */
+.topbar {
+  background: var(--brand-gradient);
+  color: #fff;
+  box-shadow: 0 6px 20px -12px rgba(7, 92, 56, 0.6);
+}
+.brand,
+.topbar .brand {
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.topbar .sync-badge {
+  color: #fff;
+}
+
+@media (min-width: 721px) {
+  .topnav a {
+    color: rgba(255, 255, 255, 0.82);
+  }
+  .topnav a:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+  }
+  .topnav a[aria-current='page'] {
+    background: #fff;
+    color: var(--primary-strong);
+    box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* Điện thoại: thanh dưới đáy nổi, kính mờ, bo tròn */
+@media (max-width: 720px) {
+  .topnav {
+    left: 10px;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    padding-bottom: 0;
+    border-radius: 24px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
+    border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    box-shadow: var(--shadow-lift);
+    overflow: hidden;
+  }
+  .topnav a {
+    color: var(--muted);
+  }
+  .topnav a[aria-current='page'] {
+    color: var(--primary);
+  }
+  .topnav a[aria-current='page'] .nav-icon {
+    background: var(--primary-soft);
+  }
+  main {
+    padding-bottom: calc(112px + env(safe-area-inset-bottom));
+  }
+  .fab {
+    bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---- Bảng giá ---- */
+.hero {
+  position: relative;
+  overflow: hidden;
+  margin: 4px 0 14px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: var(--brand-gradient);
+  color: #fff;
+  box-shadow: var(--shadow-primary), var(--shadow);
+}
+.hero::after {
+  content: '🌾';
+  position: absolute;
+  right: -6px;
+  bottom: -18px;
+  font-size: 6.5rem;
+  opacity: 0.18;
+  transform: rotate(-12deg);
+  pointer-events: none;
+}
+.hero-date {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.85;
+  text-transform: capitalize;
+}
+.hero h1 {
+  margin: 2px 0 4px;
+  color: #fff;
+  font-size: 1.6rem;
+}
+.hero p:last-child {
+  margin: 0;
+  font-size: 0.92rem;
+  opacity: 0.9;
+}
+.price-card {
+  transition: box-shadow 0.15s;
+}
+.price-big {
+  color: var(--text);
+  font-weight: 800;
+}
+.price-meta .change {
+  font-weight: 700;
+}
+.price-card .expand {
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.section-title {
+  text-transform: uppercase;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+}
+.region-prices li {
+  border-bottom-color: color-mix(in srgb, var(--border) 70%, transparent);
+}
+@media (max-width: 420px) {
+  .topnav a {
+    font-size: 0.74rem;
+    letter-spacing: -0.01em;
+  }
 }

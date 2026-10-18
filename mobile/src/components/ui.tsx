@@ -2,7 +2,8 @@ import { ApiError, formatChange, trendOf } from '@nhanong/shared';
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, font, shadow } from '../lib/theme';
+import { colors, font, primaryShadow, radius, shadow } from '../lib/theme';
+import { BrandGradient } from './Gradient';
 import { setAuth } from '../lib/auth';
 import type { AsyncState } from '../lib/useAsync';
 
@@ -13,8 +14,10 @@ export function Change({ value }: { value: number | null }) {
   if (trend === 'none') return <Text style={[styles.change, { color: colors.muted }]}>giá mới</Text>;
   if (trend === 'flat') return <Text style={[styles.change, { color: colors.muted }]}>giữ giá</Text>;
   const color = trend === 'up' ? colors.up : trend === 'down' ? colors.down : colors.muted;
+  // Viên màu nhạt quanh mức tăng / giảm cho dễ thấy
+  const bg = trend === 'up' ? colors.gainSoft : trend === 'down' ? colors.lossSoft : colors.surface2;
   return (
-    <Text style={[styles.change, { color }]}>
+    <Text style={[styles.change, { color, backgroundColor: bg, paddingHorizontal: 8, paddingVertical: 1, borderRadius: 999, overflow: 'hidden' }]}>
       {ARROWS[trend]} {formatChange(value).replace(/^[+-]/, '')}
     </Text>
   );
@@ -33,6 +36,7 @@ export function Chip({ label, active, onPress, small }: { label: string; active:
       accessibilityState={{ selected: active }}
       style={[styles.chip, small && { minHeight: 36, paddingHorizontal: 12 }, active && styles.chipActive]}
     >
+      {active && <BrandGradient radius={999} />}
       <Text style={[styles.chipText, small && { fontSize: font.small + 1 }, active && styles.chipTextActive]}>{label}</Text>
     </Pressable>
   );
@@ -44,8 +48,16 @@ export function Button({ label, onPress, disabled, variant = 'primary' }: { labe
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      style={({ pressed }) => [styles.button, variant !== 'primary' && styles.buttonOutline, variant === 'danger' && { borderColor: colors.error }, (pressed || disabled) && { opacity: 0.6 }]}
+      style={({ pressed }) => [
+        styles.button,
+        variant === 'primary' && primaryShadow,
+        variant !== 'primary' && styles.buttonOutline,
+        variant === 'danger' && { borderColor: colors.error },
+        disabled && { opacity: 0.5 },
+        pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+      ]}
     >
+      {variant === 'primary' && <BrandGradient radius={radius.control} />}
       <Text style={[styles.buttonText, variant === 'outline' && { color: colors.primary }, variant === 'danger' && { color: colors.error }]}>{label}</Text>
     </Pressable>
   );
@@ -81,10 +93,12 @@ export function Status({ state, retry }: { state: AsyncState<unknown>; retry: ()
 export const styles = StyleSheet.create({
   body: { fontSize: font.body, color: colors.text },
   muted: { fontSize: font.small, color: colors.muted },
-  change: { fontSize: font.small, fontWeight: '600' },
+  change: { fontSize: font.small, fontWeight: '700' },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: 'rgba(225, 232, 222, 0.7)',
     padding: 16,
     marginBottom: 12,
     ...shadow,
@@ -93,22 +107,23 @@ export const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 16,
     borderRadius: 999,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     backgroundColor: colors.surface,
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: font.body, color: colors.text },
-  chipTextActive: { color: '#fff', fontWeight: '600' },
+  chipActive: { backgroundColor: colors.primary, borderColor: 'transparent', ...primaryShadow },
+  chipText: { fontSize: font.body, color: colors.muted, fontWeight: '600' },
+  chipTextActive: { color: '#fff', fontWeight: '700' },
   button: {
-    minHeight: 48,
-    borderRadius: 12,
+    minHeight: 50,
+    borderRadius: radius.control,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
-  buttonOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary },
-  buttonText: { color: '#fff', fontSize: font.body, fontWeight: '600' },
+  buttonOutline: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.primary, elevation: 0, shadowOpacity: 0 },
+  buttonText: { color: '#fff', fontSize: font.body, fontWeight: '700' },
 });

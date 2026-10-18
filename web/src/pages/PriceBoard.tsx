@@ -26,6 +26,11 @@ export function PriceBoard({ query }: { query: URLSearchParams }) {
 
   return (
     <>
+      <section className="hero">
+        <p className="hero-date">{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}</p>
+        <h1>Giá nông sản hôm nay</h1>
+        <p>{groups.length > 0 ? `${groups.length} mặt hàng · cập nhật mỗi ngày` : 'Cập nhật mỗi ngày từ nguồn tin cậy'}</p>
+      </section>
       <LocalBanner />
       <nav className="tabs" aria-label="Nhóm hàng">
         {TYPES.map((t) => (

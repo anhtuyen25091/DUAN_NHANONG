@@ -1,4 +1,5 @@
 import { router, Stack } from 'expo-router';
+import { gradientHeader } from '../components/Gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { DealNotices } from '../components/DealNotices';
@@ -53,9 +54,10 @@ export default function RootLayout() {
     <>
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.primary,
-          headerTitleStyle: { color: colors.text },
+          headerStyle: { backgroundColor: colors.primary },
+          headerBackground: gradientHeader,
+          headerTintColor: '#fff',
+          headerTitleStyle: { color: '#fff', fontWeight: '700' },
           contentStyle: { backgroundColor: colors.bg },
           headerBackTitle: 'Quay lại',
         }}
@@ -106,7 +108,8 @@ export default function RootLayout() {
       </Stack>
       <ToastHost />
       <DealNotices />
-      <StatusBar style="dark" />
+      {/* Đầu trang xanh đậm → chữ thanh trạng thái màu trắng */}
+      <StatusBar style="light" />
     </>
   );
 }
