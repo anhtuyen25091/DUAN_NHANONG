@@ -1,4 +1,4 @@
-import { fitSize, photosToSync, RECEIPT_QUALITY, type Ledger } from '@nhanong/shared';
+import { fitSize, orphanPhotos, photosToSync, RECEIPT_QUALITY, type Ledger } from '@nhanong/shared';
 import { Directory, File, Paths } from 'expo-file-system';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { api } from './api';
@@ -51,14 +51,35 @@ export function photoUri(id: string): string | null {
   return f.exists ? f.uri : null;
 }
 
-/** Sau mỗi lần đồng bộ sổ: gửi ảnh chưa gửi, tải ảnh ghi ở máy khác */
-export async function syncPhotos(ledger: Ledger, token: string): Promise<void> {
-  const has = new Set(
-    dir()
-      .list()
-      .filter((item) => item instanceof File && item.name.endsWith('.jpg'))
-      .map((item) => item.name.replace(/\.jpg$/, '')),
+const localPhotos = () => dir().list().filter((item): item is File => item instanceof File && item.name.endsWith('.jpg'));
+
+/**
+ * Xóa ảnh thừa trên máy: khoản đã xóa (quá 1 ngày) hoặc đã thay ảnh khác. Chạy khi mở sổ và sau mỗi lần đồng bộ.
+ * Ảnh trên máy chủ do lệnh receipts:prune dọn theo cùng quy tắc.
+ */
+export function prunePhotos(ledger: Ledger): number {
+  const files = localPhotos();
+  const ids = orphanPhotos(
+    ledger.getSnapshot(),
+    files.map((f) => ({ id: f.name.replace(/\.jpg$/, ''), savedAt: f.modificationTime ?? null })),
   );
+  if (ids.length === 0) return 0;
+  const uploaded = readUploaded();
+  for (const id of ids) {
+    try {
+      photoFile(id).delete();
+    } catch {
+      // Lần sau xóa
+    }
+    uploaded.delete(id);
+  }
+  writeUploaded(uploaded);
+  return ids.length;
+}
+
+/** Sau mỗi lần đồng bộ sổ: gửi ảnh chưa gửi, tải ảnh ghi ở máy khác, rồi dọn ảnh thừa */
+export async function syncPhotos(ledger: Ledger, token: string): Promise<void> {
+  const has = new Set(localPhotos().map((f) => f.name.replace(/\.jpg$/, '')));
   const uploaded = readUploaded();
   const { upload, download } = photosToSync(ledger.getSnapshot(), { has, uploaded });
 
@@ -81,4 +102,5 @@ export async function syncPhotos(ledger: Ledger, token: string): Promise<void> {
       // Máy ghi khoản chưa gửi ảnh lên: lần sau tải
     }
   }
+  prunePhotos(ledger);
 }

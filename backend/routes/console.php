@@ -32,4 +32,11 @@ Schedule::command('shops:collect')
     ->withoutOverlapping(720)
     ->onOneServer();
 
+// Ảnh hóa đơn không còn khoản thu chi nào dùng (khoản đã xóa / đã thay ảnh), sau 1 ngày
+Schedule::command('receipts:prune')
+    ->dailyAt('03:30')
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping(60)
+    ->onOneServer();
+
 Schedule::command('model:prune', ['--model' => [CrawlLog::class]])->daily();

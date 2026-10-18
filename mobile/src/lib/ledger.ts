@@ -2,6 +2,7 @@ import { LEDGER_TABLES, Ledger, type LedgerMeta, type LedgerRecords, type Ledger
 import { openDatabaseAsync } from 'expo-sqlite';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
+import { prunePhotos } from './receipts';
 import { startDueReminders } from './reminders';
 import { startSync } from './sync';
 
@@ -80,6 +81,12 @@ export function openLedger(): Promise<Ledger> {
       startSync(ledger);
       // Thông báo nhắc hạn trả nợ (chỉ khi người dùng đã bật trong Cài đặt sổ)
       startDueReminders(ledger);
+      // Dọn ảnh hóa đơn thừa (cả khi chỉ lưu trên máy)
+      try {
+        prunePhotos(ledger);
+      } catch {
+        // Không dọn được thì lần sau
+      }
       return ledger;
     });
   return opening;

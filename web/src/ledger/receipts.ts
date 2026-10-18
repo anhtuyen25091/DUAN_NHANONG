@@ -1,14 +1,15 @@
-import { fitSize, photosToSync, RECEIPT_QUALITY, type Ledger } from '@nhanong/shared'
+import { fitSize, orphanPhotos, photosToSync, RECEIPT_QUALITY, type Ledger } from '@nhanong/shared'
 import { api } from '../api'
 
 /**
  * Ảnh hóa đơn trên web: lưu trong IndexedDB riêng ("nhanong-photos"), không nằm trong sổ.
- * Mỗi ảnh: { id, blob, uploaded } (uploaded = đã gửi lên mạng). Nén trước khi lưu: cạnh dài ≤ 1280 px, JPEG 0,7.
+ * Mỗi ảnh: { id, blob, uploaded, savedAt } (uploaded = đã gửi lên mạng; savedAt = lúc lưu, ảnh cũ không có). Nén trước khi lưu: cạnh dài ≤ 1280 px, JPEG 0,7.
  */
 interface StoredPhoto {
   id: string
   blob: Blob
   uploaded: boolean
+  savedAt?: number
 }
 
 const DB = 'nhanong-photos'
@@ -35,6 +36,7 @@ async function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => I
 const put = (photo: StoredPhoto) => tx('readwrite', (s) => s.put(photo))
 const get = (id: string) => tx<StoredPhoto | undefined>('readonly', (s) => s.get(id))
 const all = () => tx<StoredPhoto[]>('readonly', (s) => s.getAll())
+const remove = (id: string) => tx('readwrite', (s) => s.delete(id))
 
 /** Nén ảnh chụp / chọn từ máy: thu nhỏ bằng canvas rồi lưu JPEG */
 async function compress(file: Blob): Promise<Blob> {
@@ -51,7 +53,7 @@ async function compress(file: Blob): Promise<Blob> {
 /** Lưu ảnh mới, trả id để gắn vào khoản thu chi */
 export async function savePhoto(file: Blob): Promise<string> {
   const id = crypto.randomUUID()
-  await put({ id, blob: await compress(file), uploaded: false })
+  await put({ id, blob: await compress(file), uploaded: false, savedAt: Date.now() })
   return id
 }
 
@@ -61,7 +63,18 @@ export async function photoUrl(id: string): Promise<string | null> {
   return photo ? URL.createObjectURL(photo.blob) : null
 }
 
-/** Sau mỗi lần đồng bộ sổ: gửi ảnh chưa gửi, tải ảnh ghi ở máy khác */
+/**
+ * Xóa ảnh thừa: khoản đã xóa (quá 1 ngày) hoặc đã thay ảnh khác. Chạy khi mở sổ và sau mỗi lần đồng bộ.
+ * Ảnh trên máy chủ do lệnh receipts:prune dọn theo cùng quy tắc.
+ */
+export async function prunePhotos(ledger: Ledger): Promise<number> {
+  const photos = await all()
+  const ids = orphanPhotos(ledger.getSnapshot(), photos.map((p) => ({ id: p.id, savedAt: p.savedAt ?? null })))
+  for (const id of ids) await remove(id)
+  return ids.length
+}
+
+/** Sau mỗi lần đồng bộ sổ: gửi ảnh chưa gửi, tải ảnh ghi ở máy khác, rồi dọn ảnh thừa */
 export async function syncPhotos(ledger: Ledger, token: string): Promise<void> {
   const photos = await all()
   const { upload, download } = photosToSync(ledger.getSnapshot(), {
@@ -78,9 +91,10 @@ export async function syncPhotos(ledger: Ledger, token: string): Promise<void> {
   for (const id of download) {
     try {
       const data = await api.receiptPhoto(token, id)
-      await put({ id, blob: new Blob([data], { type: 'image/jpeg' }), uploaded: true })
+      await put({ id, blob: new Blob([data], { type: 'image/jpeg' }), uploaded: true, savedAt: Date.now() })
     } catch {
       // Máy ghi khoản chưa gửi ảnh lên: lần sau tải
     }
   }
+  await prunePhotos(ledger)
 }

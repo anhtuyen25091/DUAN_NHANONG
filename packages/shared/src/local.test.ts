@@ -83,6 +83,29 @@ describe('ảnh hóa đơn', () => {
     expect(fitSize(4000, 3000)).toEqual({ width: 1280, height: 960 });
     expect(fitSize(800, 600)).toEqual({ width: 800, height: 600 });
   });
+
+  it('ảnh thừa: chỉ xóa ảnh không khoản nào dùng, sau 1 ngày (còn kịp hoàn tác, ảnh chưa lưu khoản)', async () => {
+    const { orphanPhotos, PHOTO_GRACE_MS } = await import('./receipts');
+    const now = Date.parse('2026-10-18T10:00:00Z');
+    const t = (photo: string, deletedAt: string | null = null) => ({ id: photo, photo_id: photo, deleted_at: deletedAt }) as never;
+    const snapshot = {
+      transactions: [
+        t('dung'), // khoản còn
+        t('xoa-hom-qua', '2026-10-16T09:00:00Z'), // xóa quá 1 ngày → xóa ảnh
+        t('xoa-vua-xong', '2026-10-18T09:59:00Z'), // còn hoàn tác được → giữ
+      ],
+    };
+    const old = now - PHOTO_GRACE_MS - 1;
+    const local = [
+      { id: 'dung', savedAt: old },
+      { id: 'xoa-hom-qua', savedAt: old },
+      { id: 'xoa-vua-xong', savedAt: old },
+      { id: 'anh-da-thay', savedAt: old }, // khoản đã thay ảnh khác → xóa
+      { id: 'anh-cu-khong-ro-ngay', savedAt: null }, // ảnh cũ không rõ ngày lưu → xóa
+      { id: 'vua-chup-chua-luu', savedAt: now - 60_000 }, // đang ở màn ghi tiền → giữ
+    ];
+    expect(orphanPhotos(snapshot, local, now)).toEqual(['xoa-hom-qua', 'anh-da-thay', 'anh-cu-khong-ro-ngay']);
+  });
 });
 
 describe('link mã đơn / phiếu', () => {

@@ -33,3 +33,26 @@ export function photosToSync(
     download: used.filter((id) => !local.has.has(id)),
   };
 }
+
+/**
+ * Ảnh thừa được giữ thêm 1 ngày rồi mới xóa:
+ * - ảnh vừa chụp nhưng chưa bấm Lưu khoản (chưa khoản nào dùng)
+ * - khoản vừa xóa còn bấm "Hoàn tác" được
+ */
+export const PHOTO_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Ảnh trên máy không còn khoản nào dùng → xóa được: khoản đã xóa (quá 1 ngày) hoặc khoản đã thay ảnh khác.
+ * savedAt: lúc lưu ảnh (ms); không rõ (ảnh cũ) thì coi như đã lâu.
+ */
+export function orphanPhotos(
+  snapshot: Pick<LedgerSnapshot, 'transactions'>,
+  local: ReadonlyArray<{ id: string; savedAt: number | null }>,
+  now = Date.now(),
+): string[] {
+  const keep = usedPhotos(snapshot);
+  for (const t of snapshot.transactions) {
+    if (t.photo_id && t.deleted_at && now - Date.parse(t.deleted_at) < PHOTO_GRACE_MS) keep.add(t.photo_id);
+  }
+  return local.filter((p) => !keep.has(p.id) && (p.savedAt === null || now - p.savedAt >= PHOTO_GRACE_MS)).map((p) => p.id);
+}

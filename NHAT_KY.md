@@ -11,6 +11,44 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 18/10/2026: Dọn ảnh hóa đơn thừa (trên máy và máy chủ) ✅
+
+**Vấn đề:** xóa khoản thu chi hoặc thay ảnh khác thì ảnh cũ vẫn nằm lại trên máy và trên máy chủ. Trước đây chỉ khi xóa cả sổ trên mạng thì ảnh mới bị xóa.
+
+**Quy tắc chung** (`orphanPhotos` trong `packages/shared/src/receipts.ts`): một ảnh được xóa khi đủ cả hai điều kiện:
+- không còn khoản nào dùng: khoản đã xóa quá 1 ngày, hoặc khoản đã thay ảnh khác
+- ảnh đã lưu quá 1 ngày
+
+Giữ 1 ngày để:
+- người dùng còn bấm "Hoàn tác" được khi lỡ xóa khoản
+- ảnh vừa chụp nhưng chưa bấm Lưu không bị xóa
+
+**Đã làm**
+- App (`mobile/src/lib/receipts.ts` `prunePhotos`):
+  - chạy khi mở sổ (kể cả chế độ chỉ lưu trên máy) và sau mỗi lần đồng bộ
+  - ngày lưu ảnh lấy theo ngày sửa file
+  - xóa id khỏi `uploaded.json`
+- Web (`web/src/ledger/receipts.ts`):
+  - như app; ảnh lưu thêm `savedAt`
+  - ảnh cũ chưa có `savedAt` thì coi như đã lâu
+- Máy chủ: lệnh `receipts:prune` (có `--dry-run`):
+  - chạy mỗi ngày lúc 3:30
+  - đọc `photo_id` của các khoản (`ledger_records`, bảng `transactions`) theo từng người
+  - giữ ảnh của khoản còn và khoản mới xóa trong 1 ngày
+  - ảnh gửi lên chưa quá 1 ngày cũng giữ
+
+**Kiểm tra**
+- Test shared mới có 6 trường hợp; toàn bộ shared 113 test qua.
+- Backend có `PruneReceiptPhotosTest`:
+  - xóa ảnh của khoản xóa lâu và ảnh đã thay
+  - giữ ảnh đang dùng, ảnh của khoản mới xóa, ảnh vừa gửi
+  - khoản của người khác không giữ ảnh của mình
+- Toàn bộ backend 207 test qua.
+- Typecheck web và mobile qua.
+- Chạy thử `receipts:prune --dry-run` trên dữ liệu local: 0 ảnh.
+
+---
+
 ## 18/10/2026: Giao diện 2026, đổi màu và kiểu dáng hiện đại hơn (web + app) ✅
 
 **Yêu cầu:** đổi màu, nâng cấp thiết kế cho hợp thời đại; thiết kế cũ đơn giản quá.

@@ -1,5 +1,6 @@
 import { Ledger, type LedgerSnapshot } from '@nhanong/shared'
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { prunePhotos } from './receipts'
 import { indexedDbStorage } from './storage'
 import { startSync } from './sync'
 
@@ -11,6 +12,8 @@ export function openLedger(): Promise<Ledger> {
     .then((storage) => Ledger.open(storage))
     .then((ledger) => {
       startSync(ledger)
+      // Dọn ảnh hóa đơn thừa (cả khi chỉ lưu trên máy)
+      prunePhotos(ledger).catch(() => {})
       return ledger
     })
   return opening
