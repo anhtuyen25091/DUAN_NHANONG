@@ -1,4 +1,4 @@
-import { formatDate, formatKg, formatVnd, monthLabel, monthStart, today, TRADE_KIND_LABELS, type TradeKind } from '@nhanong/shared';
+import { formatDate, formatKg, formatVnd, itemsText, monthLabel, monthStart, purchaseTotals, today, TRADE_KIND_LABELS, type TradeKind } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
@@ -11,6 +11,8 @@ import { Button, Card, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { colors, font } from '../../lib/theme';
+import { confirmAsync } from '../../lib/confirm';
+import { flushOutbox, purchaseOutbox, useOutbox } from '../../lib/outbox';
 import { useAsync } from '../../lib/useAsync';
 
 type Tab = 'so' | 'tong-hop' | 'khach' | 'bao-cao';
@@ -35,17 +37,60 @@ export default function TradeScreen() {
       <View style={{ marginBottom: 12 }}>
         <Button label="🏢 Doanh nghiệp (chủ + các lái)" variant="outline" onPress={() => router.push('/business')} />
       </View>
+      <View style={{ marginBottom: 12 }}>
+        <Button label="🌾 Chợ lô hàng nông dân chào bán" variant="outline" onPress={() => router.push({ pathname: '/offers', params: { tab: 'market' } })} />
+      </View>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
         <Chip label="Giao dịch" active={tab === 'so'} onPress={() => setTab('so')} />
         <Chip label="Tổng hợp" active={tab === 'tong-hop'} onPress={() => setTab('tong-hop')} />
         <Chip label="Khách hàng" active={tab === 'khach'} onPress={() => setTab('khach')} />
         <Chip label="Báo cáo" active={tab === 'bao-cao'} onPress={() => setTab('bao-cao')} />
       </View>
+      <PendingPurchases />
       {tab === 'so' && <TradeList token={auth.token} />}
       {tab === 'tong-hop' && <TradeSummaryView token={auth.token} />}
       {tab === 'khach' && <CustomerList token={auth.token} />}
       {tab === 'bao-cao' && <TradeReport token={auth.token} />}
     </ScrollView>
+  );
+}
+
+/** Phiếu lập lúc mất sóng, đang chờ gửi (hoặc bị máy chủ từ chối: sửa lại / bỏ) */
+function PendingPurchases() {
+  const { sending } = useOutbox();
+  const items = purchaseOutbox.mine();
+  if (items.length === 0) return null;
+  return (
+    <Card style={{ borderColor: colors.primary, gap: 6 }}>
+      <SmallTitle>{`📤 Phiếu chờ gửi (${items.length})`}</SmallTitle>
+      <Text style={styles.muted}>Lập lúc mất sóng, đang lưu trên máy này. Có mạng lại sẽ tự gửi; số phiếu (PM-…) có sau khi gửi.</Text>
+      {items.map((p) => {
+        const totals = purchaseTotals(p.input.lines);
+        return (
+          <View key={p.id} style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6, gap: 4 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+              <Text style={[styles.body, { flex: 1, fontWeight: '700' }]}>
+                {p.input.kind === 'sell' ? '📦' : '🛒'} {p.input.customer_name ?? 'Khách quen'} · {formatDate(p.input.date, true)}
+              </Text>
+              <Text style={[styles.body, { fontWeight: '700' }]}>{formatVnd(totals.amount)}</Text>
+            </View>
+            <Text style={styles.muted}>{itemsText(totals.lines.map((l) => ({ name: l.name, kg: l.net_kg })))}</Text>
+            {p.error ? <Text style={{ color: colors.error }}>Chưa gửi được: {p.error}</Text> : null}
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {p.error ? <Chip label="Sửa" active={false} onPress={() => router.push({ pathname: '/trade/form', params: { kind: p.input.kind ?? 'buy', pending: p.id } })} /> : null}
+              <Chip
+                label="Bỏ phiếu"
+                active={false}
+                onPress={async () => {
+                  if (await confirmAsync('Bỏ phiếu chờ gửi?', 'Phiếu chưa lên máy chủ sẽ mất.', 'Bỏ')) purchaseOutbox.remove(p.id);
+                }}
+              />
+            </View>
+          </View>
+        );
+      })}
+      <Button label={sending ? 'Đang gửi…' : '🔄 Gửi ngay'} variant="outline" disabled={sending} onPress={() => void flushOutbox(true).catch(() => {})} />
+    </Card>
   );
 }
 

@@ -30,7 +30,13 @@ export function TradeTotalsCard({ totals }: { totals: TradeTotals }) {
 
 /** 1 giao dịch: phiếu → mở phiếu; đợt cân → mở đơn mua bán (chủ doanh nghiệp mở đơn của lái ở chế độ chỉ xem) */
 export function TradeRowCard({ row: r }: { row: TradeRow }) {
-  const tag = r.owing > 0 ? `${r.kind === 'buy' ? 'Còn nợ khách' : 'Khách nợ'} ${formatVnd(r.owing)}` : r.pending ? 'Chờ bên kia xác nhận' : null;
+  const tag = r.over_limit
+    ? '⚠️ Vượt giá chốt'
+    : r.owing > 0
+      ? `${r.kind === 'buy' ? 'Còn nợ khách' : 'Khách nợ'} ${formatVnd(r.owing)}`
+      : r.pending
+        ? 'Chờ bên kia xác nhận'
+        : null;
   return (
     <RowCard
       title={`${r.kind === 'buy' ? '🛒' : '📦'} ${r.counterpart}`}

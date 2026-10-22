@@ -12,6 +12,8 @@ import {
   type DebtPayment,
   type EntryType,
   type CutLine,
+  type FarmLog,
+  type FarmLogKind,
   type CustomFieldDef,
   type CustomFieldTarget,
   type CustomFieldType,
@@ -54,6 +56,7 @@ export const LEDGER_TABLES = [
   'workers',
   'work_logs',
   'custom_fields',
+  'farm_logs',
 ] as const;
 export type LedgerTable = (typeof LEDGER_TABLES)[number];
 
@@ -73,6 +76,7 @@ export interface LedgerRecords {
   workers: Worker[];
   work_logs: WorkLog[];
   custom_fields: CustomFieldDef[];
+  farm_logs: FarmLog[];
 }
 
 /** Cài đặt của sổ, lưu cùng chỗ với dữ liệu */
@@ -223,6 +227,21 @@ export interface NewHarvest {
   note?: string | null;
 }
 
+export interface NewFarmLog {
+  garden_id: string;
+  date?: string;
+  kind: FarmLogKind;
+  title: string;
+  quantity?: number | null;
+  unit?: string | null;
+  target?: string | null;
+  withholding_days?: number | null;
+  /** Lấy từ kho vật tư: tự ghi "dùng cho vườn" với số lượng này (tiền chuyển sang vườn) */
+  supply_id?: string | null;
+  worker?: string | null;
+  note?: string | null;
+}
+
 export interface NewWorker {
   name: string;
   phone?: string | null;
@@ -299,6 +318,7 @@ export class Ledger {
     workers: new Map(),
     work_logs: new Map(),
     custom_fields: new Map(),
+    farm_logs: new Map(),
   };
   private meta: LedgerMeta = {};
   private listeners = new Set<Listener>();
@@ -356,6 +376,7 @@ export class Ledger {
       workers: alive(this.tables.workers).sort((a, b) => a.name.localeCompare(b.name, 'vi')),
       work_logs: alive(this.tables.work_logs).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)),
       custom_fields: alive(this.tables.custom_fields).sort((a, b) => a.sort - b.sort),
+      farm_logs: alive(this.tables.farm_logs).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)),
       meta: { ...this.meta },
     };
     this.listeners.forEach((l) => l());
@@ -454,6 +475,7 @@ export class Ledger {
       ...this.live('seasons').filter((s) => s.garden_id === id).map((r) => ['seasons', r] as const),
       ...this.live('supply_usages').filter((u) => u.garden_id === id).map((r) => ['supply_usages', r] as const),
       ...this.live('harvests').filter((h) => h.garden_id === id).map((r) => ['harvests', r] as const),
+      ...this.live('farm_logs').filter((l) => l.garden_id === id).map((r) => ['farm_logs', r] as const),
     ]);
     return async () => {
       const back = this.stamp();
@@ -1389,6 +1411,70 @@ export class Ledger {
     this.checkHarvest(next);
     next.transaction_id = await this.syncHarvestEntry(next, patch.category_id);
     await this.write('harvests', [next]);
+  }
+
+  // ---- Nhật ký canh tác ----
+
+  /** Ghi 1 việc vào nhật ký vườn; chọn vật tư trong kho kèm số lượng thì tự ghi "dùng cho vườn" */
+  async addFarmLog(input: NewFarmLog): Promise<FarmLog> {
+    const log = this.farmLogFrom(input, randomUuid());
+    if (input.supply_id && log.quantity) {
+      const usage = await this.useSupply({ supply_id: input.supply_id, garden_id: log.garden_id, quantity: log.quantity, used_on: log.date, note: `Nhật ký: ${log.title}` });
+      log.supply_usage_id = usage.id;
+    }
+    await this.write('farm_logs', [log]);
+    await this.setMeta({ last_garden_id: log.garden_id });
+    return log;
+  }
+
+  /** Sửa nhật ký; lần dùng vật tư đi kèm (nếu có) được cập nhật theo vườn / ngày / số lượng mới */
+  async updateFarmLog(id: string, patch: Partial<NewFarmLog>): Promise<void> {
+    const log = this.alive('farm_logs', id);
+    if (!log) return;
+    const next: FarmLog = { ...this.farmLogFrom({ ...log, ...patch, supply_id: log.supply_id }, log.id), supply_usage_id: log.supply_usage_id };
+    const usage = log.supply_usage_id ? this.alive('supply_usages', log.supply_usage_id) : undefined;
+    if (usage) {
+      const supply = this.alive('supplies', usage.supply_id);
+      const quantity = next.quantity ?? usage.quantity;
+      const left = supply ? supply.quantity - this.usedQuantity(supply.id) + usage.quantity : quantity;
+      if (quantity > left + 1e-9) throw new Error(`Trong kho chỉ còn ${formatQty(left)} ${supply?.unit ?? ''}.`.trim());
+      await this.write('supply_usages', [{ ...usage, garden_id: next.garden_id, used_on: next.date, quantity, updated_at: this.stamp() }]);
+    }
+    await this.write('farm_logs', [next]);
+  }
+
+  /** Xóa nhật ký (kèm lần dùng vật tư đi kèm: vật tư trả về kho); trả về hàm hoàn tác */
+  async removeFarmLog(id: string): Promise<Undo> {
+    const log = this.alive('farm_logs', id);
+    if (!log) return async () => {};
+    const usage = log.supply_usage_id ? this.alive('supply_usages', log.supply_usage_id) : undefined;
+    return this.removeRecords([['farm_logs', log], ...(usage ? [['supply_usages', usage] as const] : [])]);
+  }
+
+  private farmLogFrom(input: NewFarmLog, id: string): FarmLog {
+    if (!this.alive('gardens', input.garden_id)) throw new Error('Hãy chọn vườn.');
+    const supply = input.supply_id ? this.alive('supplies', input.supply_id) : undefined;
+    const title = input.title.trim() || supply?.name || '';
+    if (!title) throw new Error('Hãy ghi tên thuốc / phân / việc làm.');
+    const quantity = input.quantity && input.quantity > 0 ? input.quantity : null;
+    const days = input.withholding_days && input.withholding_days > 0 ? Math.round(input.withholding_days) : null;
+    return {
+      id,
+      garden_id: input.garden_id,
+      date: input.date ?? today(this.now()),
+      kind: input.kind,
+      title,
+      quantity,
+      unit: input.unit?.trim() || supply?.unit || null,
+      target: input.target?.trim() || null,
+      withholding_days: input.kind === 'spray' ? days : null,
+      supply_id: supply?.id ?? null,
+      supply_usage_id: null,
+      worker: input.worker?.trim() || null,
+      note: input.note?.trim() || null,
+      updated_at: this.stamp(),
+      deleted_at: null,
+    };
   }
 
   /** Xóa sản lượng kèm khoản tiền bán (nếu có); trả về hàm hoàn tác */

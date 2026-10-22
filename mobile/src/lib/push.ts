@@ -42,7 +42,21 @@ export function notifications(): NotificationsModule | null {
   return loaded;
 }
 
-export type OpenedData = { product?: string; region?: string | null; debtId?: string; dealId?: string; purchaseId?: string } | undefined;
+export type OpenedData =
+  | {
+      product?: string;
+      region?: string | null;
+      debtId?: string;
+      dealId?: string;
+      purchaseId?: string;
+      /** Chủ doanh nghiệp: phiếu lái con lập (vd mua vượt giá chốt) */
+      businessPurchaseId?: string;
+      /** Lái: chủ vừa chốt giá mua */
+      business?: string;
+      /** Chào bán: lô hàng mới gần mình / có người trả giá / được chọn giá */
+      offerId?: string;
+    }
+  | undefined;
 
 /** Bấm vào thông báo (kể cả thông báo đã mở app từ trước): gọi onOpen với data; trả về hàm hủy */
 export function onNotificationOpened(onOpen: (data: OpenedData) => void): () => void {

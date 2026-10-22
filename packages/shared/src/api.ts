@@ -2,7 +2,8 @@
  * Kiểu dữ liệu và client gọi API /api/v1 của backend, dùng chung cho web và mobile.
  */
 import type { BuyerProfile, BuyerProfileInput, BuyerReport, BuyerStatus, LocalPriceFilters, LocalPrices, MyLocation, Place } from './local';
-import type { AdvanceInput, Business, BusinessActivity, BusinessAdvance, BusinessDeal, BusinessInput, BusinessMemberInfo, BusinessSummary, MemberCash, MemberInput } from './business';
+import type { BidInput, OfferInput, OfferMarket, ProduceOffer } from './offers';
+import type { AdvanceInput, Business, BusinessActivity, BusinessAdvance, BusinessDeal, BusinessInput, BusinessMemberInfo, BusinessSummary, BuyPriceBoard, BuyPriceInput, MemberCash, MemberInput } from './business';
 import { documentPath, type CustomerInput, type DocumentFormat, type DocumentTarget, type Purchase, type PurchaseInput, type ReceivedPurchase, type TradeCustomer, type TradeFilters, type TradeList, type TradeSummary } from './trade';
 
 export type CategoryType = 'nong_san' | 'phan_bon' | 'thuoc_bvtv';
@@ -603,6 +604,19 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
     businessActivity: (token: string, since?: string) =>
       request<{ data: BusinessActivity[] }>('GET', '/business/activity', { token, query: since ? { since } : {} }).then((r) => r.data),
     businessDeals: (token: string) => request<{ data: BusinessDeal[] }>('GET', '/business/deals', { token }).then((r) => r.data),
+    offerMarket: (token: string, query: { lat: number; lng: number; radius?: number; product?: string }) => request<OfferMarket>('GET', '/offers', { token, query }),
+    myOffers: (token: string) => request<{ data: ProduceOffer[] }>('GET', '/me/offers', { token }).then((r) => r.data),
+    myOfferBids: (token: string) => request<{ data: ProduceOffer[] }>('GET', '/me/offer-bids', { token }).then((r) => r.data),
+    offer: (token: string, id: string) => request<{ data: ProduceOffer }>('GET', `/offers/${id}`, { token }).then((r) => r.data),
+    saveOffer: (token: string, input: OfferInput, id?: string) =>
+      request<{ data: ProduceOffer }>(id ? 'PATCH' : 'POST', id ? `/offers/${id}` : '/offers', { token, body: input }).then((r) => r.data),
+    setOfferStatus: (token: string, id: string, status: 'open' | 'closed') => request<{ data: ProduceOffer }>('PATCH', `/offers/${id}`, { token, body: { status } }).then((r) => r.data),
+    deleteOffer: (token: string, id: string) => request<void>('DELETE', `/offers/${id}`, { token }),
+    bidOffer: (token: string, id: string, input: BidInput) => request<{ data: ProduceOffer }>('PUT', `/offers/${id}/bid`, { token, body: input }).then((r) => r.data),
+    withdrawBid: (token: string, id: string) => request<{ data: ProduceOffer }>('DELETE', `/offers/${id}/bid`, { token }).then((r) => r.data),
+    acceptBid: (token: string, id: string, bid: string) => request<{ data: ProduceOffer }>('POST', `/offers/${id}/bids/${bid}/accept`, { token }).then((r) => r.data),
+    buyPrices: (token: string, date?: string) => request<{ data: BuyPriceBoard }>('GET', '/business/prices', { token, query: date ? { date } : {} }).then((r) => r.data),
+    saveBuyPrices: (token: string, input: BuyPriceInput) => request<{ data: BuyPriceBoard }>('PUT', '/business/prices', { token, body: input }).then((r) => r.data),
     businessAdvances: (token: string, member?: number) =>
       request<{ data: BusinessAdvance[]; cash: MemberCash | null }>('GET', '/business/advances', { token, query: { member } }),
     createAdvance: (token: string, input: AdvanceInput) => request<{ data: BusinessAdvance; cash: MemberCash }>('POST', '/business/advances', { token, body: input }),

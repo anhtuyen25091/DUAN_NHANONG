@@ -17,6 +17,7 @@ class LedgerRecord extends Model
         'gardens', 'categories', 'transactions',
         'seasons', 'supplies', 'supply_usages', 'debts', 'debt_payments', 'harvest_contracts', 'harvest_cuts',
         'custom_fields', 'templates', 'harvests', 'workers', 'work_logs',
+        'farm_logs',
     ];
 
     protected function casts(): array

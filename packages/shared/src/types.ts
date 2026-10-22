@@ -239,6 +239,34 @@ export interface WorkLog extends SyncRecord {
   note: string | null;
 }
 
+/** Loại việc trong nhật ký canh tác */
+export type FarmLogKind = 'spray' | 'fertilize' | 'water' | 'prune' | 'other';
+
+/**
+ * 1 dòng nhật ký canh tác của vườn: phun thuốc, bón phân, tưới, tỉa cành…
+ * Phun thuốc có thời gian cách ly (withholding_days): chưa hết thì chưa nên thu hoạch.
+ * Lấy vật tư từ kho thì có supply_usage_id (lần "dùng cho vườn" tự ghi kèm), xóa nhật ký thì trả lại kho.
+ */
+export interface FarmLog extends SyncRecord {
+  garden_id: string;
+  date: string;
+  kind: FarmLogKind;
+  /** Tên thuốc / phân / việc làm */
+  title: string;
+  /** Liều lượng, ví dụ 2 chai, 50 kg */
+  quantity: number | null;
+  unit: string | null;
+  /** Sâu bệnh cần trị / mục đích */
+  target: string | null;
+  /** Số ngày cách ly (thuốc BVTV) */
+  withholding_days: number | null;
+  supply_id: string | null;
+  supply_usage_id: string | null;
+  /** Người làm */
+  worker: string | null;
+  note: string | null;
+}
+
 /** Hạng mục mặc định cho chế độ Cơ bản (người dùng có thể thêm/sửa) */
 export const DEFAULT_CATEGORIES: Array<Pick<LedgerCategory, 'type' | 'name' | 'icon' | 'color'>> = [
   { type: 'expense', name: 'Phân bón', icon: '🌱', color: '#16a34a' },

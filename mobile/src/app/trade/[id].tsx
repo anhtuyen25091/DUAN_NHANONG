@@ -70,6 +70,13 @@ function PurchaseView({ token, initial }: { token: string; initial: Purchase }) 
           📞 {p.phone}
         </Text>
       )}
+      {p.price_warnings && p.price_warnings.length > 0 && (
+        <Card style={{ borderColor: colors.error }}>
+          <Text style={[styles.body, { color: colors.error }]}>
+            ⚠️ Mua vượt giá chủ chốt: {p.price_warnings.map((w) => `${w.name} ${formatVnd(w.price)} (chốt ${formatVnd(w.max_price)})`).join('; ')}
+          </Text>
+        </Card>
+      )}
       <PurchaseLines lines={p.lines} />
       <Card>
         <Row label={`Tổng tiền hàng (${formatKg(p.kg)} kg tịnh)`} value={formatVnd(p.amount)} bold />

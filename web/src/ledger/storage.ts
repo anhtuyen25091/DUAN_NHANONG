@@ -21,8 +21,8 @@ function done(tx: IDBTransaction): Promise<void> {
 
 function openDb(): Promise<IDBDatabase> {
   // Thêm bảng mới thì tăng version (onupgradeneeded tạo bảng còn thiếu).
-  // 2: mùa vụ, kho vật tư, công nợ; 3: bán cho lái; 4: khoản hay dùng, thu hoạch, nhân công, ô tự thêm
-  const req = indexedDB.open(DB_NAME, 4)
+  // 2: mùa vụ, kho vật tư, công nợ; 3: bán cho lái; 4: khoản hay dùng, thu hoạch, nhân công, ô tự thêm; 5: nhật ký canh tác
+  const req = indexedDB.open(DB_NAME, 5)
   req.onupgradeneeded = () => {
     const db = req.result
     for (const table of LEDGER_TABLES) if (!db.objectStoreNames.contains(table)) db.createObjectStore(table, { keyPath: 'id' })

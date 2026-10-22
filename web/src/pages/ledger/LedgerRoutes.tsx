@@ -8,6 +8,7 @@ import { ChooseMode } from './ChooseMode'
 import { ContractDetail, ContractForm, ContractList, CutForm } from './Contracts'
 import { DebtDetail, DebtForm, DebtList, PartyDebts } from './Debts'
 import { CustomFieldSettings, HarvestForm, TemplateList, WorkDayForm, WorkerDetail, WorkerForm, WorkerList } from './Extras'
+import { FarmLogBook, FarmLogForm } from './FarmLogs'
 import { GardenDetail } from './GardenDetail'
 import { GardenForm } from './GardenForm'
 import { LedgerHome } from './LedgerHome'
@@ -46,6 +47,12 @@ export default function LedgerRoutes({ path, query }: { path: string[]; query: U
         <GardenForm ledger={ledger} data={data} id={id} />
       ) : page === 'vuon' && id && action === 'thu-hoach-moi' ? (
         <HarvestForm key="new" ledger={ledger} data={data} gardenId={id} />
+      ) : page === 'vuon' && id && action === 'nhat-ky-moi' ? (
+        <FarmLogForm key="new" ledger={ledger} data={data} gardenId={id} />
+      ) : page === 'vuon' && id && action === 'nhat-ky' ? (
+        <FarmLogBook data={data} gardenId={id} />
+      ) : page === 'nhat-ky' && id ? (
+        <FarmLogForm key={id} ledger={ledger} data={data} id={id} />
       ) : page === 'thu-hoach' && id ? (
         <HarvestForm key={id} ledger={ledger} data={data} id={id} />
       ) : page === 'mau' ? (

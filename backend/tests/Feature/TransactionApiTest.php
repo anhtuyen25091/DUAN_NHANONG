@@ -8,6 +8,7 @@ use App\Enums\DealStatus;
 use App\Models\Customer;
 use App\Models\Deal;
 use App\Models\DealEntry;
+use App\Models\Purchase;
 use App\Models\User;
 use Database\Seeders\CatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,6 +31,27 @@ class TransactionApiTest extends TestCase
         $this->travelTo(now()->setDate(2026, 10, 16)->setTime(9, 0));
         $this->trader = User::factory()->create(['name' => 'Lái Tư', 'phone' => '0900000002']);
         Sanctum::actingAs($this->trader);
+    }
+
+    public function test_offline_purchase_sent_twice_with_same_uuid_is_saved_once(): void
+    {
+        $uuid = '7d6f1c2e-3b4a-4c5d-8e9f-0a1b2c3d4e5f';
+        $first = $this->postJson(route('api.v1.purchases.store'), $this->purchase(['uuid' => $uuid]))
+            ->assertCreated()
+            ->assertJsonPath('data.id', $uuid)
+            ->assertJsonPath('data.code', 'PM-000001');
+        // Rớt mạng lúc chờ trả lời, máy gửi lại: trả đúng phiếu cũ
+        $this->postJson(route('api.v1.purchases.store'), $this->purchase(['uuid' => $uuid]))
+            ->assertOk()
+            ->assertJsonPath('data.code', $first->json('data.code'));
+        $this->assertSame(1, Purchase::query()->where('user_id', $this->trader->id)->count());
+
+        // Người khác không dùng lại uuid của mình được
+        Sanctum::actingAs(User::factory()->create());
+        $this->postJson(route('api.v1.purchases.store'), $this->purchase(['uuid' => $uuid]))->assertStatus(409);
+        // Không đổi uuid khi sửa
+        Sanctum::actingAs($this->trader);
+        $this->patchJson(route('api.v1.purchases.update', $uuid), ['uuid' => '11111111-2222-4333-8444-555555555555'])->assertUnprocessable();
     }
 
     public function test_purchase_computes_net_weight_amount_and_saves_new_customer(): void

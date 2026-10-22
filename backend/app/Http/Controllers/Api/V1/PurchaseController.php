@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Businesses\BuyPriceLimits;
 use App\Documents\TransactionDocuments;
 use App\Enums\PurchaseKind;
 use App\Http\Controllers\Controller;
+use App\Models\BusinessMember;
 use App\Models\Customer;
 use App\Models\Deal;
 use App\Models\Purchase;
@@ -33,7 +35,18 @@ class PurchaseController extends Controller
         $businessId = $this->businessIdFor($user);
         $data = $this->validated($request);
 
-        $purchase = DB::transaction(function () use ($user, $data, $businessId): Purchase {
+        // Phiếu lập lúc mất mạng (máy tạo sẵn uuid), gửi lại lần 2 (vd rớt mạng lúc chờ trả lời): trả phiếu đã lưu, không tạo trùng
+        if (isset($data['uuid'])) {
+            $existing = Purchase::withTrashed()->where('uuid', $data['uuid'])->first();
+            if ($existing !== null) {
+                abort_unless($existing->user_id === $user->id, 409, 'Mã phiếu đã được dùng.');
+
+                return response()->json(['data' => self::present($existing->load('customer'))]);
+            }
+        }
+        $warnings = $this->priceWarnings($user, $data['kind'] ?? PurchaseKind::Buy->value, $data['date'], $data['lines']);
+
+        $purchase = DB::transaction(function () use ($user, $data, $businessId, $warnings): Purchase {
             $customer = $this->customerFor($user, $data, $businessId);
             $purchase = new Purchase([
                 'kind' => $data['kind'] ?? PurchaseKind::Buy->value,
@@ -45,13 +58,16 @@ class PurchaseController extends Controller
                 'note' => $data['note'] ?? null,
             ]);
             $purchase->user_id = $user->id;
+            $purchase->uuid = $data['uuid'] ?? null;
             // Lái con của doanh nghiệp lập phiếu: phiếu thuộc doanh nghiệp (chủ thấy, thống kê)
             $purchase->business_id = $businessId;
             $purchase->customer_id = $customer?->id;
+            $purchase->price_warnings = $warnings;
             $purchase->save();
 
             return $purchase;
         });
+        $this->notifyOwnerOverLimit($purchase, $warnings);
 
         return response()->json(['data' => self::present($purchase->fresh('customer'))], 201);
     }
@@ -157,8 +173,10 @@ class PurchaseController extends Controller
     {
         $this->authorizeOwner($request, $purchase);
         $data = $this->validated($request, updating: true);
+        $hadWarnings = ! empty($purchase->price_warnings);
+        $warnings = $this->priceWarnings($request->user(), $purchase->kind->value, $data['date'] ?? $purchase->date->toDateString(), $data['lines'] ?? $purchase->lines);
 
-        DB::transaction(function () use ($request, $purchase, $data): void {
+        DB::transaction(function () use ($request, $purchase, $data, $warnings): void {
             if (! empty($data['customer']) || ! empty($data['customer_name'])) {
                 $customer = $this->customerFor($request->user(), $data, $purchase->business_id);
                 $purchase->customer_id = $customer?->id;
@@ -166,8 +184,13 @@ class PurchaseController extends Controller
                 $purchase->customer_phone = $customer?->phone ?? ($data['customer_phone'] ?? null);
             }
             $purchase->fill(collect($data)->only(['date', 'lines', 'paid', 'note'])->all());
+            $purchase->price_warnings = $warnings;
             $purchase->save();
         });
+        // Sửa phiếu thành vượt giá chốt (trước đó không vượt): báo chủ
+        if (! $hadWarnings) {
+            $this->notifyOwnerOverLimit($purchase, $warnings);
+        }
 
         // Khách đã nhận phiếu: báo phiếu vừa được sửa
         $viewers = $purchase->viewers()->pluck('users.id');
@@ -209,6 +232,8 @@ class PurchaseController extends Controller
             // Dòng hàng đầy đủ (cân, trừ bì, tịnh) để sửa phiếu
             'lines' => $p->lines,
             'customer_address' => $p->customer?->address,
+            // Lái mua vượt giá chủ chốt (lúc lập / sửa phiếu)
+            'price_warnings' => $p->price_warnings ?? [],
         ];
         if (! $withSharing) {
             return $data;
@@ -304,6 +329,8 @@ class PurchaseController extends Controller
         $sometimes = $updating ? 'sometimes' : 'required';
         $data = $request->validate([
             'kind' => [$updating ? 'prohibited' : 'nullable', Rule::enum(PurchaseKind::class)],
+            // Máy tạo sẵn uuid khi lập phiếu lúc mất mạng (gửi sau)
+            'uuid' => [$updating ? 'prohibited' : 'nullable', 'uuid'],
             'customer' => ['nullable', 'uuid'],
             // Sửa phiếu: chỉ đổi khách khi gửi customer / customer_name
             'customer_name' => ['nullable', $updating ? 'string' : 'required_without:customer', 'string', 'max:120'],
@@ -373,6 +400,42 @@ class PurchaseController extends Controller
         $customer->save();
 
         return $customer;
+    }
+
+    /**
+     * Lái con lập phiếu mua: các dòng vượt giá chủ chốt. Doanh nghiệp đặt chế độ "chặn" thì báo lỗi, không lưu phiếu.
+     * Chủ tự lập phiếu, phiếu bán, làm riêng (không thuộc doanh nghiệp): không kiểm tra.
+     *
+     * @param  list<array<string, mixed>>  $lines
+     * @return list<array{product_code: string, name: string, price: int, max_price: int}>|null
+     */
+    private function priceWarnings(User $user, string $kind, string $date, array $lines): ?array
+    {
+        $membership = $user->membership()->with('business')->first();
+        if ($kind !== PurchaseKind::Buy->value || $membership === null || $membership->role !== BusinessMember::BUYER) {
+            return null;
+        }
+        $violations = BuyPriceLimits::violations($membership->business, CarbonImmutable::parse($date), Purchase::normalizeLines($lines));
+        if ($violations === []) {
+            return null;
+        }
+        if ($membership->business->price_mode === BuyPriceLimits::BLOCK) {
+            throw ValidationException::withMessages(['lines' => 'Vượt giá chủ chốt: '.implode('; ', array_map(BuyPriceLimits::describe(...), $violations)).'. Hạ giá hoặc báo chủ chốt lại giá.']);
+        }
+
+        return $violations;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>|null  $warnings
+     */
+    private function notifyOwnerOverLimit(Purchase $purchase, ?array $warnings): void
+    {
+        if (empty($warnings) || $purchase->business_id === null) {
+            return;
+        }
+        $ownerId = $purchase->business()->value('owner_id');
+        PushNotifier::later([$ownerId], '⚠️ '.$purchase->user->name.' mua vượt giá chốt', 'Phiếu '.$purchase->code().': '.implode('; ', array_map(BuyPriceLimits::describe(...), $warnings)), ['businessPurchaseId' => $purchase->uuid]);
     }
 
     /** Doanh nghiệp của người lập phiếu; tài khoản bị chủ khóa thì không lập phiếu được */

@@ -1,4 +1,4 @@
-import { ApiError, foldVietnamese, formatKg, formatVnd, kgInputText, parseKgText, purchaseTotals, today, type Purchase, type PurchaseLineInput, type TradeKind } from '@nhanong/shared';
+import { ApiError, foldVietnamese, formatKg, formatVnd, isOfflineError, kgInputText, parseKgText, priceWarnings, purchaseTotals, randomUuid, today, type PendingPurchase, type Purchase, type PurchaseLineInput, type TradeKind } from '@nhanong/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -9,16 +9,18 @@ import { Button, Card, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { colors, font } from '../../lib/theme';
+import { purchaseOutbox } from '../../lib/outbox';
 import { useAsync } from '../../lib/useAsync';
 
-/** Lập phiếu mua / bán (?kind=buy|sell&customer=uuid), hoặc sửa phiếu (?id=uuid) */
+/** Lập phiếu mua / bán (?kind=buy|sell&customer=uuid), sửa phiếu (?id=uuid), sửa phiếu chờ gửi bị từ chối (?pending=uuid) */
 export default function PurchaseFormScreen() {
   const auth = useAuth();
-  const params = useLocalSearchParams<{ kind?: string; customer?: string; id?: string }>();
+  const params = useLocalSearchParams<{ kind?: string; customer?: string; id?: string; pending?: string }>();
   const existing = useAsync(() => (auth && params.id ? api.purchase(auth.token, params.id) : Promise.resolve(null)), [auth?.token, params.id]);
   if (!auth) return <DealsSignIn />;
   if (existing.state.status !== 'ok') return <Status state={existing.state} retry={existing.reload} />;
-  return <PurchaseForm token={auth.token} kind={params.kind === 'sell' ? 'sell' : 'buy'} customerId={params.customer ?? null} purchase={existing.state.data} />;
+  const pending = params.pending ? purchaseOutbox.get(params.pending) : undefined;
+  return <PurchaseForm token={auth.token} kind={params.kind === 'sell' ? 'sell' : 'buy'} customerId={params.customer ?? null} purchase={existing.state.data} pending={pending} />;
 }
 
 interface LineDraft {
@@ -31,20 +33,35 @@ interface LineDraft {
 
 const emptyLine = (): LineDraft => ({ product_code: '', name: '', kg: '', deduct: '', price: 0 });
 
-function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { token: string; kind: TradeKind; customerId: string | null; purchase: Purchase | null }) {
-  const [kind, setKind] = useState<TradeKind>(purchase?.kind ?? initialKind);
+function PurchaseForm({
+  token,
+  kind: initialKind,
+  customerId,
+  purchase,
+  pending,
+}: {
+  token: string;
+  kind: TradeKind;
+  customerId: string | null;
+  purchase: Purchase | null;
+  pending?: PendingPurchase;
+}) {
+  const [kind, setKind] = useState<TradeKind>(purchase?.kind ?? pending?.input.kind ?? initialKind);
   const customers = useAsync(() => api.customers(token), [token]);
   const categories = useAsync(() => api.categories(), []);
-  const [customer, setCustomer] = useState<string | null>(purchase?.customer ?? customerId);
-  const [name, setName] = useState(purchase?.counterpart ?? '');
-  const [phone, setPhone] = useState(purchase?.phone ?? '');
-  const [date, setDate] = useState(purchase?.date ?? today());
+  // Lái con của doanh nghiệp: giá mua chủ chốt vào ngày phiếu (xem trước dòng nào vượt giá)
+  const business = useAsync(() => api.business(token), [token]);
+  const isBuyer = business.state.status === 'ok' && business.state.data?.my_role === 'buyer';
+  const [customer, setCustomer] = useState<string | null>(purchase?.customer ?? pending?.input.customer ?? customerId);
+  const [name, setName] = useState(purchase?.counterpart ?? pending?.input.customer_name ?? '');
+  const [phone, setPhone] = useState(purchase?.phone ?? pending?.input.customer_phone ?? '');
+  const [date, setDate] = useState(purchase?.date ?? pending?.input.date ?? today());
   const [lines, setLines] = useState<LineDraft[]>(
-    purchase?.lines.map((l) => ({ product_code: l.product_code ?? '', name: l.name, kg: kgInputText(l.kg), deduct: kgInputText(l.deduct_kg), price: l.price })) ?? [emptyLine()],
+    (purchase?.lines ?? pending?.input.lines)?.map((l) => ({ product_code: l.product_code ?? '', name: l.name, kg: kgInputText(l.kg), deduct: kgInputText(l.deduct_kg ?? 0), price: l.price })) ?? [emptyLine()],
   );
   const [picking, setPicking] = useState<number | null>(null);
-  const [paid, setPaid] = useState(purchase?.paid ?? 0);
-  const [note, setNote] = useState(purchase?.note ?? '');
+  const [paid, setPaid] = useState(purchase?.paid ?? pending?.input.paid ?? 0);
+  const [note, setNote] = useState(purchase?.note ?? pending?.input.note ?? '');
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -56,30 +73,41 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
   const products = categories.state.status === 'ok' ? categories.state.data.flatMap((c) => c.products.map((p) => ({ ...p, group: c.name }))) : [];
   const inputs: PurchaseLineInput[] = lines.map((l) => ({ product_code: l.product_code || null, name: l.name.trim(), kg: parseKgText(l.kg), deduct_kg: parseKgText(l.deduct), price: l.price }));
   const totals = purchaseTotals(inputs);
+  const limits = useAsync(() => (isBuyer && kind === 'buy' ? api.buyPrices(token, date) : Promise.resolve(null)), [token, isBuyer, kind, date]);
+  const board = limits.state.status === 'ok' ? limits.state.data : null;
+  const warnings = board ? priceWarnings(inputs, board.items) : [];
+  const blocked = board?.mode === 'block' && warnings.some(Boolean);
   const setLine = (i: number, patch: Partial<LineDraft>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
 
   const submit = async () => {
     if (inputs.some((l) => !l.name || l.kg <= 0)) return setError('Mỗi dòng hàng cần tên hàng và số kg cân.');
     setSending(true);
     setError(null);
+    const input = {
+      ...(purchase ? {} : { kind }),
+      customer: chosen?.id ?? null,
+      // Phiếu lưu trên máy: giữ cả tên khách để hiện trong danh sách chờ gửi
+      customer_name: chosen ? (purchase ? null : chosen.name) : name.trim(),
+      customer_phone: chosen ? null : phone.trim() || null,
+      date,
+      lines: inputs,
+      paid,
+      note: note.trim() || null,
+    };
+    // Phiếu mới: tạo sẵn uuid, mất sóng thì lưu trên máy với đúng uuid đó (gửi lại không tạo trùng)
+    const uuid = purchase ? undefined : (pending?.id ?? randomUuid());
     try {
-      const saved = await api.savePurchase(
-        token,
-        {
-          ...(purchase ? {} : { kind }),
-          customer: chosen?.id ?? null,
-          customer_name: chosen ? null : name.trim(),
-          customer_phone: chosen ? null : phone.trim() || null,
-          date,
-          lines: inputs,
-          paid,
-          note: note.trim() || null,
-        },
-        purchase?.id,
-      );
+      const saved = await api.savePurchase(token, { ...input, ...(uuid ? { uuid } : {}) }, purchase?.id);
+      if (pending) purchaseOutbox.remove(pending.id);
       showToast({ message: purchase ? 'Đã lưu phiếu' : `Đã lập phiếu ${saved.code}` });
       router.replace({ pathname: '/trade/[id]', params: { id: saved.id } });
     } catch (err) {
+      if (!purchase && uuid && isOfflineError(err)) {
+        purchaseOutbox.add(input, uuid);
+        showToast({ message: 'Mất sóng: đã lưu phiếu trên máy, có mạng sẽ tự gửi.' });
+        router.replace('/trade');
+        return;
+      }
       setError(err instanceof ApiError ? (Object.values(err.errors)[0]?.[0] ?? err.message) : (err as Error).message);
       setSending(false);
     }
@@ -166,6 +194,12 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
               </View>
             </View>
             <MoneyField label="Đơn giá (đ/kg tịnh) *" value={l.price} onChange={(v) => setLine(i, { price: v })} />
+            {warnings[i] && (
+              <Text style={{ color: colors.error, marginTop: -4, marginBottom: 6 }}>
+                ⚠️ Cao hơn giá chủ chốt {formatVnd(warnings[i].max_price)}
+                {board?.mode === 'block' ? ': không lập phiếu được' : ': phiếu sẽ bị đánh dấu và báo chủ'}
+              </Text>
+            )}
             <Text style={styles.body}>
               Tịnh <Text style={{ fontWeight: '700' }}>{formatKg(c.net_kg)} kg</Text> × {formatVnd(c.price)} = <Text style={{ fontWeight: '700' }}>{formatVnd(c.amount)}</Text>
             </Text>
@@ -200,7 +234,7 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
       <Button
         label={sending ? 'Đang lưu…' : purchase ? 'Lưu phiếu' : 'Lập phiếu'}
         onPress={submit}
-        disabled={sending || !shownName.trim() || totals.amount <= 0 || paid > totals.amount}
+        disabled={sending || blocked || !shownName.trim() || totals.amount <= 0 || paid > totals.amount}
       />
     </ScrollView>
   );

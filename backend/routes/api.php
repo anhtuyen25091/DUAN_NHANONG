@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\DealEntryController;
 use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\LedgerSyncController;
 use App\Http\Controllers\Api\V1\LocalPriceController;
+use App\Http\Controllers\Api\V1\OfferController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\PriceAlertController;
@@ -104,6 +105,18 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/deal-entries/{entry}/confirm', [DealEntryController::class, 'confirm'])->name('deal-entries.confirm');
         Route::post('/deal-entries/{entry}/dispute', [DealEntryController::class, 'dispute'])->name('deal-entries.dispute');
 
+        // Chào bán: nông dân đăng lô hàng, điểm mua / lái quanh đó trả giá, nông dân chọn 1 giá
+        Route::get('/offers', [OfferController::class, 'index'])->middleware('throttle:60,1')->name('offers.index');
+        Route::get('/me/offers', [OfferController::class, 'mine'])->name('offers.mine');
+        Route::get('/me/offer-bids', [OfferController::class, 'myBids'])->name('offers.my-bids');
+        Route::post('/offers', [OfferController::class, 'store'])->middleware('throttle:20,60')->name('offers.store');
+        Route::get('/offers/{offer}', [OfferController::class, 'show'])->name('offers.show');
+        Route::patch('/offers/{offer}', [OfferController::class, 'update'])->name('offers.update');
+        Route::delete('/offers/{offer}', [OfferController::class, 'destroy'])->name('offers.destroy');
+        Route::put('/offers/{offer}/bid', [OfferController::class, 'bid'])->middleware('throttle:30,1')->name('offers.bid');
+        Route::delete('/offers/{offer}/bid', [OfferController::class, 'withdraw'])->name('offers.withdraw');
+        Route::post('/offers/{offer}/bids/{bid}/accept', [OfferController::class, 'accept'])->name('offers.accept');
+
         // Sổ giao dịch của điểm thu mua: khách, phiếu mua / bán, in PDF / Word
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
@@ -137,6 +150,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/business/transactions', [BusinessController::class, 'transactions'])->name('business.transactions');
         Route::get('/business/deals', [BusinessController::class, 'deals'])->name('business.deals');
         Route::get('/business/activity', [BusinessController::class, 'activity'])->name('business.activity');
+        Route::get('/business/prices', [BusinessController::class, 'prices'])->name('business.prices.index');
+        Route::put('/business/prices', [BusinessController::class, 'savePrices'])->name('business.prices.save');
         Route::get('/business/advances', [BusinessController::class, 'advances'])->name('business.advances.index');
         Route::post('/business/advances', [BusinessController::class, 'storeAdvance'])->name('business.advances.store');
         Route::delete('/business/advances/{advance}', [BusinessController::class, 'destroyAdvance'])->name('business.advances.destroy');

@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { DealNotices } from '../components/DealNotices';
 import { ToastHost } from '../components/ledger';
 import { startDealWatch } from '../lib/dealWatch';
+import { startPurchaseOutbox } from '../lib/outbox';
 import { getAuth, subscribeAuth } from '../lib/auth';
 import { openLedger } from '../lib/ledger';
 import { onNotificationOpened, registerPush, type OpenedData } from '../lib/push';
@@ -14,6 +15,12 @@ function openFromNotification(data: OpenedData) {
   // Thông báo nhắc hạn trả nợ: mở khoản nợ
   if (data?.dealId) {
     router.push({ pathname: '/deals/[id]', params: { id: data.dealId } });
+  } else if (data?.offerId) {
+    router.push({ pathname: '/offers/[id]', params: { id: data.offerId } });
+  } else if (data?.businessPurchaseId) {
+    router.push({ pathname: '/trade/[id]', params: { id: data.businessPurchaseId } });
+  } else if (data?.business) {
+    router.push('/business');
   } else if (data?.purchaseId) {
     router.push({ pathname: '/trade/received/[id]', params: { id: data.purchaseId } });
   } else if (data?.debtId) {
@@ -25,6 +32,7 @@ function openFromNotification(data: OpenedData) {
 
 export default function RootLayout() {
   useEffect(() => startDealWatch(), []);
+  useEffect(() => startPurchaseOutbox(), []);
   useEffect(() => {
     // Token có thể đổi: cập nhật mỗi lần mở app, không hỏi quyền (chỉ hỏi khi người dùng đặt cảnh báo).
     // Máy không hỗ trợ (web, Expo Go trên Android) thì registerPush / onNotificationOpened không làm gì.
@@ -91,6 +99,8 @@ export default function RootLayout() {
         <Stack.Screen name="ledger/templates" options={{ title: '⭐ Khoản hay dùng' }} />
         <Stack.Screen name="ledger/custom-fields" options={{ title: '🏷️ Thông tin tự thêm' }} />
         <Stack.Screen name="ledger/harvest-form" options={{ title: '🌾 Ghi thu hoạch' }} />
+        <Stack.Screen name="ledger/farm-log-form" options={{ title: '📓 Ghi việc' }} />
+        <Stack.Screen name="ledger/farm-log-book" options={{ title: '📓 Nhật ký canh tác' }} />
         <Stack.Screen name="ledger/workers/index" options={{ title: '👷 Nhân công' }} />
         <Stack.Screen name="ledger/workers/form" options={{ title: 'Người làm' }} />
         <Stack.Screen name="ledger/workers/[id]" options={{ title: 'Người làm' }} />
@@ -105,6 +115,9 @@ export default function RootLayout() {
         <Stack.Screen name="trade/customer/[id]" options={{ title: 'Khách hàng' }} />
         <Stack.Screen name="trade/received/[id]" options={{ title: '📄 Phiếu được gửi' }} />
         <Stack.Screen name="business/index" options={{ title: '🏢 Doanh nghiệp' }} />
+        <Stack.Screen name="offers/index" options={{ title: '📣 Chào bán lô hàng' }} />
+        <Stack.Screen name="offers/form" options={{ title: '📣 Chào bán lô hàng' }} />
+        <Stack.Screen name="offers/[id]" options={{ title: 'Lô hàng' }} />
       </Stack>
       <ToastHost />
       <DealNotices />

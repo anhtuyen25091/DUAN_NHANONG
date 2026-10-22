@@ -6,6 +6,7 @@ import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { EntryItemRow, entryItems, Fab, ItemRow, MonthBars, Pager, ProfitCard, RowCard, type EntryItem } from '../../../components/ledger';
 import { Button, Card, Chip, styles } from '../../../components/ui';
 import { FieldLines } from '../../../components/extraFields';
+import { FarmLogSection, WithholdingNotice } from '../../../components/farmLogs';
 import { useLedger } from '../../../lib/ledger';
 import { colors, font } from '../../../lib/theme';
 import { showToast } from '../../../lib/toast';
@@ -96,6 +97,7 @@ export default function GardenScreen() {
         </Text>
       ) : null}
       {garden && <FieldLines fields={data.custom_fields} target="garden" extra={garden.extra} />}
+      {garden && <WithholdingNotice data={data} gardenId={garden.id} />}
 
       {advanced && garden ? (
         <>
@@ -128,6 +130,8 @@ export default function GardenScreen() {
         <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text, marginBottom: 6 }}>6 tháng gần đây</Text>
         <MonthBars months={monthlyTotals(allocated, 6, today())} />
       </Card>
+
+      {garden && <FarmLogSection data={data} gardenId={garden.id} />}
 
       {advanced && garden && (
         <>

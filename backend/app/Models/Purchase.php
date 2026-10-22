@@ -37,6 +37,7 @@ class Purchase extends Model
             'number' => 'integer',
             'version' => 'integer',
             'shared_version' => 'integer',
+            'price_warnings' => 'array',
         ];
     }
 

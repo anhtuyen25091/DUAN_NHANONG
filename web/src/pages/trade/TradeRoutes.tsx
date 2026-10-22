@@ -4,11 +4,15 @@ import {
   formatDateTime,
   formatKg,
   formatVnd,
+  isOfflineError,
+  itemsText,
   kgInputText,
   monthLabel,
   parseKgText,
+  priceWarnings,
   purchaseShareText,
   purchaseTotals,
+  randomUuid,
   telHref,
   today,
   TRADE_KIND_LABELS,
@@ -27,6 +31,7 @@ import { DateField } from '../../components/DateField'
 import { PrintButtons } from '../../components/PrintButtons'
 import { Status } from '../../components/Status'
 import { go, href, replaceQuery, useAsync } from '../../hooks'
+import { flushOutbox, purchaseOutbox, useOutbox } from '../../outbox'
 import { showToast } from '../../ledger/toast'
 import { MoneyField, QtyField } from '../ledger/fields'
 import { RangeFields, TotalsCard, TradeRowCard } from './parts'
@@ -54,7 +59,8 @@ export default function TradeRoutes({ path, query }: { path: string[]; query: UR
       </div>
     )
 
-  if (page === 'moi') return <PurchaseForm key={`new-${query.get('loai')}`} token={auth.token} kind={query.get('loai') === 'sell' ? 'sell' : 'buy'} customerId={query.get('khach')} />
+  if (page === 'moi')
+    return <PurchaseForm key={`new-${query.get('loai')}-${query.get('cho')}`} token={auth.token} kind={query.get('loai') === 'sell' ? 'sell' : 'buy'} customerId={query.get('khach')} pendingId={query.get('cho')} />
   if (page === 'phieu' && id && action === 'sua') return <PurchaseEdit token={auth.token} id={id} />
   if (page === 'phieu' && id) return <PurchaseView key={id} token={auth.token} id={id} />
   if (page === 'khach' && id) return <CustomerView key={id} token={auth.token} id={id} />
@@ -80,6 +86,9 @@ function TradeHome({ token, query }: { token: string; query: URLSearchParams }) 
         <a className="button" href={href('doanh-nghiep')}>
           🏢 Doanh nghiệp
         </a>
+        <a className="button" href={href('chao-ban', { tab: 'cho' })}>
+          🌾 Chợ lô hàng
+        </a>
       </div>
       <nav className="segmented" aria-label="Mục">
         {(
@@ -95,11 +104,60 @@ function TradeHome({ token, query }: { token: string; query: URLSearchParams }) 
           </button>
         ))}
       </nav>
+      <PendingPurchases />
       {tab === 'so' && <TradeList token={token} />}
       {tab === 'tong-hop' && <TradeSummaryView token={token} />}
       {tab === 'khach' && <CustomerList token={token} />}
       {tab === 'bao-cao' && <TradeReport token={token} />}
     </div>
+  )
+}
+
+/** Phiếu lập lúc mất mạng, đang chờ gửi (hoặc bị máy chủ từ chối: sửa lại / bỏ) */
+function PendingPurchases() {
+  const { sending } = useOutbox()
+  const items = purchaseOutbox.mine()
+  if (items.length === 0) return null
+  return (
+    <section className="card">
+      <h2>📤 Phiếu chờ gửi ({items.length})</h2>
+      <p className="small muted">Lập lúc mất mạng, đang lưu trên máy này. Có mạng lại sẽ tự gửi; số phiếu (PM-…) có sau khi gửi.</p>
+      <div className="entries">
+        {items.map((p) => {
+          const amount = purchaseTotals(p.input.lines).amount
+          return (
+            <div key={p.id} className="entry">
+              <span className="entry-main">
+                <span className="entry-text">
+                  <span>
+                    {p.input.kind === 'sell' ? '📦' : '🛒'} {p.input.customer_name ?? 'Khách quen'} · {formatDate(p.input.date, true)}
+                  </span>
+                  <span className="small muted">{itemsText(purchaseTotals(p.input.lines).lines.map((l) => ({ name: l.name, kg: l.net_kg })))}</span>
+                  {p.error && <span className="small out">Chưa gửi được: {p.error}</span>}
+                </span>
+                <span className="amount">{formatVnd(amount)}</span>
+              </span>
+              {p.error && (
+                <a className="button" href={href('giao-dich/moi', { loai: p.input.kind ?? 'buy', cho: p.id })}>
+                  Sửa
+                </a>
+              )}
+              <button
+                type="button"
+                className="entry-del"
+                aria-label="Bỏ phiếu"
+                onClick={() => window.confirm('Bỏ phiếu chờ gửi này? Phiếu chưa lên máy chủ sẽ mất.') && purchaseOutbox.remove(p.id)}
+              >
+                🗑
+              </button>
+            </div>
+          )
+        })}
+      </div>
+      <button type="button" disabled={sending} onClick={() => void flushOutbox(true).catch(() => {})}>
+        {sending ? 'Đang gửi…' : '🔄 Gửi ngay'}
+      </button>
+    </section>
   )
 }
 
@@ -398,19 +456,38 @@ function PurchaseEdit({ token, id }: { token: string; id: string }) {
   return <PurchaseForm token={token} kind={state.data.kind} purchase={state.data} />
 }
 
-function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { token: string; kind: TradeKind; customerId?: string | null; purchase?: Purchase }) {
-  const [kind, setKind] = useState<TradeKind>(purchase?.kind ?? initialKind)
+function PurchaseForm({
+  token,
+  kind: initialKind,
+  customerId,
+  purchase,
+  pendingId,
+}: {
+  token: string
+  kind: TradeKind
+  customerId?: string | null
+  purchase?: Purchase
+  /** Sửa phiếu chờ gửi (bị máy chủ từ chối) */
+  pendingId?: string | null
+}) {
+  const pending = pendingId ? purchaseOutbox.get(pendingId) : undefined
+  const [kind, setKind] = useState<TradeKind>(purchase?.kind ?? pending?.input.kind ?? initialKind)
   const [customers] = useAsync(() => api.customers(token), [token])
   const [categories] = useAsync(() => api.categories(), [])
-  const [customer, setCustomer] = useState<string | null>(purchase?.customer ?? customerId ?? null)
-  const [name, setName] = useState(purchase?.counterpart ?? '')
-  const [phone, setPhone] = useState(purchase?.phone ?? '')
-  const [date, setDate] = useState(purchase?.date ?? today())
+  // Lái con của doanh nghiệp: giá mua chủ chốt vào ngày phiếu (xem trước dòng nào vượt giá)
+  const [business] = useAsync(() => api.business(token), [token])
+  const isBuyer = business.status === 'ok' && business.data?.my_role === 'buyer'
+  const [customer, setCustomer] = useState<string | null>(purchase?.customer ?? pending?.input.customer ?? customerId ?? null)
+  const [name, setName] = useState(purchase?.counterpart ?? pending?.input.customer_name ?? '')
+  const [phone, setPhone] = useState(purchase?.phone ?? pending?.input.customer_phone ?? '')
+  const [date, setDate] = useState(purchase?.date ?? pending?.input.date ?? today())
   const [lines, setLines] = useState<LineDraft[]>(
-    purchase?.lines.map((l) => ({ product_code: l.product_code ?? '', name: l.name, kg: kgInputText(l.kg), deduct: kgInputText(l.deduct_kg), price: l.price })) ?? [{ product_code: '', name: '', kg: '', deduct: '', price: 0 }],
+    (purchase?.lines ?? pending?.input.lines)?.map((l) => ({ product_code: l.product_code ?? '', name: l.name, kg: kgInputText(l.kg), deduct: kgInputText(l.deduct_kg ?? 0), price: l.price })) ?? [
+      { product_code: '', name: '', kg: '', deduct: '', price: 0 },
+    ],
   )
-  const [paid, setPaid] = useState(purchase?.paid ?? 0)
-  const [note, setNote] = useState(purchase?.note ?? '')
+  const [paid, setPaid] = useState(purchase?.paid ?? pending?.input.paid ?? 0)
+  const [note, setNote] = useState(purchase?.note ?? pending?.input.note ?? '')
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
 
@@ -420,6 +497,9 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
   const products = categories.status === 'ok' ? categories.data.flatMap((c: Category) => c.products.map((p) => ({ ...p, group: c.name }))) : []
   const inputs: PurchaseLineInput[] = lines.map((l) => ({ product_code: l.product_code || null, name: l.name.trim(), kg: parseKgText(l.kg), deduct_kg: parseKgText(l.deduct), price: l.price }))
   const totals = purchaseTotals(inputs)
+  const [limits] = useAsync(() => (isBuyer && kind === 'buy' ? api.buyPrices(token, date) : Promise.resolve(null)), [token, isBuyer, kind, date])
+  const warnings = limits.status === 'ok' && limits.data ? priceWarnings(inputs, limits.data.items) : []
+  const blocked = limits.status === 'ok' && limits.data?.mode === 'block' && warnings.some(Boolean)
 
   const setLine = (i: number, patch: Partial<LineDraft>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)))
   const onName = (text: string) => {
@@ -434,24 +514,31 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
     e.preventDefault()
     setSending(true)
     setError(null)
+    const input = {
+      ...(purchase ? {} : { kind }),
+      customer: chosen?.id ?? null,
+      // Phiếu lưu trên máy: giữ cả tên khách để hiện trong danh sách chờ gửi
+      customer_name: chosen ? (purchase ? null : chosen.name) : name.trim(),
+      customer_phone: chosen ? null : phone.trim() || null,
+      date,
+      lines: inputs,
+      paid,
+      note: note.trim() || null,
+    }
+    // Phiếu mới: tạo sẵn uuid, mất mạng thì lưu trên máy với đúng uuid đó (gửi lại không tạo trùng)
+    const uuid = purchase ? undefined : (pending?.id ?? randomUuid())
     try {
-      const saved = await api.savePurchase(
-        token,
-        {
-          ...(purchase ? {} : { kind }),
-          customer: chosen?.id ?? null,
-          customer_name: chosen ? null : name.trim(),
-          customer_phone: chosen ? null : phone.trim() || null,
-          date,
-          lines: inputs,
-          paid,
-          note: note.trim() || null,
-        },
-        purchase?.id,
-      )
+      const saved = await api.savePurchase(token, { ...input, ...(uuid ? { uuid } : {}) }, purchase?.id)
+      if (pending) purchaseOutbox.remove(pending.id)
       showToast({ message: purchase ? 'Đã lưu phiếu' : `Đã lập phiếu ${saved.code}` })
       go(`giao-dich/phieu/${saved.id}`)
     } catch (err) {
+      if (!purchase && uuid && isOfflineError(err)) {
+        purchaseOutbox.add(input, uuid)
+        showToast({ message: 'Mất mạng: đã lưu phiếu trên máy, có mạng sẽ tự gửi.' })
+        go('giao-dich')
+        return
+      }
       setError(err instanceof ApiError ? Object.values(err.errors)[0]?.[0] ?? err.message : (err as Error).message)
     } finally {
       setSending(false)
@@ -529,6 +616,12 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
                   <QtyField label="Trừ bì / tạp chất" text={l.deduct} onText={(t) => setLine(i, { deduct: t })} suffix="kg" />
                 </div>
                 <MoneyField label="Đơn giá (đ/kg tịnh) *" value={l.price} onChange={(v) => setLine(i, { price: v })} required />
+                {warnings[i] && (
+                  <p className="small out">
+                    ⚠️ Cao hơn giá chủ chốt {formatVnd(warnings[i].max_price)}
+                    {limits.status === 'ok' && limits.data?.mode === 'block' ? ': không lập phiếu được' : ': phiếu sẽ bị đánh dấu và báo chủ'}
+                  </p>
+                )}
                 <p className="small">
                   Tịnh <b>{formatKg(computed.net_kg)} kg</b> × {formatVnd(computed.price)} = <b>{formatVnd(computed.amount)}</b>
                   {lines.length > 1 && (
@@ -569,7 +662,7 @@ function PurchaseForm({ token, kind: initialKind, customerId, purchase }: { toke
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Ví dụ: độ ẩm 14%, hàng loại 1" />
         </label>
         {error && <div className="notice error">{error}</div>}
-        <button type="submit" className="wide primary" disabled={sending || !shownName.trim() || totals.amount <= 0 || paid > totals.amount}>
+        <button type="submit" className="wide primary" disabled={sending || blocked || !shownName.trim() || totals.amount <= 0 || paid > totals.amount}>
           {sending ? 'Đang lưu…' : purchase ? 'Lưu phiếu' : 'Lập phiếu'}
         </button>
       </form>
@@ -619,6 +712,11 @@ function PurchaseView({ token, id }: { token: string; id: string }) {
           </>
         )}
       </p>
+      {p.price_warnings && p.price_warnings.length > 0 && (
+        <div className="notice error">
+          ⚠️ Mua vượt giá chủ chốt: {p.price_warnings.map((w) => `${w.name} ${formatVnd(w.price)} (chốt ${formatVnd(w.max_price)})`).join('; ')}
+        </div>
+      )}
       <section className="card">
         <table className="trade-table">
           <thead>

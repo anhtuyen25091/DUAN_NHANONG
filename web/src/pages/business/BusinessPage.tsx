@@ -5,12 +5,15 @@ import {
   formatDate,
   formatKg,
   formatVnd,
+  PRICE_MODE_LABELS,
   today,
   TRADE_KIND_LABELS,
   type AdvanceKind,
   type Business,
   type BusinessMemberInfo,
+  type BuyPriceLimit,
   type MemberCash,
+  type PriceMode,
   type TradeKind,
 } from '@nhanong/shared'
 import { useState, type FormEvent } from 'react'
@@ -25,10 +28,11 @@ import { MoneyField } from '../ledger/fields'
 import { RangeFields, TotalsCard, TradeRowCard } from '../trade/parts'
 import { useRange } from '../trade/useRange'
 
-type Tab = 'tong-quan' | 'lai' | 'tien-ung' | 'so' | 'don' | 'thong-tin'
+type Tab = 'tong-quan' | 'gia' | 'lai' | 'tien-ung' | 'so' | 'don' | 'thong-tin'
 
 const OWNER_TABS: [Tab, string][] = [
   ['tong-quan', 'Tổng quan'],
+  ['gia', 'Giá chốt'],
   ['lai', 'Lái'],
   ['tien-ung', 'Tiền ứng'],
   ['so', 'Giao dịch'],
@@ -77,6 +81,7 @@ export default function BusinessPage({ query }: { query: URLSearchParams }) {
         ))}
       </nav>
       {tab === 'tong-quan' && <Overview token={auth.token} />}
+      {tab === 'gia' && <BuyPrices token={auth.token} />}
       {tab === 'lai' && <Members token={auth.token} business={business} onChange={retry} />}
       {tab === 'tien-ung' && <Advances token={auth.token} business={business} initialMember={Number(query.get('lai')) || undefined} />}
       {tab === 'so' && <BusinessTrades token={auth.token} business={business} initialMember={Number(query.get('lai')) || undefined} />}
@@ -206,6 +211,7 @@ function MemberView({ token, business, onLeft }: { token: string; business: Busi
           📒 Phiếu của tôi
         </a>
       </div>
+      <TodayPrices token={token} mode={business.price_mode} />
       {business.my_cash && <CashCard cash={business.my_cash} />}
       <h2 className="section">Các lần ứng / nộp lại</h2>
       <Status state={advances} retry={retry} />
@@ -244,6 +250,134 @@ function MemberView({ token, business, onLeft }: { token: string; business: Busi
         </button>
       </p>
     </div>
+  )
+}
+
+/** Lái: giá mua tối đa chủ chốt hôm nay */
+function TodayPrices({ token, mode }: { token: string; mode: PriceMode }) {
+  const [state] = useAsync(() => api.buyPrices(token), [token])
+  if (state.status !== 'ok' || state.data.items.length === 0) return null
+  return (
+    <section className="card">
+      <h2>💰 Giá mua chủ chốt hôm nay</h2>
+      <p className="small muted">{mode === 'block' ? 'Mua cao hơn giá này thì không lập phiếu được.' : 'Mua cao hơn giá này thì phiếu bị đánh dấu và báo chủ.'}</p>
+      <LimitTable items={state.data.items} />
+    </section>
+  )
+}
+
+function LimitTable({ items }: { items: BuyPriceLimit[] }) {
+  return (
+    <table className="trade-table">
+      <thead>
+        <tr>
+          <th>Hàng</th>
+          <th className="num">Giá tối đa</th>
+          <th className="num">Ngày chốt</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((l) => (
+          <tr key={l.product_code}>
+            <td>{l.name}</td>
+            <td className="num">
+              <b>{formatVnd(l.max_price)}</b>/{l.unit}
+            </td>
+            <td className="num">{formatDate(l.date, true)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+/**
+ * Chủ chốt giá mua tối đa cho lái theo ngày: để trống = không giới hạn. Ngày chưa chốt thì dùng lần chốt gần nhất trước đó.
+ * Chế độ: cảnh báo (vẫn lập phiếu, báo chủ) hoặc chặn.
+ */
+function BuyPrices({ token }: { token: string }) {
+  const [date, setDate] = useState(today())
+  const [state, retry] = useAsync(() => api.buyPrices(token, date), [token, date])
+  const [categories] = useAsync(() => api.categories(), [])
+  const [draft, setDraft] = useState<Record<string, number>>({})
+  const [saving, setSaving] = useState(false)
+
+  if (state.status !== 'ok') return <Status state={state} retry={retry} />
+  const board = state.data
+  const current = Object.fromEntries(board.items.map((l) => [l.product_code, l.max_price]))
+  const products = categories.status === 'ok' ? categories.data.filter((c) => c.type === 'nong_san').flatMap((c) => c.products.map((p) => ({ ...p, group: c.name }))) : []
+  const valueOf = (code: string) => draft[code] ?? current[code] ?? 0
+  const changed = Object.entries(draft).filter(([code, v]) => v !== (current[code] ?? 0))
+
+  const save = async (input: Parameters<typeof api.saveBuyPrices>[1], message: string) => {
+    setSaving(true)
+    try {
+      await api.saveBuyPrices(token, { date, ...input })
+      setDraft({})
+      showToast({ message })
+      retry()
+    } catch (err) {
+      showToast({ message: errorText(err) })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <section className="card form">
+        <p className="small muted">Giá mua tối đa lái được trả cho nông dân. Ngày nào chưa chốt thì dùng giá chốt gần nhất trước đó. Chốt xong các lái nhận thông báo.</p>
+        <DateField label="Chốt giá cho ngày" value={date} onChange={(d) => (setDate(d), setDraft({}))} />
+        <fieldset>
+          <legend>Khi lái mua cao hơn giá chốt</legend>
+          <div className="segmented wrap">
+            {(['warn', 'block'] as const).map((m) => (
+              <button key={m} type="button" className={board.mode === m ? 'active' : ''} aria-pressed={board.mode === m} disabled={saving} onClick={() => board.mode !== m && save({ mode: m }, 'Đã đổi cách xử lý')}>
+                {PRICE_MODE_LABELS[m]}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      </section>
+      <form
+        className="card form"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void save({ items: changed.map(([product_code, v]) => ({ product_code, max_price: v > 0 ? v : null })) }, `Đã chốt giá ngày ${formatDate(date)}`)
+        }}
+      >
+        <h2>Giá chốt ngày {formatDate(date)}</h2>
+        {products.map((p) => (
+          <div key={p.code}>
+            <MoneyField label={`${p.group} · ${p.name} (đ/${p.unit})`} value={valueOf(p.code)} onChange={(v) => setDraft({ ...draft, [p.code]: v })} />
+            {current[p.code] && board.items.find((l) => l.product_code === p.code)?.date !== date && (
+              <span className="small muted">Đang dùng giá chốt ngày {formatDate(board.items.find((l) => l.product_code === p.code)!.date)}</span>
+            )}
+          </div>
+        ))}
+        <p className="small muted">Để trống (0) = không giới hạn mặt hàng đó từ ngày này.</p>
+        <button type="submit" className="wide primary" disabled={saving || changed.length === 0}>
+          {saving ? 'Đang lưu…' : `Chốt giá (${changed.length} mặt hàng)`}
+        </button>
+      </form>
+      {board.recent.length > 0 && (
+        <section className="card">
+          <h2>Các lần chốt gần đây</h2>
+          <table className="trade-table">
+            <tbody>
+              {board.recent.map((r, i) => (
+                <tr key={i}>
+                  <td>{formatDate(r.date, true)}</td>
+                  <td>{r.name}</td>
+                  <td className="num">{r.max_price ? formatVnd(r.max_price) : 'Bỏ giới hạn'}</td>
+                  <td className="small muted">{r.set_by}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+    </>
   )
 }
 

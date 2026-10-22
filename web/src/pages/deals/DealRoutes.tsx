@@ -61,6 +61,9 @@ function DealList({ token }: { token: string }) {
         <a className="button" href={href('giao-dich')}>
           📒 Sổ giao dịch, in phiếu
         </a>
+        <a className="button" href={href('chao-ban')}>
+          📣 Chào bán / chợ lô hàng
+        </a>
       </div>
       {waiting > 0 && <div className="notice upgrade">🔔 Có {waiting} mục bên kia vừa ghi, chờ bạn xác nhận.</div>}
       <ReceivedPurchases token={token} />

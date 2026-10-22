@@ -3,16 +3,20 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Businesses\BusinessStats;
+use App\Businesses\BuyPriceLimits;
 use App\Deals\DealSummary;
 use App\Documents\TransactionDocuments;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\BusinessAdvance;
+use App\Models\BusinessBuyPrice;
 use App\Models\BusinessMember;
 use App\Models\Deal;
+use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseVersion;
 use App\Models\User;
+use App\Notifications\PushNotifier;
 use App\Transactions\TransactionFeed;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -262,14 +266,16 @@ class BusinessController extends Controller
                     $changes = $previous ? array_slice(PurchaseVersion::changes($previous->data, $latest->data), 0, 2) : [];
                     [$text, $at] = ["{$member} sửa phiếu {$code}".($changes ? ': '.implode('; ', $changes) : ''), $latest->created_at];
                 } else {
-                    $text = "{$member} lập phiếu {$code} ".($p->kind->value === 'buy' ? 'mua của ' : 'bán cho ').$p->customer_name.': '.TransactionDocuments::vnd($p->amount);
+                    $text = "{$member} lập phiếu {$code} ".($p->kind->value === 'buy' ? 'mua của ' : 'bán cho ').$p->customer_name.': '.TransactionDocuments::vnd($p->amount)
+                        .(empty($p->price_warnings) ? '' : ' · ⚠️ vượt giá chốt');
                     $at = $p->created_at;
                 }
 
                 return ['type' => 'purchase', 'id' => $p->uuid, 'title' => "Phiếu {$code} · lái {$member}", 'text' => $text, 'at' => $at->toIso8601String()];
             });
 
-        return response()->json(['data' => $deals->filter()->merge($purchases)->sortBy('at')->values()]);
+        // toBase: chưa có đơn nào thì $deals vẫn là Eloquent Collection rỗng, merge mảng vào sẽ lỗi
+        return response()->json(['data' => $deals->toBase()->filter()->merge($purchases)->sortBy('at')->values()]);
     }
 
     /** Đơn chung của các lái (chủ xem số liệu, tải quyết toán) */
@@ -299,6 +305,84 @@ class BusinessController extends Controller
                 'updated_at' => $d->updated_at?->toIso8601String(),
             ];
         })->values()]);
+    }
+
+    /**
+     * Giá mua chủ chốt cho lái (chủ và lái đều xem được): giá đang áp dụng vào ngày ?date= (mặc định hôm nay),
+     * chế độ khi lái mua vượt giá, và các lần chốt gần đây.
+     */
+    public function prices(Request $request): JsonResponse
+    {
+        $membership = $request->user()->membership()->with('business')->firstOrFail();
+        $date = CarbonImmutable::parse($request->validate(['date' => ['nullable', 'date_format:Y-m-d']])['date'] ?? 'today');
+
+        return response()->json(['data' => $this->presentPrices($membership->business, $date)]);
+    }
+
+    /**
+     * Chủ chốt giá cho 1 ngày (mặc định hôm nay): mỗi mặt hàng 1 giá tối đa; max_price null = bỏ giới hạn từ ngày đó.
+     * Gửi kèm mode để đổi chế độ (warn: vẫn lập phiếu, báo chủ; block: không cho lập phiếu vượt giá).
+     */
+    public function savePrices(Request $request): JsonResponse
+    {
+        $business = $this->ownedBusiness($request);
+        $data = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'mode' => ['nullable', Rule::in([BuyPriceLimits::WARN, BuyPriceLimits::BLOCK])],
+            'items' => ['nullable', 'array', 'max:100'],
+            'items.*.product_code' => ['required', 'string', 'exists:products,code'],
+            'items.*.max_price' => ['present', 'nullable', 'integer', 'min:1', 'max:1000000000'],
+        ], ['items.*.max_price.min' => 'Giá chốt phải lớn hơn 0.']);
+        $date = CarbonImmutable::parse($data['date'] ?? 'today');
+        $products = Product::query()->whereIn('code', array_column($data['items'] ?? [], 'product_code'))->pluck('id', 'code');
+
+        DB::transaction(function () use ($business, $data, $date, $products, $request): void {
+            if (isset($data['mode'])) {
+                $business->forceFill(['price_mode' => $data['mode']])->save();
+            }
+            foreach ($data['items'] ?? [] as $item) {
+                BusinessBuyPrice::query()->updateOrCreate(
+                    ['business_id' => $business->id, 'product_id' => $products[$item['product_code']], 'date' => $date->toDateString()],
+                    ['max_price' => $item['max_price'], 'set_by' => $request->user()->id],
+                );
+            }
+        });
+
+        // Báo các lái đang dùng: giá chốt mới
+        if (! empty($data['items'])) {
+            $buyers = $business->members()->where('role', BusinessMember::BUYER)->where('status', BusinessMember::ACTIVE)->pluck('user_id');
+            $limits = BuyPriceLimits::on($business, $date)->take(3)->map(fn (array $l): string => $l['name'].' '.TransactionDocuments::vnd($l['max_price']))->implode(' · ');
+            PushNotifier::later($buyers, "💰 {$business->name} chốt giá mua ngày ".$date->format('d/m'), $limits, ['business' => 'prices']);
+        }
+
+        return response()->json(['data' => $this->presentPrices($business->fresh(), $date)]);
+    }
+
+    /**
+     * @return array{mode: string, date: string, items: list<array<string, mixed>>, recent: list<array<string, mixed>>}
+     */
+    private function presentPrices(Business $business, CarbonImmutable $date): array
+    {
+        $recent = BusinessBuyPrice::query()
+            ->where('business_id', $business->id)
+            ->with(['product', 'setter'])
+            ->latest('date')->latest('id')
+            ->limit(60)
+            ->get()
+            ->map(fn (BusinessBuyPrice $p): array => [
+                'date' => $p->date->toDateString(),
+                'product_code' => $p->product?->code,
+                'name' => $p->product?->name,
+                'max_price' => $p->max_price,
+                'set_by' => $p->setter?->name,
+            ]);
+
+        return [
+            'mode' => $business->price_mode,
+            'date' => $date->toDateString(),
+            'items' => BuyPriceLimits::on($business, $date)->values()->all(),
+            'recent' => $recent->values()->all(),
+        ];
     }
 
     /** Tiền ứng: chủ xem tất cả (lọc theo lái), lái xem của mình */
@@ -383,6 +467,8 @@ class BusinessController extends Controller
             'my_role' => $membership->role,
             'my_status' => $membership->status,
             'my_group' => $membership->group_name,
+            // Lái mua vượt giá chủ chốt: warn (vẫn lập phiếu, báo chủ) | block (không cho lập phiếu)
+            'price_mode' => $business->price_mode,
             // Chỉ chủ thấy mã mời và danh sách lái
             'invite_code' => $isOwner ? $business->invite_code : null,
             'members' => $isOwner ? $business->members()->with('user')->get()->map(fn (BusinessMember $m): array => BusinessStats::member($m))->values()->all() : null,

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import { Notices } from './components/Notices'
 import { startDealWatch, useDealWatch } from './dealWatch'
 import { href, useRoute } from './hooks'
+import { startPurchaseOutbox } from './outbox'
 import { Account } from './pages/Account'
 import { BuyerArea } from './pages/BuyerArea'
 import { LocalPrices } from './pages/LocalPrices'
@@ -16,11 +17,13 @@ const LedgerRoutes = lazy(() => import('./pages/ledger/LedgerRoutes'))
 const DealRoutes = lazy(() => import('./pages/deals/DealRoutes'))
 const TradeRoutes = lazy(() => import('./pages/trade/TradeRoutes'))
 const BusinessPage = lazy(() => import('./pages/business/BusinessPage'))
+const OfferRoutes = lazy(() => import('./pages/offers/OfferRoutes'))
 
 export default function App() {
   const { path, query } = useRoute()
   const { awaiting } = useDealWatch()
   useEffect(() => startDealWatch(), [])
+  useEffect(() => startPurchaseOutbox(), [])
   // Số mục chờ xác nhận hiện cả trên tiêu đề tab trình duyệt
   useEffect(() => {
     document.title = awaiting > 0 ? `(${awaiting}) Nhà Nông` : 'Nhà Nông'
@@ -30,7 +33,7 @@ export default function App() {
       ? 'shops'
       : path[0] === 'so'
         ? 'ledger'
-        : path[0] === 'don' || path[0] === 'giao-dich' || path[0] === 'doanh-nghiep'
+        : path[0] === 'don' || path[0] === 'giao-dich' || path[0] === 'doanh-nghiep' || path[0] === 'chao-ban'
           ? 'deals'
           : path[0] === 'tai-khoan' || path[0] === 'diem-mua'
             ? 'account'
@@ -90,6 +93,10 @@ export default function App() {
         ) : path[0] === 'giao-dich' ? (
           <Suspense fallback={<p className="muted center">Đang mở…</p>}>
             <TradeRoutes path={path} query={query} />
+          </Suspense>
+        ) : path[0] === 'chao-ban' ? (
+          <Suspense fallback={<p className="muted center">Đang mở…</p>}>
+            <OfferRoutes path={path} query={query} />
           </Suspense>
         ) : path[0] === 'doanh-nghiep' ? (
           <Suspense fallback={<p className="muted center">Đang mở…</p>}>

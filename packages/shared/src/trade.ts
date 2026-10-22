@@ -1,3 +1,4 @@
+import type { PriceWarning } from './business';
 import { formatNumber } from './format';
 
 /**
@@ -51,6 +52,8 @@ export interface PurchaseLine extends Required<Omit<PurchaseLineInput, 'product_
 
 export interface PurchaseInput {
   kind?: TradeKind;
+  /** uuid máy tạo sẵn (phiếu lập lúc mất mạng, gửi sau); gửi lại cùng uuid thì không tạo trùng */
+  uuid?: string;
   /** uuid khách có sẵn; không có thì gõ tên (+ SĐT) để tự lưu vào sổ khách */
   customer?: string | null;
   customer_name?: string | null;
@@ -86,6 +89,8 @@ export interface TradeRow {
   note: string | null;
   /** Sổ cả doanh nghiệp: lái nào làm */
   member?: { id: number; name: string };
+  /** Phiếu lái mua vượt giá chủ chốt */
+  over_limit?: boolean;
 }
 
 export interface Purchase extends TradeRow {
@@ -100,6 +105,8 @@ export interface Purchase extends TradeRow {
   created_by?: { id: number; name: string | null };
   /** Tên doanh nghiệp nếu phiếu thuộc doanh nghiệp */
   business?: string | null;
+  /** Các dòng lái mua vượt giá chủ chốt */
+  price_warnings?: PriceWarning[];
   /** Chỉ có khi xem 1 phiếu của mình: mã chia sẻ, ai đang xem, tài khoản trùng SĐT khách (chưa gửi), lịch sử */
   share_code?: string | null;
   /** Bản lúc chia sẻ lần đầu; null = chưa chia sẻ */

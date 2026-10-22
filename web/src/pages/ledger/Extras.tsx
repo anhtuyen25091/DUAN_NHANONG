@@ -21,6 +21,7 @@ import { DateField } from '../../components/DateField'
 import { go, href } from '../../hooks'
 import { parseQty, qtyText } from '../../ledger/qty'
 import { showToast } from '../../ledger/toast'
+import { WithholdingNotice } from './FarmLogs'
 import { GardenPicker, MoneyField, QtyField } from './fields'
 
 const toastError = (err: unknown) => showToast({ message: (err as Error).message })
@@ -92,6 +93,7 @@ export function HarvestForm({ ledger, data, gardenId, id }: { ledger: Ledger; da
         <input value={crop} onChange={(e) => setCrop(e.target.value)} maxLength={60} placeholder="Ví dụ: Cà phê nhân, Sầu riêng Ri6" />
       </label>
       <DateField label="Ngày thu hoạch" value={date} onChange={setDate} max={today()} />
+      <WithholdingNotice data={data} gardenId={garden} on={date} />
       <label className="checkbox">
         <input type="checkbox" checked={sold} onChange={(e) => setSold(e.target.checked)} />
         Đã bán, ghi luôn tiền vào

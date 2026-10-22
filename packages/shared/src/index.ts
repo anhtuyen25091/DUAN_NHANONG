@@ -11,5 +11,8 @@ export * from './sync';
 export * from './trade';
 export * from './types';
 export * from './map';
+export * from './outbox';
+export * from './offers';
+export * from './farmlog';
 export * from './receipts';
 export * from './realtime';

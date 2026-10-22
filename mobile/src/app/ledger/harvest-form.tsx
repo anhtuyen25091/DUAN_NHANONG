@@ -2,6 +2,7 @@ import { formatQtyGrouped, formatVnd, HARVEST_UNITS, today, type Ledger, type Le
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { WithholdingNotice } from '../../components/farmLogs';
 import { CheckRow, DateField, ErrorNote, Field, GardenPicker, MoneyField, QtyField, TextField } from '../../components/fields';
 import { Button, Chip, styles } from '../../components/ui';
 import { useLedger } from '../../lib/ledger';
@@ -67,6 +68,7 @@ function HarvestForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot })
       </Field>
       <TextField label="Loại nông sản" value={crop} onChange={setCrop} maxLength={60} placeholder="Ví dụ: Cà phê nhân, Sầu riêng Ri6" />
       <DateField label="Ngày thu hoạch" value={date} onChange={setDate} notFuture />
+      <WithholdingNotice data={data} gardenId={garden} on={date} />
       <CheckRow label="Đã bán, ghi luôn tiền vào" checked={sold} onChange={setSold} />
       {sold && (
         <>

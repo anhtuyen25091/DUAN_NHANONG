@@ -37,6 +37,8 @@ export interface Business {
   my_role: BusinessRole;
   my_status: MemberStatus;
   my_group: string | null;
+  /** Lái mua vượt giá chủ chốt: warn (vẫn lập phiếu, báo chủ) | block (không cho lập phiếu) */
+  price_mode: PriceMode;
   /** Chỉ chủ thấy */
   invite_code: string | null;
   members: BusinessMemberInfo[] | null;
@@ -104,6 +106,55 @@ export interface BusinessActivity {
   title: string;
   text: string;
   at: string;
+}
+
+export type PriceMode = 'warn' | 'block';
+
+export const PRICE_MODE_LABELS: Record<PriceMode, string> = {
+  warn: 'Cảnh báo: vẫn cho lập phiếu, báo chủ',
+  block: 'Chặn: không cho lập phiếu vượt giá',
+};
+
+/** Giá mua tối đa chủ chốt cho 1 mặt hàng (lần chốt gần nhất tính tới ngày đang xem) */
+export interface BuyPriceLimit {
+  product_code: string;
+  name: string;
+  unit: string;
+  max_price: number;
+  /** Ngày chốt */
+  date: string;
+  set_by: string | null;
+}
+
+export interface BuyPriceBoard {
+  mode: PriceMode;
+  date: string;
+  items: BuyPriceLimit[];
+  /** Các lần chốt gần đây (max_price null = bỏ giới hạn) */
+  recent: { date: string; product_code: string | null; name: string | null; max_price: number | null; set_by: string | null }[];
+}
+
+export interface BuyPriceInput {
+  date?: string;
+  mode?: PriceMode;
+  items?: { product_code: string; max_price: number | null }[];
+}
+
+/** 1 dòng hàng vượt giá chốt */
+export interface PriceWarning {
+  product_code: string;
+  name: string;
+  price: number;
+  max_price: number;
+}
+
+/** Dòng hàng nào vượt giá chốt (xem trước khi lập phiếu, giống cách máy chủ kiểm tra: chỉ dòng đã chọn mặt hàng) */
+export function priceWarnings(lines: { product_code?: string | null; name: string; price: number }[], limits: BuyPriceLimit[]): (PriceWarning | null)[] {
+  const byCode = new Map(limits.map((l) => [l.product_code, l]));
+  return lines.map((line) => {
+    const limit = line.product_code ? byCode.get(line.product_code) : undefined;
+    return limit && line.price > limit.max_price ? { product_code: limit.product_code, name: line.name, price: line.price, max_price: limit.max_price } : null;
+  });
 }
 
 /** Mở thẳng app (đã cài) ở màn nhập mã đơn / phiếu: nhanong://deals/join?code=… */

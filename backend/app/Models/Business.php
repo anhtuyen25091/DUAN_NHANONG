@@ -46,6 +46,14 @@ class Business extends Model
         return $this->hasMany(BusinessAdvance::class);
     }
 
+    /**
+     * @return HasMany<BusinessBuyPrice, $this>
+     */
+    public function buyPrices(): HasMany
+    {
+        return $this->hasMany(BusinessBuyPrice::class);
+    }
+
     public function isOwner(User $user): bool
     {
         return $this->owner_id === $user->id;

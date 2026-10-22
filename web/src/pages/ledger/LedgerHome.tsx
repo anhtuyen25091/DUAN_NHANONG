@@ -172,6 +172,10 @@ function AdvancedShortcuts({ data }: { data: LedgerSnapshot }) {
   const owedWages = workerBalances(data).reduce((s, b) => s + b.owed, 0)
   return (
     <div className="shortcut-grid">
+      <a className="card shortcut" href={href('chao-ban')}>
+        <b>📣 Chào bán lô hàng</b>
+        <span className="small muted">Sắp thu hoạch: để các điểm mua quanh vườn trả giá</span>
+      </a>
       <a className="card shortcut" href={href('so/ban')}>
         <b>🤝 Bán cho lái</b>
         <span className="small muted">

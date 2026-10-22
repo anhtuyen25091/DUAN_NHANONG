@@ -24,6 +24,7 @@ import { go, href, replaceQuery } from '../../hooks'
 import { MonthBars } from '../../components/MonthBars'
 import { showToast } from '../../ledger/toast'
 import { EntryList } from './EntryList'
+import { FarmLogSection, WithholdingNotice } from './FarmLogs'
 import { Pager } from '../../components/Pager'
 
 const PER_PAGE = 20
@@ -104,6 +105,7 @@ export function GardenDetail({ ledger, data, id, query }: { ledger: Ledger; data
         <p className="muted">{[garden.crop, garden.area_m2 ? `${garden.area_m2.toLocaleString('vi-VN')} m²` : null].filter(Boolean).join(' · ')}</p>
       )}
       {garden && <FieldLines fields={data.custom_fields} target="garden" extra={garden.extra} />}
+      {garden && <WithholdingNotice data={data} gardenId={garden.id} />}
 
       {advanced && garden ? (
         <>
@@ -153,6 +155,8 @@ export function GardenDetail({ ledger, data, id, query }: { ledger: Ledger; data
         <h2>6 tháng gần đây</h2>
         <MonthBars months={monthlyTotals(allocated, 6, today())} />
       </section>
+
+      {garden && <FarmLogSection data={data} gardenId={garden.id} />}
 
       {advanced && garden && (
         <>

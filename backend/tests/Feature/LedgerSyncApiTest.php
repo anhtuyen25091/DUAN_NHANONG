@@ -55,6 +55,19 @@ class LedgerSyncApiTest extends TestCase
         $this->getJson(route('api.v1.sync.pull', ['since' => 1]))->assertJsonPath('records', []);
     }
 
+    public function test_farm_log_records_sync_between_devices(): void
+    {
+        $user = User::factory()->create();
+        $log = $this->record(['garden_id' => (string) Str::uuid(), 'date' => '2026-10-16', 'kind' => 'spray', 'title' => 'Regent', 'withholding_days' => 14], '2026-10-22T08:00:00.000Z');
+
+        $this->actingAs($user)->postJson(route('api.v1.sync.push'), ['records' => [['tbl' => 'farm_logs', 'data' => $log]]])
+            ->assertOk()
+            ->assertJsonPath('accepted', 1);
+        $this->getJson(route('api.v1.sync.pull', ['since' => 0]))
+            ->assertJsonPath('records.farm_logs.0.title', 'Regent')
+            ->assertJsonPath('records.farm_logs.0.withholding_days', 14);
+    }
+
     public function test_newer_update_wins_older_is_ignored(): void
     {
         $user = User::factory()->create();

@@ -6,12 +6,16 @@ import {
   formatKg,
   formatVnd,
   monthStart,
+  PRICE_MODE_LABELS,
   today,
   TRADE_KIND_LABELS,
   type AdvanceKind,
   type Business,
   type BusinessMemberInfo,
+  type BuyPriceInput,
+  type BuyPriceLimit,
   type MemberCash,
+  type PriceMode,
   type TradeKind,
 } from '@nhanong/shared';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -30,10 +34,11 @@ import { colors, font } from '../../lib/theme';
 import { showToast } from '../../lib/toast';
 import { useAsync } from '../../lib/useAsync';
 
-type Tab = 'overview' | 'members' | 'advances' | 'trades' | 'deals' | 'info';
+type Tab = 'overview' | 'prices' | 'members' | 'advances' | 'trades' | 'deals' | 'info';
 
 const OWNER_TABS: [Tab, string][] = [
   ['overview', 'Tổng quan'],
+  ['prices', 'Giá chốt'],
   ['members', 'Lái'],
   ['advances', 'Tiền ứng'],
   ['trades', 'Giao dịch'],
@@ -82,6 +87,7 @@ export default function BusinessScreen() {
         ))}
       </View>
       {tab === 'overview' && <Overview token={auth.token} onMember={(id) => open('trades', id)} />}
+      {tab === 'prices' && <BuyPrices token={auth.token} />}
       {tab === 'members' && <Members token={auth.token} business={business} onChange={loaded.refetch} onOpen={open} />}
       {tab === 'advances' && <Advances key={`a${member}`} token={auth.token} business={business} initialMember={member} />}
       {tab === 'trades' && <Trades key={`t${member}`} token={auth.token} business={business} initialMember={member} />}
@@ -199,6 +205,7 @@ function MemberView({ token, business, onLeft }: { token: string; business: Busi
           <Button label="📒 Phiếu của tôi" variant="outline" onPress={() => router.push('/trade')} />
         </View>
       </View>
+      <TodayPrices token={token} mode={business.price_mode} />
       {business.my_cash && <CashCard cash={business.my_cash} />}
       <SmallTitle>Các lần ứng / nộp lại</SmallTitle>
       <Status state={advances.state} retry={advances.reload} />
@@ -219,6 +226,110 @@ function MemberView({ token, business, onLeft }: { token: string; business: Busi
         />
       </View>
     </ScrollView>
+  );
+}
+
+/** Lái: giá mua tối đa chủ chốt hôm nay */
+function TodayPrices({ token, mode }: { token: string; mode: PriceMode }) {
+  const prices = useAsync(() => api.buyPrices(token), [token]);
+  if (prices.state.status !== 'ok' || prices.state.data.items.length === 0) return null;
+  return (
+    <Card>
+      <SmallTitle>💰 Giá mua chủ chốt hôm nay</SmallTitle>
+      <Text style={[styles.muted, { marginBottom: 6 }]}>{mode === 'block' ? 'Mua cao hơn giá này thì không lập phiếu được.' : 'Mua cao hơn giá này thì phiếu bị đánh dấu và báo chủ.'}</Text>
+      <LimitRows items={prices.state.data.items} />
+    </Card>
+  );
+}
+
+function LimitRows({ items }: { items: BuyPriceLimit[] }) {
+  return (
+    <View>
+      {items.map((l) => (
+        <View key={l.product_code} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 4, borderTopWidth: 1, borderTopColor: colors.border }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.body}>{l.name}</Text>
+            <Text style={styles.muted}>chốt {formatDate(l.date, true)}</Text>
+          </View>
+          <Text style={[styles.body, { fontWeight: '700' }]}>
+            {formatVnd(l.max_price)}/{l.unit}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Chủ chốt giá mua tối đa cho lái theo ngày: để trống = không giới hạn. Ngày chưa chốt thì dùng lần chốt gần nhất trước đó.
+ * Chế độ: cảnh báo (vẫn lập phiếu, báo chủ) hoặc chặn.
+ */
+function BuyPrices({ token }: { token: string }) {
+  const [date, setDate] = useState(today());
+  const loaded = useAsync(() => api.buyPrices(token, date), [token, date]);
+  const categories = useAsync(() => api.categories(), []);
+  const [draft, setDraft] = useState<Record<string, number>>({});
+  const [saving, setSaving] = useState(false);
+
+  if (loaded.state.status !== 'ok') return <Status state={loaded.state} retry={loaded.reload} />;
+  const board = loaded.state.data;
+  const current = Object.fromEntries(board.items.map((l) => [l.product_code, l]));
+  const products = categories.state.status === 'ok' ? categories.state.data.filter((c) => c.type === 'nong_san').flatMap((c) => c.products.map((p) => ({ ...p, group: c.name }))) : [];
+  const valueOf = (code: string) => draft[code] ?? current[code]?.max_price ?? 0;
+  const changed = Object.entries(draft).filter(([code, v]) => v !== (current[code]?.max_price ?? 0));
+
+  const save = async (input: BuyPriceInput, message: string) => {
+    setSaving(true);
+    try {
+      await api.saveBuyPrices(token, { date, ...input });
+      setDraft({});
+      showToast({ message });
+      loaded.refetch();
+    } catch (err) {
+      Alert.alert('Chưa lưu được', errorText(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View>
+      <Text style={[styles.muted, { marginBottom: 8 }]}>Giá mua tối đa lái được trả cho nông dân. Ngày nào chưa chốt thì dùng giá chốt gần nhất trước đó. Chốt xong các lái nhận thông báo.</Text>
+      <DateField label="Chốt giá cho ngày" value={date} onChange={(d) => (setDate(d), setDraft({}))} />
+      <Field label="Khi lái mua cao hơn giá chốt">
+        <View style={{ gap: 6 }}>
+          {(['warn', 'block'] as const).map((m) => (
+            <Chip key={m} label={PRICE_MODE_LABELS[m]} active={board.mode === m} onPress={() => !saving && board.mode !== m && save({ mode: m }, 'Đã đổi cách xử lý')} />
+          ))}
+        </View>
+      </Field>
+      <Card>
+        <SmallTitle>{`Giá chốt ngày ${formatDate(date)}`}</SmallTitle>
+        {products.map((p) => (
+          <View key={p.code}>
+            <MoneyField label={`${p.name} (đ/${p.unit})`} value={valueOf(p.code)} onChange={(v) => setDraft({ ...draft, [p.code]: v })} />
+            {current[p.code] && current[p.code].date !== date && <Text style={[styles.muted, { marginTop: -6, marginBottom: 8 }]}>Đang dùng giá chốt ngày {formatDate(current[p.code].date)}</Text>}
+          </View>
+        ))}
+        <Text style={[styles.muted, { marginBottom: 8 }]}>Để trống (0) = không giới hạn mặt hàng đó từ ngày này.</Text>
+        <Button
+          label={saving ? 'Đang lưu…' : `Chốt giá (${changed.length} mặt hàng)`}
+          disabled={saving || changed.length === 0}
+          onPress={() => save({ items: changed.map(([product_code, v]) => ({ product_code, max_price: v > 0 ? v : null })) }, `Đã chốt giá ngày ${formatDate(date)}`)}
+        />
+      </Card>
+      {board.recent.length > 0 && (
+        <Card>
+          <SmallTitle>Các lần chốt gần đây</SmallTitle>
+          {board.recent.map((r, i) => (
+            <Text key={i} style={styles.body}>
+              {formatDate(r.date, true)} · {r.name}: <Text style={{ fontWeight: '700' }}>{r.max_price ? formatVnd(r.max_price) : 'bỏ giới hạn'}</Text>
+              {r.set_by ? <Text style={styles.muted}> · {r.set_by}</Text> : null}
+            </Text>
+          ))}
+        </Card>
+      )}
+    </View>
   );
 }
 

@@ -52,8 +52,9 @@ function DealList({ token }: { token: string }) {
               <Button label="🔑 Nhập mã đơn / phiếu" variant="outline" onPress={() => router.push('/deals/join')} />
             </View>
           </View>
-          <View style={{ marginBottom: 12 }}>
+          <View style={{ marginBottom: 12, gap: 8 }}>
             <Button label="📒 Sổ giao dịch, gửi phiếu PDF / Word" variant="outline" onPress={() => router.push('/trade')} />
+            <Button label="📣 Chào bán / chợ lô hàng" variant="outline" onPress={() => router.push('/offers')} />
           </View>
           {waiting > 0 && <Notice text={`🔔 Có ${waiting} mục bên kia vừa ghi, chờ bạn xác nhận.`} />}
           <ReceivedPurchases token={token} />

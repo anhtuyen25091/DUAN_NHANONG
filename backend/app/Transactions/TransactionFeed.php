@@ -156,6 +156,8 @@ final class TransactionFeed
             'owing' => $p->owing(),
             'pending' => false,
             'note' => $p->note,
+            // Lái mua vượt giá chủ chốt
+            'over_limit' => ! empty($p->price_warnings),
             'sort' => $p->created_at?->timestamp ?? 0,
         ];
     }

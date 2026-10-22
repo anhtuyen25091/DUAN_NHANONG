@@ -60,6 +60,7 @@ export function TradeRowCard({ row: r }: { row: TradeRow }) {
         <span className="small">{itemsText(r.items)}</span>
         {r.owing > 0 && <span className="tag overdue">{r.kind === 'buy' ? 'Còn nợ khách' : 'Khách nợ'} {formatVnd(r.owing)}</span>}
         {r.pending && <span className="tag">Chờ bên kia xác nhận</span>}
+        {r.over_limit && <span className="tag overdue">⚠️ Vượt giá chốt</span>}
       </span>
       <span className="profit">{formatVnd(r.amount)}</span>
     </a>

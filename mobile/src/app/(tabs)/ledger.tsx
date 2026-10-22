@@ -187,6 +187,9 @@ function AdvancedShortcuts({ data }: { data: LedgerSnapshot }) {
   const owedWages = workerBalances(data).reduce((s, b) => s + b.owed, 0);
   return (
     <View>
+      <Shortcut title="📣 Chào bán lô hàng" onPress={() => router.push('/offers')}>
+        <Text style={styles.muted}>Sắp thu hoạch: để các điểm mua quanh vườn trả giá</Text>
+      </Shortcut>
       <Shortcut title="🤝 Bán cho lái" onPress={() => router.push('/ledger/contracts')}>
         <Text style={styles.muted}>
           {openContracts.length ? `${openContracts.length} lái đang cắt · cọc còn ${formatVnd(openContracts.reduce((s, c) => s + c.depositLeft, 0))}` : 'Lái đặt cọc, cắt nhiều đợt'}
