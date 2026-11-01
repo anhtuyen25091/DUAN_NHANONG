@@ -107,7 +107,7 @@ export default function LedgerScreen() {
             <View style={{ marginTop: 8 }}>
               <Button label={`Xem tất cả ${data.transactions.length} khoản ›`} variant="outline" onPress={() => router.push('/ledger/entries')} />
             </View>
-          ) : null
+          ) : undefined
         }
       />
       <Fab label="＋ Ghi tiền" href="/ledger/add" />

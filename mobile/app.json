@@ -36,7 +36,8 @@
           "locationWhenInUsePermission": "Nhà Nông dùng vị trí để tìm đại lý và điểm thu mua gần bạn."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-status-bar"
     ],
     "scheme": "nhanong",
     "experiments": {

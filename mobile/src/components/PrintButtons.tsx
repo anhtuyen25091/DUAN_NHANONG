@@ -27,7 +27,7 @@ export function PrintButtons({ token, target, label }: { token: string; target: 
       const file = new File(Paths.cache, filename);
       if (file.exists) file.delete();
       file.create();
-      file.write(new Uint8Array(data));
+      file.writeSync(new Uint8Array(data));
       await Sharing.shareAsync(file.uri, {
         mimeType: mime,
         dialogTitle: `Gửi ${filename}`,

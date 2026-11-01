@@ -1,7 +1,7 @@
 import { extraTexts, fieldsFor, formatVnd, pressAmountKey, readVnd, saveExtra, today, type AmountKey, type EntryType, type QuickTemplate } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { DatePicker } from '../../components/DatePicker';
 import { CustomFieldInputs } from '../../components/extraFields';
 import { CheckRow } from '../../components/fields';
@@ -37,7 +37,7 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
   const [extra, setExtra] = useState(() => extraTexts(data.custom_fields, 'transaction', editing?.extra));
   const [keepAsTemplate, setKeepAsTemplate] = useState(false);
   const [photoId, setPhotoId] = useState<string | null>(editing?.photo_id ?? null);
-  const noteInput = useRef<TextInput>(null);
+  const noteInput = useRef<TextInputInstance>(null);
   const hasFields = fieldsFor(data.custom_fields, 'transaction').length > 0;
 
   /** Bấm 1 khoản hay dùng: điền sẵn mọi thứ, nhảy sang bước số tiền (vẫn sửa được trước khi Lưu) */

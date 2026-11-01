@@ -27,7 +27,7 @@ function readUploaded(): Set<string> {
 function writeUploaded(ids: Set<string>) {
   const f = uploadedFile();
   if (!f.exists) f.create();
-  f.write(JSON.stringify([...ids]));
+  f.writeSync(JSON.stringify([...ids]));
 }
 
 const randomId = () =>
@@ -95,7 +95,7 @@ export async function syncPhotos(ledger: Ledger, token: string): Promise<void> {
       const data = await api.receiptPhoto(token, id);
       const f = photoFile(id);
       f.create();
-      f.write(new Uint8Array(data));
+      f.writeSync(new Uint8Array(data));
       uploaded.add(id);
       writeUploaded(uploaded);
     } catch {

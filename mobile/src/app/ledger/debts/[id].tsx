@@ -1,7 +1,7 @@
 import { DEBT_KIND_LABELS, debtStatus, formatDate, formatVnd, interestPaid, LENDER_TYPE_LABELS, loanSchedule, monthlyInterest, telHref, today, type Installment, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View, type ScrollViewInstance } from 'react-native';
 import { checkDate, DateField, ErrorNote, MoneyField } from '../../../components/fields';
 import { ItemRow, KIND_ICON, SectionTitle } from '../../../components/ledger';
 import { LoanScheduleCard } from '../../../components/loan';
@@ -27,7 +27,7 @@ function DebtDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnapshot
   const [installment, setInstallment] = useState<number | null>(next?.no ?? null);
   const [amount, setAmount] = useState(next ? next.principal : isLoan ? 0 : (status?.left ?? 0));
   const [interest, setInterest] = useState(next ? next.interest : isLoan && status ? monthlyInterest(status.left, status.debt) : 0);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const payFormY = useRef(0);
   const [date, setDate] = useState(today());
   const [error, setError] = useState<string | null>(null);

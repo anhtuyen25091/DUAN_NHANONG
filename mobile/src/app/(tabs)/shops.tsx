@@ -174,7 +174,7 @@ export default function ShopsScreen() {
         refreshControl={<RefreshControl refreshing={first.refreshing} onRefresh={first.reload} colors={[colors.primary]} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        ListFooterComponent={loadingMore ? <Text style={[styles.muted, { textAlign: 'center' }]}>Đang tải…</Text> : null}
+        ListFooterComponent={loadingMore ? <Text style={[styles.muted, { textAlign: 'center' }]}>Đang tải…</Text> : undefined}
         renderItem={({ item }) => <ShopCard shop={item} />}
       />
       <Pressable
