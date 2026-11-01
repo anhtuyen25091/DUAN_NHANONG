@@ -7,11 +7,12 @@ use App\Models\Device;
 use App\Models\Reading;
 use App\Models\Threshold;
 use App\Notifications\AlertNotifier;
+use App\Services\Control\RuleEngine;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
 /**
- * So số đo mới nhất với ngưỡng của lô: vượt ngưỡng thì mở cảnh báo (mỗi ngưỡng 1 cảnh báo đang mở),
+ * So số đo mới nhất với ngưỡng của lô (và chạy luật tự động): vượt ngưỡng thì mở cảnh báo (mỗi ngưỡng 1 cảnh báo đang mở),
  * về lại trong ngưỡng thì tự đóng.
  */
 class EvaluateThresholds implements ShouldQueue
@@ -23,12 +24,15 @@ class EvaluateThresholds implements ShouldQueue
      */
     public function __construct(public int $deviceId, public array $latest) {}
 
-    public function handle(AlertNotifier $notifier): void
+    public function handle(AlertNotifier $notifier, RuleEngine $rules): void
     {
         $device = Device::query()->find($this->deviceId);
         if ($device?->plot_id === null) {
             return;
         }
+
+        // Luật tự động (bật quạt oxy khi DO thấp...) chạy cùng lúc xét ngưỡng
+        $rules->evaluate($device, $this->latest);
 
         $thresholds = Threshold::query()
             ->where('plot_id', $device->plot_id)

@@ -190,6 +190,77 @@ export interface IotHistory {
   data: IotPoint[];
 }
 
+export type IotActuatorKind = 'pump' | 'aerator' | 'valve' | 'mister' | 'light' | 'other';
+export type IotCommandStatus = 'pending' | 'sent' | 'done' | 'failed' | 'expired' | 'replaced';
+
+/** Máy bơm / quạt oxy / van… nối vào kênh relay của mạch điều khiển */
+export interface IotActuator {
+  id: number;
+  device_id: number;
+  device_name: string;
+  device_online: boolean;
+  plot_id: number | null;
+  name: string;
+  kind: IotActuatorKind;
+  kind_label: string;
+  channel: number;
+  max_minutes: number;
+  /** Trạng thái mạch báo về gần nhất */
+  is_on: boolean;
+  state_changed_at: string | null;
+  auto_off_at: string | null;
+  /** Lệnh đang chờ mạch làm */
+  pending: { id: number; action: 'on' | 'off'; minutes: number | null; status: IotCommandStatus; expires_at: string } | null;
+}
+
+export interface IotActuatorInput {
+  name: string;
+  kind: IotActuatorKind;
+  channel: number;
+  plot_id: number | null;
+  max_minutes: number;
+}
+
+export interface IotCommand {
+  id: number;
+  actuator_id: number;
+  action: 'on' | 'off';
+  minutes: number | null;
+  source: 'manual' | 'rule';
+  reason: string | null;
+  status: IotCommandStatus;
+  status_label: string;
+  message: string | null;
+  created_at: string;
+  done_at: string | null;
+}
+
+/** "Khi {metric} {thấp hơn|cao hơn} {value} thì bật {actuator} {minutes} phút; trở lại {off_value} thì tắt" */
+export interface IotRule {
+  id: number;
+  plot_id: number;
+  metric: IotMetricRef & { group: string; decimals: number };
+  actuator: { id: number; name: string };
+  operator: 'below' | 'above';
+  value: number;
+  off_value: number | null;
+  minutes: number;
+  cooldown_minutes: number;
+  enabled: boolean;
+  last_triggered_at: string | null;
+}
+
+export interface IotRuleInput {
+  metric: string;
+  actuator_id: number;
+  operator: 'below' | 'above';
+  value: number;
+  off_value: number | null;
+  minutes: number;
+  cooldown_minutes: number;
+  enabled: boolean;
+}
+
 export interface IotIngestResult {
   device?: string;
   accepted: number;
@@ -271,6 +342,19 @@ export function createIotApi({ baseUrl, getToken, fetch: fetchFn = globalThis.fe
     plotSummary: (plotId: number) => request<{ data: IotPlotSummary }>('GET', `/plots/${plotId}/summary`).then((r) => r.data),
     readings: (deviceId: number, query: { metric: string; from?: string; to?: string; interval?: IotInterval }) =>
       request<IotHistory>('GET', `/devices/${deviceId}/readings`, { query }),
+    actuators: (plotId: number) => request<{ data: IotActuator[] }>('GET', `/plots/${plotId}/actuators`).then((r) => r.data),
+    createActuator: (deviceId: number, input: IotActuatorInput) =>
+      request<{ data: IotActuator }>('POST', `/devices/${deviceId}/actuators`, { body: input }).then((r) => r.data),
+    updateActuator: (id: number, input: IotActuatorInput) => request<{ data: IotActuator }>('PUT', `/actuators/${id}`, { body: input }).then((r) => r.data),
+    deleteActuator: (id: number) => request<void>('DELETE', `/actuators/${id}`),
+    /** Bật (kèm số phút) / tắt; mạch nhận trong vài giây, quá 10 phút chưa nhận thì lệnh hủy */
+    command: (actuatorId: number, action: 'on' | 'off', minutes?: number) =>
+      request<{ data: IotCommand }>('POST', `/actuators/${actuatorId}/command`, { body: { action, minutes } }).then((r) => r.data),
+    commandHistory: (actuatorId: number) => request<{ data: IotCommand[] }>('GET', `/actuators/${actuatorId}/commands`).then((r) => r.data),
+    rules: (plotId: number) => request<{ data: IotRule[] }>('GET', `/plots/${plotId}/rules`).then((r) => r.data),
+    createRule: (plotId: number, input: IotRuleInput) => request<{ data: IotRule }>('POST', `/plots/${plotId}/rules`, { body: input }).then((r) => r.data),
+    updateRule: (id: number, input: IotRuleInput) => request<{ data: IotRule }>('PUT', `/rules/${id}`, { body: input }).then((r) => r.data),
+    deleteRule: (id: number) => request<void>('DELETE', `/rules/${id}`),
     alerts: (open = false) => request<{ data: IotAlert[] }>('GET', '/alerts', { query: { open: open ? 1 : undefined } }).then((r) => r.data),
     resolveAlert: (alertId: number) => request<{ data: IotAlert }>('POST', `/alerts/${alertId}/resolve`).then((r) => r.data),
     savePushToken: (token: string, platform: 'android' | 'ios') => request<void>('PUT', '/me/push-token', { body: { token, platform } }),
@@ -349,6 +433,14 @@ export function weatherDayLabel(date: string, index: number): string {
   const d = new Date(`${date}T00:00:00`);
   const weekdays = ['CN', 'Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7'];
   return `${weekdays[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+}
+
+/** "Khi DO thấp hơn 4 mg/L → bật Quạt oxy 90 phút, tắt khi ≥ 5" */
+export function describeRule(rule: IotRule): string {
+  const unit = rule.metric.unit ? ` ${rule.metric.unit}` : '';
+  const when = `Khi ${rule.metric.name} ${rule.operator === 'below' ? 'thấp hơn' : 'cao hơn'} ${formatDecimal(rule.value)}${unit}`;
+  const off = rule.off_value === null ? '' : `, tắt khi ${rule.operator === 'below' ? '≥' : '≤'} ${formatDecimal(rule.off_value)}`;
+  return `${when} → bật ${rule.actuator.name} ${rule.minutes} phút${off}`;
 }
 
 /** Lượng mưa 1 ngày: ưu tiên máy đo mưa của trang trại, không có thì dữ liệu thời tiết */

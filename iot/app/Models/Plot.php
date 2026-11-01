@@ -53,4 +53,20 @@ class Plot extends Model
     {
         return $this->hasMany(Threshold::class);
     }
+
+    /**
+     * @return HasMany<Actuator, $this>
+     */
+    public function actuators(): HasMany
+    {
+        return $this->hasMany(Actuator::class);
+    }
+
+    /**
+     * @return HasMany<AutomationRule, $this>
+     */
+    public function rules(): HasMany
+    {
+        return $this->hasMany(AutomationRule::class);
+    }
 }

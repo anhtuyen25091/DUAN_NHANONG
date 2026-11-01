@@ -68,6 +68,23 @@ Bảng phân vùng riêng (`partitions.csv`): 1,5 MB cho chương trình, 2,4 MB
 
 Muốn dùng LoRa thay WiFi thì dùng cảm biến LoRaWAN thương mại (Dragino, Milesight, SenseCAP) qua gateway. Xem [docs/THIET_BI.md](../../docs/THIET_BI.md).
 
+## Mạch điều khiển máy bơm / quạt oxy (`CONTROLLER_MODE 1`)
+
+Dùng cho mạch cắm điện lưới, đặt trong tủ điện cạnh ao / ruộng, có module relay (loại 4 kênh kích mức thấp phổ biến):
+
+```
+ESP32 GPIO27 ── IN1 (kênh 1)     ESP32 GPIO14 ── IN2 (kênh 2)
+ESP32 GPIO13 ── IN3 (kênh 3)     ESP32 GPIO23 ── IN4 (kênh 4)
+5V / GND ────── VCC / GND        Tiếp điểm COM / NO của relay đóng cắt cuộn khởi động từ (contactor) của máy bơm, quạt
+```
+
+⚠️ Máy bơm, quạt oxy chạy điện 220V / 380V công suất lớn: relay chỉ đóng cắt **cuộn điều khiển của khởi động từ**, không đấu thẳng động cơ vào relay. Phần điện lực nhờ thợ điện lắp, có CB / aptomat chống giật.
+
+- Mạch không ngủ sâu: cứ `poll_seconds` (máy chủ trả về, mặc định 10 giây) hỏi lệnh `GET /device/commands`, bật / tắt relay rồi báo lại `POST /device/commands/{id}/ack`; vẫn đo và gửi số đo theo `MEASURE_INTERVAL_MIN`.
+- Mỗi lần bật mạch **tự tắt khi hết số phút** trong lệnh, kể cả khi mất WiFi. Mất điện có lại: tắt hết, chờ lệnh mới.
+- Trong app: màn hình lô › ⚙️ Điều khiển › ＋ Thêm thiết bị (chọn mạch, kênh relay). Luật tự động: ⚡ Luật tự động (VD DO < 4 bật quạt oxy, DO ≥ 5 tắt).
+- Chưa có mạch: `php artisan iot:simulate-controller <mã mạch>` giả lập mạch để thử app.
+
 ## Gửi qua MQTT
 
 Đặt `USE_MQTT 1`. Firmware publish lên topic `nhanong/<mã thiết bị>/up` với nội dung giống `POST /ingest`, kèm thêm trường `"key"`. Trên máy chủ chạy `php artisan iot:mqtt-listen`. Broker chạy thật cần tài khoản: điền `MQTT_USERNAME` / `MQTT_PASSWORD` (xem `deploy/mosquitto-production.conf`).

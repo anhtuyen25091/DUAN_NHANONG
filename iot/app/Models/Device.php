@@ -116,4 +116,12 @@ class Device extends Model
     {
         return $this->hasMany(Alert::class);
     }
+
+    /**
+     * @return HasMany<Actuator, $this>
+     */
+    public function actuators(): HasMany
+    {
+        return $this->hasMany(Actuator::class);
+    }
 }

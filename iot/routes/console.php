@@ -11,3 +11,5 @@ Schedule::command('devices:check-health')->everyThirtyMinutes()->withoutOverlapp
 // Mưa: kiểm tra đang mưa 15 phút / lần; lưu lượng mưa từng ngày mỗi giờ (hôm nay + hôm qua)
 Schedule::command('weather:rain-watch')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('weather:sync-rain --days=2')->hourly()->withoutOverlapping();
+// Lệnh bật / tắt quá hạn (mạch không nhận kịp): hủy và báo
+Schedule::command('commands:expire')->everyMinute()->withoutOverlapping();

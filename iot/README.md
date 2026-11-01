@@ -80,6 +80,14 @@ Các lý do bị loại:
 
 Gửi lại cùng số đo thì được tính vào `duplicates`, không bị nhân đôi.
 
+**Mạch điều khiển relay** (cùng khóa thiết bị):
+
+| | |
+|---|---|
+| `GET /device/commands?states=1:1,2:0` | Lấy lệnh đang chờ (kèm trạng thái relay hiện tại). Trả `{"commands": [{"id": 12, "channel": 1, "action": "on", "minutes": 30}], "poll_seconds": 10}`. Lệnh chưa báo kết quả thì gửi lại; mạch bỏ qua id đã làm. |
+| `POST /device/commands/{id}/ack` | `{"ok": true, "states": "1:1,2:0"}` hoặc `{"ok": false, "message": "…"}` (báo lỗi về điện thoại) |
+| `POST /ingest` | Mạch có relay thì phản hồi kèm `commands` như trên |
+
 **Không có Internet ở ruộng:**
 
 | | |
@@ -109,6 +117,9 @@ Số đo gửi bù cũ hơn 24 giờ chỉ được lưu lại, không bắn c�
 | `GET /devices/{id}/readings?metric=soil_ph&from=&to=&interval=raw\|hour\|day` | Lịch sử để vẽ biểu đồ |
 | `GET/POST /plots/{id}/thresholds`, `DELETE /thresholds/{id}` | Ngưỡng cảnh báo (`min` / `max`) |
 | `GET /alerts?open=1`, `POST /alerts/{id}/resolve` | Cảnh báo |
+| `GET /plots/{id}/actuators`, `POST /devices/{id}/actuators`, `PUT/DELETE /actuators/{id}` | Thiết bị điều khiển (máy bơm, quạt oxy, van…) gắn vào kênh relay của mạch điều khiển ESP32 |
+| `POST /actuators/{id}/command` (`{"action": "on", "minutes": 30}`), `GET /actuators/{id}/commands` | Bật / tắt bằng tay, lịch sử lệnh. Bật luôn có số phút (≤ `max_minutes`); lệnh mới thay lệnh cũ chưa làm; mạch không nhận trong 10 phút thì lệnh hủy (không tự chạy muộn) và báo về điện thoại |
+| `GET/POST /plots/{id}/rules`, `PUT/DELETE /rules/{id}` | Luật tự động: `{"metric": "water_do", "operator": "below", "value": 4, "off_value": 5, "actuator_id": 1, "minutes": 60, "cooldown_minutes": 30}`. Chạy mỗi khi có số đo mới của lô; tự bật thì báo về điện thoại; chỉ tự tắt máy do chính luật đã bật (không tắt máy người dùng bật tay) |
 | `PUT /me/push-token`, `DELETE /me/push-token` | Expo push token của máy (`{"token": "ExponentPushToken[…]", "platform": "android"}`). Khi một chỉ số vừa vượt ngưỡng, máy nhận thông báo (kênh Android `iot-alerts`); vượt tiếp thì không báo lặp. |
 
 ## Lệnh
@@ -122,4 +133,6 @@ Số đo gửi bù cũ hơn 24 giờ chỉ được lưu lại, không bắn c�
 | `weather:sync-rain --days=2` | Mỗi giờ: lưu lượng mưa từng ngày (bảng `farm_rain_daily`). Trang trại vừa có / đổi vị trí thì tự lấy 1 năm. Ngày đã qua lấy từ API lưu trữ, hôm nay cộng các giờ đã qua; ngày không có số liệu để trống (không ghi 0). |
 | `iot:mqtt-listen` | Nghe MQTT. Chạy liên tục bằng supervisor. |
 | `iot:simulate` | Giả lập thiết bị |
+| `iot:simulate-controller <uid>` | Giả lập mạch điều khiển relay: nhận lệnh bật / tắt, tự tắt khi hết giờ (để thử app khi chưa có phần cứng) |
+| `commands:expire` | Mỗi phút: hủy lệnh bật / tắt quá 10 phút mà mạch chưa nhận, báo chủ trang trại |
 | `admin:grant` | Cấp quyền vào `/admin` |

@@ -502,6 +502,131 @@ void runPortal() {
     server.stop();
 }
 
+// ================= Mạch điều khiển relay (CONTROLLER_MODE 1) =================
+
+#if CONTROLLER_MODE
+static const size_t RELAY_COUNT = sizeof(RELAY_PINS) / sizeof(RELAY_PINS[0]);
+bool relayOn[RELAY_COUNT];
+unsigned long relayOffAt[RELAY_COUNT];  // millis() lúc tự tắt; 0 = không hẹn
+uint32_t doneIds[16];                   // lệnh đã làm (máy chủ gửi lại khi chưa nhận được báo cáo)
+size_t doneNext = 0;
+unsigned long pollMs = 10000;
+unsigned long lastPoll = 0;
+unsigned long lastMeasure = 0;
+
+void setRelay(size_t index, bool on, uint32_t minutes) {
+    relayOn[index] = on;
+    relayOffAt[index] = on ? millis() + minutes * 60000UL : 0;
+    digitalWrite(RELAY_PINS[index], (on != (bool)RELAY_ACTIVE_LOW) ? HIGH : LOW);
+    Serial.printf("Kênh %u: %s%s\n", (unsigned)(index + 1), on ? "BẬT" : "TẮT", on ? (String(" ") + minutes + " phút").c_str() : "");
+}
+
+// "1:1,2:0" gửi kèm mỗi lần hỏi lệnh để máy chủ biết trạng thái thật
+String relayStates() {
+    String states;
+    for (size_t i = 0; i < RELAY_COUNT; i++) {
+        if (i) states += ",";
+        states += String(i + 1) + ":" + (relayOn[i] ? "1" : "0");
+    }
+    return states;
+}
+
+bool alreadyDone(uint32_t id) {
+    for (uint32_t done : doneIds) {
+        if (done == id) return true;
+    }
+    return false;
+}
+
+void ackCommand(uint32_t id, bool ok, const char *message) {
+    HTTPClient http;
+    http.begin(String(API_BASE) + "/device/commands/" + id + "/ack");
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Accept", "application/json");
+    http.addHeader("Authorization", String("Bearer ") + DEVICE_KEY);
+    JsonDocument doc;
+    doc["ok"] = ok;
+    if (message) doc["message"] = message;
+    doc["states"] = relayStates();
+    String body;
+    serializeJson(doc, body);
+    http.POST(body);
+    http.end();
+}
+
+void pollCommands() {
+    HTTPClient http;
+    http.begin(String(API_BASE) + "/device/commands?states=" + relayStates());
+    http.addHeader("Accept", "application/json");
+    http.addHeader("Authorization", String("Bearer ") + DEVICE_KEY);
+    http.setTimeout(10000);
+    int status = http.GET();
+    if (status != 200) {
+        Serial.printf("Hỏi lệnh lỗi HTTP %d\n", status);
+        http.end();
+        return;
+    }
+
+    JsonDocument response;
+    DeserializationError error = deserializeJson(response, http.getString());
+    http.end();
+    if (error) return;
+
+    if (response["poll_seconds"].is<uint32_t>()) pollMs = max(3UL, (unsigned long)response["poll_seconds"].as<uint32_t>()) * 1000UL;
+    if (nowEpoch() == 0 && response["server_time"].is<uint32_t>()) setClock(response["server_time"].as<uint32_t>());
+
+    for (JsonObject command : response["commands"].as<JsonArray>()) {
+        uint32_t id = command["id"];
+        uint32_t channel = command["channel"];
+        bool on = strcmp(command["action"] | "", "on") == 0;
+        uint32_t minutes = command["minutes"] | 0;
+
+        if (alreadyDone(id)) {
+            ackCommand(id, true, nullptr);  // lần báo trước bị mất: báo lại
+            continue;
+        }
+        if (channel < 1 || channel > RELAY_COUNT) {
+            ackCommand(id, false, "Mạch không có kênh relay này");
+            continue;
+        }
+        setRelay(channel - 1, on, minutes);
+        doneIds[doneNext++ % 16] = id;
+        ackCommand(id, true, nullptr);
+    }
+}
+
+void controllerSetup() {
+    for (size_t i = 0; i < RELAY_COUNT; i++) {
+        pinMode(RELAY_PINS[i], OUTPUT);
+        setRelay(i, false, 0);  // khởi động / mất điện có lại: luôn tắt hết, chờ lệnh mới
+    }
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+}
+
+void controllerLoop() {
+    // Hẹn giờ tự tắt chạy cả khi mất WiFi: máy bơm không chạy quá số phút đã ra lệnh
+    for (size_t i = 0; i < RELAY_COUNT; i++) {
+        if (relayOn[i] && relayOffAt[i] != 0 && (long)(millis() - relayOffAt[i]) >= 0) setRelay(i, false, 0);
+    }
+
+    bool online = WiFi.status() == WL_CONNECTED;
+    if (online && millis() - lastPoll >= pollMs) {
+        lastPoll = millis();
+        if (nowEpoch() == 0) syncClockNtp();
+        pollCommands();
+    }
+    if (lastMeasure == 0 || millis() - lastMeasure >= MEASURE_INTERVAL_MIN * 60000UL) {
+        lastMeasure = millis();
+        measure();
+        compactQueue();
+        if (online) flushQueue();
+    }
+    delay(200);
+}
+#endif
+
 // ================= Vòng đời =================
 
 void setup() {
@@ -509,6 +634,11 @@ void setup() {
     LittleFS.begin(true);
     pinMode(PORTAL_BUTTON_PIN, INPUT_PULLUP);
     initClock();
+
+#if CONTROLLER_MODE
+    controllerSetup();
+    return;  // mạch điều khiển chạy liên tục trong loop(), không ngủ sâu
+#endif
 
     esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
     bool buttonWake = cause == ESP_SLEEP_WAKEUP_EXT0 || digitalRead(PORTAL_BUTTON_PIN) == LOW;
@@ -546,4 +676,8 @@ void setup() {
     esp_deep_sleep_start();
 }
 
-void loop() {}
+void loop() {
+#if CONTROLLER_MODE
+    controllerLoop();
+#endif
+}

@@ -3,6 +3,7 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { useCallback } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { AlertCard, SectionTitle } from '../../../components/iot';
+import { ControlSection } from '../../../components/iotControl';
 import { Button, Card, Status, styles } from '../../../components/ui';
 import { iotApi } from '../../../lib/iot';
 import { colors, font } from '../../../lib/theme';
@@ -73,7 +74,9 @@ export default function IotPlotScreen() {
             </View>
           </View>
 
-          <SectionTitle text="Thiết bị" />
+          <ControlSection plotId={data.plot.id} plotName={data.plot.name} plotType={data.plot.type} farmId={data.plot.farm_id} />
+
+          <SectionTitle text="Thiết bị đo" />
           {data.devices.length === 0 && (
             <Card>
               <Text style={styles.body}>Lô chưa có thiết bị đo.</Text>

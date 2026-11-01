@@ -11,6 +11,62 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 01/11/2026 (tiếp 2): Bù giá hồ tiêu / lúa gạo, bật lịch tự động, commit, điều khiển máy bơm / quạt oxy + luật tự động
+
+**1. Giá hồ tiêu / lúa gạo bị dừng**
+- Nguyên nhân: **vietbao ngừng đăng bài giá hồ tiêu và lúa gạo sau 24/10**. Đã xem sitemap 25/10 → 01/11: không còn bài loại này; cà phê vẫn còn.
+- Cách xử lý: dùng lệnh dự phòng có sẵn `crawl:backfill --recent` (báo Quốc tế, Công Thương). Chạy tay: thêm 28 giá tiêu, 16 giá cà phê, 36 giá lúa gạo.
+  - Hồ tiêu giờ có giá tới 31/10, lúa gạo tới 01/11.
+  - Lệnh này đã nằm sẵn trong lịch lúc 9:00 và 15:00; nay lịch đã bật nên tự chạy.
+
+**2. Bật lịch tự động trên máy dev**
+- Thêm `scripts/dev-services.sh install|uninstall|status`: dùng launchd chạy `schedule:work` + `queue:work` cho cả `backend/` và `iot/`.
+  - Tự chạy khi mở máy, tự bật lại nếu bị tắt.
+  - Log nằm ở `*/storage/logs/schedule.log`, `queue.log`.
+- Đã cài, 4 dịch vụ đang chạy. Sau khi sửa code chạy trong hàng đợi phải gọi `php artisan queue:restart` để worker nạp code mới.
+
+**3. Commit:** nhánh mới `iot-cam-bien`, commit `941f8b6` (toàn bộ việc từ 29/10). Chưa gộp vào `main`.
+
+**4. Điều khiển máy bơm / quạt oxy + luật tự động** (`iot/`)
+- Bảng mới:
+  - `actuators`: thiết bị điều khiển gắn vào kênh relay của mạch ESP32, có `max_minutes`
+  - `actuator_commands`: pending → sent → done / failed / expired / replaced
+  - `automation_rules`: chỉ số, dưới / trên, mức bật, mức tắt, số phút, thời gian nghỉ
+- `CommandService`:
+  - bật luôn có số phút
+  - lệnh mới thay lệnh cũ
+  - mạch không nhận trong 10 phút thì hủy (`commands:expire` mỗi phút) và báo điện thoại
+  - mạch báo lỗi cũng báo điện thoại
+  - trạng thái relay lấy theo mạch báo về
+- `RuleEngine` (chạy cùng lúc xét ngưỡng):
+  - vượt mức, máy đang tắt và đã qua thời gian nghỉ → bật, báo "⚙️ Tự bật Quạt oxy 1 (Ao tôm 1) – Vì DO 3,6 mg/L < 4"
+  - trở lại mức tắt → tắt, nhưng chỉ khi lần bật gần nhất là do chính luật này
+- API cho mạch: `GET /device/commands?states=`, `POST /device/commands/{id}/ack`, `/ingest` trả kèm lệnh.
+- API cho người dùng: thêm / sửa / xóa thiết bị điều khiển, `POST /actuators/{id}/command`, lịch sử lệnh, luật.
+- Admin: nhóm "Điều khiển" (thiết bị có nút Bật / Tắt, luật, nhật ký lệnh).
+- App:
+  - màn hình lô có khu "⚙️ Điều khiển": trạng thái, chọn 15 / 30 / 60 phút, Bật / Tắt, "Đang gửi lệnh…" tự cập nhật mỗi 3 giây, cảnh báo khi mạch mất kết nối
+  - màn "Thêm thiết bị điều khiển" và "Luật tự động"
+- Firmware: thêm `CONTROLLER_MODE` (mạch cắm điện, hỏi lệnh 10 giây / lần, tự tắt relay khi hết giờ kể cả lúc mất WiFi, mất điện có lại thì tắt hết). Đã biên dịch được cả 2 chế độ.
+- Lệnh `iot:simulate-controller <uid>`: giả lập mạch để thử app khi chưa có phần cứng.
+
+**Kiểm tra**
+- `iot`: 58 test qua (thêm `ControlTest`, 8 test). `packages/shared`: 135 test qua. `backend`: 216 test qua. Typecheck mobile và build web không lỗi.
+- Chạy thật trên MySQL với hàng đợi launchd + mạch giả lập "Tủ điều khiển ao 1" (`NDN4KUL6UZ`, kênh 1 Quạt oxy 1, kênh 2 Bơm cấp nước), luật "DO < 4 bật quạt 60 phút, DO ≥ 5 tắt":
+  - gửi DO 3,6: luật tạo lệnh, mạch giả lập bật quạt
+  - DO 5,3: luật tắt quạt
+  - bật tay bơm 15 phút qua API: mạch bật, app hiện "Đang chạy, tự tắt lúc 11:45"
+- Đã chụp màn hình khu Điều khiển và Luật tự động.
+
+**Còn tồn**
+- Chưa thử với mạch relay thật và khởi động từ. Phần điện lực cần thợ điện lắp.
+- MQTT chưa gửi lệnh xuống (mạch điều khiển dùng HTTP hỏi định kỳ). LoRaWAN chưa gửi lệnh xuống.
+- Chưa có lịch hẹn giờ (VD tưới 6:00 mỗi ngày 20 phút).
+- Nhánh `iot-cam-bien` chưa gộp vào `main`; phần điều khiển commit ở commit tiếp theo trên nhánh này.
+- `iot:simulate-controller` đang chạy nền cho "Tủ điều khiển ao 1" (tắt phiên Claude thì dừng).
+
+---
+
 ## 01/11/2026 (tiếp): Chạy crawler giá + kích hoạt gói năm cho tài khoản thử
 
 - `crawl:run` lúc 11:07:

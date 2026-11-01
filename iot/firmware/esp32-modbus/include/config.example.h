@@ -43,6 +43,14 @@
 #define PORTAL_MINUTES 10
 #define PORTAL_PASSWORD "nhanong123"  // ít nhất 8 ký tự
 
+// ---- Mạch điều khiển relay (máy bơm, quạt oxy, van...). 0 = mạch đo chạy pin, ngủ sâu giữa 2 lần đo ----
+// 1 = mạch cắm điện lưới, luôn bật: hỏi lệnh bật / tắt mỗi vài giây (GET /device/commands), vẫn đo + gửi số đo như thường.
+// Kênh relay 1, 2, 3... ứng với RELAY_PINS[0], [1], [2]... (khai báo kênh khi thêm thiết bị điều khiển trong app).
+// Mỗi lần bật mạch tự tắt khi hết số phút trong lệnh, kể cả lúc mất WiFi.
+#define CONTROLLER_MODE 0
+static const uint8_t RELAY_PINS[] = {27, 14, 13, 23};
+#define RELAY_ACTIVE_LOW 1  // module relay phổ biến kích mức thấp (LOW = đóng)
+
 // ---- RS485 (module MAX485 / TTL-RS485 tự động) ----
 #define RS485_RX 16
 #define RS485_TX 17

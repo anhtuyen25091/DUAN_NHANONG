@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from './api';
-import { createIotApi, formatDecimal, formatIotValue, normalizeDevEui, parseDecimalInput, parseDeviceFile, pointValue, rainOfDay, thresholdLabel, timeAgo, weatherDayLabel } from './iot';
+import { createIotApi, describeRule, formatDecimal, formatIotValue, normalizeDevEui, parseDecimalInput, parseDeviceFile, pointValue, rainOfDay, thresholdLabel, timeAgo, weatherDayLabel } from './iot';
 
 function fakeFetch(status: number, body: unknown) {
   return vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(status === 204 ? null : JSON.stringify(body), { status }));
@@ -105,5 +105,16 @@ describe('lượng mưa', () => {
     expect(rainOfDay({ date: 'x', rain_mm: 3.2, gauge_mm: 4.1 })).toBe(4.1);
     expect(rainOfDay({ date: 'x', rain_mm: 3.2, gauge_mm: null })).toBe(3.2);
     expect(rainOfDay({ date: 'x', rain_mm: null, gauge_mm: null })).toBeNull();
+  });
+});
+
+describe('luật tự động', () => {
+  it('mô tả dễ đọc', () => {
+    const rule = {
+      id: 1, plot_id: 1, metric: { code: 'water_do', name: 'Oxy hòa tan (DO)', unit: 'mg/L', group: 'water', decimals: 2 },
+      actuator: { id: 1, name: 'Quạt oxy 1' }, operator: 'below' as const, value: 4, off_value: 5, minutes: 90, cooldown_minutes: 30, enabled: true, last_triggered_at: null,
+    };
+    expect(describeRule(rule)).toBe('Khi Oxy hòa tan (DO) thấp hơn 4 mg/L → bật Quạt oxy 1 90 phút, tắt khi ≥ 5');
+    expect(describeRule({ ...rule, operator: 'above', value: 35.5, off_value: null, metric: { ...rule.metric, name: 'Nhiệt độ', unit: '°C' } })).toBe('Khi Nhiệt độ cao hơn 35,5 °C → bật Quạt oxy 1 90 phút');
   });
 });

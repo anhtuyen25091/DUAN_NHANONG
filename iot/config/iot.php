@@ -64,4 +64,10 @@ return [
         // Hỏi lại backend sau ngần này (gói có thể vừa mua / hết hạn)
         'plan_cache_hours' => 6,
     ],
+    // Điều khiển máy bơm / quạt oxy...: lệnh quá hạn mà mạch chưa lấy thì bỏ (không để máy tự chạy muộn)
+    'control' => [
+        'command_ttl_minutes' => 10,
+        // Mạch điều khiển hỏi lệnh mới mỗi N giây (firmware đọc từ phản hồi)
+        'poll_seconds' => 10,
+    ],
 ];

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Middleware\AuthenticateDevice;
 use App\Models\Device;
 use App\Services\CompactCsv;
+use App\Services\Control\CommandService;
 use App\Services\ReadingIngestor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ class IngestController extends Controller
     /** Kích thước tối đa của nội dung dạng CSV gọn / file điện thoại chuyển tiếp */
     private const MAX_CSV_BYTES = 512 * 1024;
 
-    public function __construct(private readonly ReadingIngestor $ingestor) {}
+    public function __construct(private readonly ReadingIngestor $ingestor, private readonly CommandService $commands) {}
 
     /**
      * POST /ingest — {"firmware": "1.0.0", "readings": [{"metric": "soil_ph", "value": 6.4, "t": 1730170000}]}
@@ -33,9 +34,13 @@ class IngestController extends Controller
             'firmware' => ['nullable', 'string', 'max:32'],
         ]);
 
-        $result = $this->ingestor->ingestPayload(AuthenticateDevice::device($request), $request->all(), ReadingSource::Http);
+        $device = AuthenticateDevice::device($request);
+        $result = $this->ingestor->ingestPayload($device, $request->all(), ReadingSource::Http);
 
-        return response()->json($result->toArray());
+        // Bo vừa đo vừa điều khiển relay: gửi kèm lệnh đang chờ để khỏi phải hỏi riêng
+        $extra = $device->actuators()->exists() ? DeviceCommandController::payload($this->commands, $device) : [];
+
+        return response()->json($result->toArray() + $extra);
     }
 
     /**
