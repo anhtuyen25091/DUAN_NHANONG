@@ -15,7 +15,7 @@ import { colors } from '../lib/theme';
 function openFromNotification(data: OpenedData) {
   // Thông báo nhắc hạn trả nợ: mở khoản nợ
   if (data?.iotFarmId) {
-    router.push({ pathname: '/iot/weather', params: { farm: String(data.iotFarmId) } });
+    router.push({ pathname: '/iot/weather', params: { farm: String(data.iotFarmId), name: data.iotFarmName ?? '' } });
   } else if (data?.iotPlotId) {
     router.push({ pathname: '/iot/plot/[id]', params: { id: String(data.iotPlotId) } });
   } else if (data?.dealId) {

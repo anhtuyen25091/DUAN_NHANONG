@@ -136,6 +136,7 @@ class RainTest extends TestCase
         $this->assertSame('🌧️ Vườn Cư Bao đang mưa', $pushes[0][0]['0']['title']);
         $this->assertStringStartsWith('Khoảng 4,8 mm/giờ', $pushes[0][0]['0']['body']);
         $this->assertSame($this->farm->id, $pushes[0][0]['0']['data']['iotFarmId']);
+        $this->assertSame($this->farm->name, $pushes[0][0]['0']['data']['iotFarmName']);
 
         $farm = $this->farm->fresh();
         $this->assertNotNull($farm->raining_since);

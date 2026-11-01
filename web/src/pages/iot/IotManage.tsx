@@ -4,6 +4,7 @@ import {
   describeRule,
   describeSchedule,
   formatDecimal,
+  isController,
   monthsLabel,
   normalizeDevEui,
   parseDecimalInput,
@@ -584,7 +585,7 @@ export function ActuatorForm({ id, plotId }: { id: number | null; plotId: number
   const actuator = id ? actuators.find((a) => a.id === id) : undefined
   const farmId = farms.find((f) => f.plots.some((p) => p.id === plotId))?.id
   const farmDevices = devices.filter((d) => d.farm_id === farmId)
-  return <ActuatorFormInner actuator={actuator} plotId={plotId} controllers={farmDevices.filter((d) => d.kind === 'esp32')} sensors={farmDevices} />
+  return <ActuatorFormInner actuator={actuator} plotId={plotId} controllers={farmDevices.filter(isController)} sensors={farmDevices} />
 }
 
 function ActuatorFormInner({ actuator, plotId, controllers, sensors }: { actuator?: IotActuator; plotId: number; controllers: IotDevice[]; sensors: IotDevice[] }) {
@@ -633,7 +634,7 @@ function ActuatorFormInner({ actuator, plotId, controllers, sensors }: { actuato
     return (
       <section>
         <Back to={`cam-bien/lo/${plotId}`} label="Quay lại" />
-        <p className="notice">Trang trại chưa có mạch ESP32 nào. Thêm thiết bị đo loại "WiFi / 4G (ESP32)" cho mạch relay trước.</p>
+        <p className="notice">Trang trại chưa có mạch điều khiển nào. Thêm thiết bị loại "WiFi / 4G (ESP32)" (mạch relay), hoặc LoRaWAN dòng "dragino-lt22222".</p>
       </section>
     )
   }

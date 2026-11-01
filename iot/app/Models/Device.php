@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
  * uid là mã công khai in trên thiết bị, dùng trong topic MQTT và file dữ liệu điện thoại chuyển tiếp.
  */
 #[Fillable(['farm_id', 'plot_id', 'name', 'kind', 'profile', 'dev_eui', 'firmware'])]
-#[Hidden(['api_key', 'api_key_hash'])]
+#[Hidden(['api_key', 'api_key_hash', 'downlink'])]
 class Device extends Model
 {
     /** @use HasFactory<DeviceFactory> */
@@ -31,6 +31,7 @@ class Device extends Model
         return [
             'kind' => DeviceKind::class,
             'api_key' => 'encrypted',
+            'downlink' => 'encrypted:array',
             'last_seen_at' => 'datetime',
             'offline_notified_at' => 'datetime',
             'low_battery_notified_at' => 'datetime',

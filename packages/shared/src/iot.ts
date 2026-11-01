@@ -288,7 +288,7 @@ export interface IotCommand {
   actuator_id: number;
   action: 'on' | 'off';
   minutes: number | null;
-  source: 'manual' | 'rule' | 'schedule' | 'safety';
+  source: 'manual' | 'rule' | 'schedule' | 'safety' | 'timer';
   reason: string | null;
   status: IotCommandStatus;
   status_label: string;
@@ -533,6 +533,7 @@ const COMMAND_SOURCES: Record<IotCommand['source'], string> = {
   rule: 'Luật tự động',
   schedule: 'Lịch tưới',
   safety: 'Khóa an toàn',
+  timer: 'Hết giờ chạy',
 };
 
 /** "Bật 30 phút · Lịch tưới" / "Tắt · Khóa an toàn" */
@@ -541,12 +542,19 @@ export function describeCommand(command: Pick<IotCommand, 'action' | 'minutes' |
   return `${action} · ${COMMAND_SOURCES[command.source] ?? command.source}`;
 }
 
-/** "Có gói Nhà Nông tới 31/10/2027 · xem lượng mưa 365 ngày" / "Miễn phí · xem lượng mưa 30 ngày" */
 export const ROLE_LABELS: Record<IotRole, string> = {
   owner: 'Chủ trang trại',
   operator: 'Được bật / tắt máy',
   viewer: 'Chỉ xem',
 };
+
+/** Dòng mạch relay LoRaWAN máy chủ gửi lệnh được (khớp RelayCodec::PROFILES bên iot/) */
+export const LORAWAN_RELAY_PROFILES = ['dragino-lt22222'];
+
+/** Thiết bị gắn được máy bơm / quạt: mạch ESP32 (relay) hoặc mạch relay LoRaWAN */
+export function isController(device: Pick<IotDevice, 'kind' | 'profile'>): boolean {
+  return device.kind === 'esp32' || LORAWAN_RELAY_PROFILES.includes(device.profile ?? '');
+}
 
 /** Được sửa (thêm / xóa) hay chỉ xem / bật tắt */
 export function canManage(role: IotRole | undefined): boolean {
@@ -557,6 +565,7 @@ export function canControl(role: IotRole | undefined): boolean {
   return role !== 'viewer';
 }
 
+/** "Có gói Nhà Nông tới 31/10/2027 · xem lượng mưa 365 ngày" / "Miễn phí · xem lượng mưa 30 ngày" */
 export function planLabel(plan: IotPlan): string {
   const days = `xem lượng mưa ${plan.rain_history_days} ngày`;
   if (!plan.premium) return `Miễn phí · ${days}`;

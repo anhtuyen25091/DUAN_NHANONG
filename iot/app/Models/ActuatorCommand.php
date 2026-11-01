@@ -26,6 +26,9 @@ class ActuatorCommand extends Model
     /** Khóa an toàn tự tắt (VD nước mặn) */
     public const SOURCE_SAFETY = 'safety';
 
+    /** Máy chủ tắt khi hết giờ chạy (mạch LoRaWAN không tự đếm giờ) */
+    public const SOURCE_TIMER = 'timer';
+
     /**
      * @return array<string, string>
      */

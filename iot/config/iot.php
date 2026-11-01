@@ -65,6 +65,15 @@ return [
         'plan_cache_hours' => 6,
     ],
     // Điều khiển máy bơm / quạt oxy...: lệnh quá hạn mà mạch chưa lấy thì bỏ (không để máy tự chạy muộn)
+    // Gửi lệnh bật / tắt xuống thiết bị relay LoRaWAN (VD Dragino LT-22222-L)
+    // The Things Stack: không cần cấu hình, địa chỉ + khóa lấy từ header của bản tin gửi lên (bật "Downlink API key" trong webhook)
+    // ChirpStack v4: cần chirpstack-rest-api + API token
+    'lorawan' => [
+        'chirpstack_url' => env('CHIRPSTACK_API_URL'),
+        'chirpstack_token' => env('CHIRPSTACK_API_TOKEN'),
+        'downlink_fport' => (int) env('IOT_LORAWAN_DOWNLINK_FPORT', 2),
+    ],
+
     'control' => [
         'command_ttl_minutes' => 10,
         // Mạch điều khiển hỏi lệnh mới mỗi N giây (firmware đọc từ phản hồi)

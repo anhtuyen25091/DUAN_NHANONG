@@ -20,6 +20,6 @@ class DryNotifier
 
         $body = "Tổng mưa {$days} ngày qua ".number_format($totalMm, 1, ',', '.').' mm.'.($forecast ? " {$forecast}" : '').' Kiểm tra độ ẩm đất, cân nhắc tưới.';
 
-        return $this->client->send($tokens, "☀️ {$farm->name} đã {$days} ngày không mưa", $body, ['iotFarmId' => $farm->id]);
+        return $this->client->send($tokens, "☀️ {$farm->name} đã {$days} ngày không mưa", $body, ['iotFarmId' => $farm->id, 'iotFarmName' => $farm->name]);
     }
 }

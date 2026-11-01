@@ -88,6 +88,13 @@ Gửi lại cùng số đo thì được tính vào `duplicates`, không bị nh
 | `POST /device/commands/{id}/ack` | `{"ok": true, "states": "1:1,2:0"}` hoặc `{"ok": false, "message": "…"}` (báo lỗi về điện thoại) |
 | `POST /ingest` | Mạch có relay thì phản hồi kèm `commands` như trên |
 
+**Mạch relay LoRaWAN** (Dragino LT-22222-L, chọn dòng `dragino-lt22222` khi thêm thiết bị; kênh 1–2):
+- Bấm bật / tắt: máy chủ đẩy lệnh `03 aa bb` xuống (`01` đóng relay, `00` mở, `11` giữ nguyên) qua network server, cổng `IOT_LORAWAN_DOWNLINK_FPORT` (mặc định 2).
+  - The Things Stack: bật "Downlink API key" trong webhook. Bản tin gửi lên có header `X-Downlink-Push` / `X-Downlink-Apikey`, máy chủ tự lưu, không cần cấu hình gì thêm.
+  - ChirpStack v4: chạy `chirpstack-rest-api`, khai báo `CHIRPSTACK_API_URL` + `CHIRPSTACK_API_TOKEN`.
+- Mạch làm xong gửi lên `RO1_status` / `RO2_status` (decoder chuẩn của TTN / Dragino) thì lệnh mới tính là đã làm.
+- Mạch LoRaWAN không tự đếm giờ như ESP32: hết số phút thì `commands:expire` gửi lệnh tắt. Mất sóng lúc đó thì máy không tự tắt, nên với máy bơm quan trọng nên dùng mạch ESP32.
+
 **Không có Internet ở ruộng:**
 
 | | |
@@ -104,21 +111,25 @@ Số đo gửi bù cũ hơn 24 giờ chỉ được lưu lại, không bắn c�
 | | |
 |---|---|
 | `GET /metrics` | Danh mục chỉ số (không cần đăng nhập) |
-| `GET/POST /farms`, `PUT/DELETE /farms/{id}` | Trang trại |
+| `GET/POST /farms`, `PUT/DELETE /farms/{id}` | Trang trại (của mình và được chia sẻ; `role`: `owner` / `operator` / `viewer`) |
+| `GET/POST /farms/{id}/members` (`{"email": "…", "role": "operator\|viewer"}`), `PUT/DELETE /farm-members/{id}` | Chia sẻ trang trại cho người đã có tài khoản cảm biến. `operator` được bật / tắt máy + xử lý cảnh báo; `viewer` chỉ xem. Chỉ chủ được thêm / sửa / xóa; người được chia sẻ tự rời được (xóa chính mình). Mọi người đều nhận thông báo. |
 | `GET /farms/{id}/rainfall?days=30` | Lượng mưa từng ngày tại vị trí trang trại (`rain_mm`: dữ liệu thời tiết; `gauge_mm`: máy đo mưa nếu có). Miễn phí xem 30 ngày; tài khoản đã nối với tài khoản Nhà Nông có gói xem 365 ngày. |
 | `PUT /me/nhanong` (`{"token": "<token đăng nhập Nhà Nông>"}`), `DELETE /me/nhanong` | Nối / bỏ nối tài khoản Nhà Nông để dùng chung gói trả phí. App tự nối khi máy đăng nhập cả 2 tài khoản. `GET /me` có thêm `plan`. |
 | `GET /farms/{id}/weather` | Dự báo 7 ngày (Open-Meteo, lưu 1 giờ) + mưa 24 giờ tới + lưu ý (mưa lớn với ao, mưa với ruộng / vườn, nắng nóng ≥ 35°C, gió ≥ 10 m/s). Trang trại cần có `lat` / `lng`. |
 | `POST /farms/{id}/plots`, `PUT/DELETE /plots/{id}` | Lô / ruộng / ao (`field`, `garden`, `pond`, `greenhouse`, `other`) |
-| `GET /plots/{id}/summary` | Số đo mới nhất của lô, so với ngưỡng, kèm cảnh báo đang mở |
+| `GET /plots/{id}/summary` | Số đo mới nhất của lô, so với ngưỡng, kèm cảnh báo đang mở và `role` của người xem |
+| `GET /plots/{id}/export?days=30&format=xlsx\|csv` | Tải số đo thô của lô (tối đa 180 ngày, giờ Việt Nam). Mặc định file Excel thật, vì CSV mở bằng Excel máy tiếng Việt hay bị dồn 1 cột. |
 | `GET/POST /devices`, `GET/PUT/DELETE /devices/{id}` | Thiết bị. Tạo mới trả `api_key` (chỉ 1 lần) |
 | `POST /devices/{id}/rotate-key` | Tạo khóa mới |
-| `GET /device-profiles` | Dòng thiết bị LoRaWAN đã khai báo ánh xạ trường (để chọn khi thêm thiết bị) |
+| `GET /device-profiles` | Dòng thiết bị LoRaWAN đã khai báo ánh xạ trường + dòng mạch relay (để chọn khi thêm thiết bị) |
 | `GET /devices/{id}/latest` | Số đo mới nhất từng chỉ số |
 | `GET /devices/{id}/readings?metric=soil_ph&from=&to=&interval=raw\|hour\|day` | Lịch sử để vẽ biểu đồ |
 | `GET/POST /plots/{id}/thresholds`, `DELETE /thresholds/{id}` | Ngưỡng cảnh báo (`min` / `max`) |
+| `GET /crop-presets`, `POST /plots/{id}/apply-preset` (`{"preset": "sau-rieng"}`) | Gợi ý theo cây trồng (sầu riêng, cà phê vối, hồ tiêu): ngưỡng, lịch tưới, khóa an toàn, kèm nguồn tài liệu |
 | `GET /alerts?open=1`, `POST /alerts/{id}/resolve` | Cảnh báo |
-| `GET /plots/{id}/actuators`, `POST /devices/{id}/actuators`, `PUT/DELETE /actuators/{id}` | Thiết bị điều khiển (máy bơm, quạt oxy, van…) gắn vào kênh relay của mạch điều khiển ESP32 |
+| `GET /plots/{id}/actuators`, `POST /devices/{id}/actuators`, `PUT/DELETE /actuators/{id}` | Thiết bị điều khiển (máy bơm, quạt oxy, van…) gắn vào kênh relay của mạch ESP32 hoặc mạch relay LoRaWAN. Khóa an toàn: `block_device_id`, `block_metric`, `block_operator`, `block_value` (VD độ mặn nước nguồn > 0,3‰ thì không cho bơm, đang chạy thì tắt) |
 | `POST /actuators/{id}/command` (`{"action": "on", "minutes": 30}`), `GET /actuators/{id}/commands` | Bật / tắt bằng tay, lịch sử lệnh. Bật luôn có số phút (≤ `max_minutes`); lệnh mới thay lệnh cũ chưa làm; mạch không nhận trong 10 phút thì lệnh hủy (không tự chạy muộn) và báo về điện thoại |
+| `GET /plots/{id}/schedules`, `POST /actuators/{id}/schedules`, `PUT/DELETE /schedules/{id}` | Lịch tưới: `{"start_time": "05:30", "minutes": 40, "every_days": 20, "months": [12,1,2,3,4], "skip_rain_mm": 10}`. `months` null = cả năm; mưa từ `skip_rain_mm` (từ hôm qua tới giờ) thì bỏ lượt |
 | `GET/POST /plots/{id}/rules`, `PUT/DELETE /rules/{id}` | Luật tự động: `{"metric": "water_do", "operator": "below", "value": 4, "off_value": 5, "actuator_id": 1, "minutes": 60, "cooldown_minutes": 30}`. Chạy mỗi khi có số đo mới của lô; tự bật thì báo về điện thoại; chỉ tự tắt máy do chính luật đã bật (không tắt máy người dùng bật tay) |
 | `PUT /me/push-token`, `DELETE /me/push-token` | Expo push token của máy (`{"token": "ExponentPushToken[…]", "platform": "android"}`). Khi một chỉ số vừa vượt ngưỡng, máy nhận thông báo (kênh Android `iot-alerts`); vượt tiếp thì không báo lặp. |
 
@@ -134,5 +145,7 @@ Số đo gửi bù cũ hơn 24 giờ chỉ được lưu lại, không bắn c�
 | `iot:mqtt-listen` | Nghe MQTT. Chạy liên tục bằng supervisor. |
 | `iot:simulate` | Giả lập thiết bị |
 | `iot:simulate-controller <uid>` | Giả lập mạch điều khiển relay: nhận lệnh bật / tắt, tự tắt khi hết giờ (để thử app khi chưa có phần cứng) |
-| `commands:expire` | Mỗi phút: hủy lệnh bật / tắt quá 10 phút mà mạch chưa nhận, báo chủ trang trại |
+| `commands:expire` | Mỗi phút: hủy lệnh bật / tắt quá 10 phút mà mạch chưa nhận, báo chủ trang trại; gửi lệnh tắt cho máy LoRaWAN hết giờ chạy |
+| `schedules:run` | Mỗi phút: chạy lịch tưới tới giờ (bỏ lượt khi đã mưa đủ / ngoài mùa / khóa an toàn chặn) |
+| `weather:dry-spell` | 7:00 hằng ngày: nhắc trang trại đã N ngày liên tiếp không mưa (`dry_alert_days`) |
 | `admin:grant` | Cấp quyền vào `/admin` |

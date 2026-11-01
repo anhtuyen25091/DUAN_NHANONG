@@ -9,6 +9,7 @@ use App\Models\Device;
 use App\Models\Farm;
 use App\Models\FieldMap;
 use App\Models\Plot;
+use App\Services\LoRaWan\RelayCodec;
 use App\Support\LatestReadings;
 use App\Support\Ownership;
 use Illuminate\Http\JsonResponse;
@@ -46,7 +47,9 @@ class DeviceController extends Controller
         $profiles = FieldMap::query()->with('metric')->orderBy('profile')->get()->groupBy('profile')
             ->map(fn ($maps, string $profile) => ['code' => $profile, 'metrics' => $maps->sortBy('metric.sort')->pluck('metric.name')->unique()->values()])
             ->values()
-            ->prepend(['code' => 'generic', 'metrics' => []]);
+            ->prepend(['code' => 'generic', 'metrics' => []])
+            // Mạch relay LoRaWAN (bật / tắt máy bơm, quạt): không có chỉ số đo
+            ->merge(collect(RelayCodec::PROFILES)->map(fn (array $relay, string $code) => ['code' => $code, 'metrics' => ["Điều khiển {$relay['channels']} relay"]])->values());
 
         return response()->json(['data' => $profiles]);
     }
@@ -93,7 +96,7 @@ class DeviceController extends Controller
     private function validated(Request $request, ?Device $device = null): array
     {
         $farmIds = $request->user()->farms()->pluck('id');
-        $profiles = FieldMap::query()->distinct()->pluck('profile')->push('generic');
+        $profiles = FieldMap::query()->distinct()->pluck('profile')->push('generic')->merge(array_keys(RelayCodec::PROFILES));
 
         $data = $request->validate([
             'farm_id' => ['required', Rule::in($farmIds)],

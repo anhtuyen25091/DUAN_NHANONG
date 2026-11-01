@@ -1,4 +1,4 @@
-import { formatDecimal, parseDecimalInput, type IotActuator, type IotActuatorKind, type IotDevice } from '@nhanong/shared';
+import { formatDecimal, isController, parseDecimalInput, type IotActuator, type IotActuatorKind, type IotDevice } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text } from 'react-native';
@@ -27,7 +27,7 @@ export default function IotActuatorFormScreen() {
   const actuator = id ? actuators.find((a) => a.id === Number(id)) : undefined;
   const farmId = actuator ? devices.find((d) => d.id === actuator.device_id)?.farm_id : Number(farm);
   // Mạch điều khiển: thiết bị ESP32 cùng trang trại (ưu tiên mạch đặt ở lô này)
-  const controllers = devices.filter((d) => d.kind === 'esp32' && d.farm_id === farmId).sort((a, b) => Number(b.plot_id === Number(plot)) - Number(a.plot_id === Number(plot)));
+  const controllers = devices.filter((d) => isController(d) && d.farm_id === farmId).sort((a, b) => Number(b.plot_id === Number(plot)) - Number(a.plot_id === Number(plot)));
   return <ActuatorForm actuator={actuator} controllers={controllers} sensors={devices.filter((d) => d.farm_id === farmId)} plotId={plot ? Number(plot) : null} />;
 }
 
@@ -89,7 +89,7 @@ function ActuatorForm({ actuator, controllers, sensors, plotId }: { actuator?: I
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         <Stack.Screen options={{ title: 'Thêm thiết bị điều khiển' }} />
         <Card>
-          <Text style={styles.body}>Trang trại chưa có mạch ESP32 nào. Thêm thiết bị loại "WiFi / 4G (ESP32)" cho mạch relay trước, rồi quay lại đây.</Text>
+          <Text style={styles.body}>Trang trại chưa có mạch điều khiển nào. Thêm thiết bị loại "WiFi / 4G (ESP32)" (mạch relay), hoặc LoRaWAN dòng "dragino-lt22222", rồi quay lại đây.</Text>
         </Card>
       </ScrollView>
     );

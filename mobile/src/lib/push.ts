@@ -69,6 +69,7 @@ export type OpenedData =
       iotAlertId?: number;
       /** Cảm biến: trời bắt đầu mưa tại trang trại */
       iotFarmId?: number;
+      iotFarmName?: string;
     }
   | undefined;
 

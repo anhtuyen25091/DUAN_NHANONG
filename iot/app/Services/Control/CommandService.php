@@ -3,6 +3,8 @@
 namespace App\Services\Control;
 
 use App\Enums\CommandStatus;
+use App\Enums\DeviceKind;
+use App\Jobs\SendLoRaWanCommand;
 use App\Models\Actuator;
 use App\Models\ActuatorCommand;
 use App\Models\AutomationRule;
@@ -38,7 +40,7 @@ class CommandService
 
         $actuator->commands()->whereIn('status', [CommandStatus::Pending, CommandStatus::Sent])->update(['status' => CommandStatus::Replaced]);
 
-        return $actuator->commands()->create([
+        $command = $actuator->commands()->create([
             'action' => $action,
             'minutes' => $minutes,
             'source' => $source,
@@ -48,6 +50,13 @@ class CommandService
             'status' => CommandStatus::Pending,
             'expires_at' => now()->addMinutes(config('iot.control.command_ttl_minutes')),
         ]);
+
+        // Mạch LoRaWAN không tự hỏi lệnh: máy chủ đẩy xuống qua network server
+        if ($actuator->device->kind === DeviceKind::LoRaWan) {
+            SendLoRaWanCommand::dispatch($command->id)->afterCommit();
+        }
+
+        return $command;
     }
 
     /**
@@ -118,6 +127,49 @@ class CommandService
                 'auto_off_at' => $states[$actuator->channel] ? $actuator->auto_off_at : null,
             ])->save();
         }
+    }
+
+    /**
+     * Mạch LoRaWAN gửi lên trạng thái relay (sau khi làm lệnh hoặc định kỳ): lệnh đang chờ khớp trạng thái thì thành "đã làm".
+     *
+     * @param  array<int, bool>  $states  kênh => đang bật
+     */
+    public function confirmStates(Device $device, array $states): void
+    {
+        $open = ActuatorCommand::query()->with('actuator')
+            ->whereIn('actuator_id', $device->actuators()->select('id'))
+            ->where('status', CommandStatus::Sent)
+            ->get();
+        foreach ($open as $command) {
+            $state = $states[$command->actuator->channel] ?? null;
+            if ($state !== null && $state === ($command->action === ActuatorCommand::ON)) {
+                $this->acknowledge($command, true);
+            }
+        }
+
+        $this->syncStates($device->load('actuators'), $states);
+    }
+
+    /**
+     * Mạch LoRaWAN không tự đếm giờ như ESP32: hết giờ chạy thì máy chủ gửi lệnh tắt.
+     *
+     * @return int số lệnh tắt đã gửi
+     */
+    public function autoOff(): int
+    {
+        $due = Actuator::query()
+            ->with('device')
+            ->where('is_on', true)
+            ->where('auto_off_at', '<=', now())
+            ->whereHas('device', fn ($query) => $query->where('kind', DeviceKind::LoRaWan))
+            ->whereDoesntHave('commands', fn ($query) => $query->whereIn('status', [CommandStatus::Pending, CommandStatus::Sent]))
+            ->get();
+
+        foreach ($due as $actuator) {
+            $this->issue($actuator, ActuatorCommand::OFF, null, ActuatorCommand::SOURCE_TIMER, reason: 'Hết giờ chạy, máy chủ gửi lệnh tắt');
+        }
+
+        return $due->count();
     }
 
     /**

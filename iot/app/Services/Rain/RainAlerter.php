@@ -65,6 +65,6 @@ class RainAlerter
             $body = "Khoảng {$number($mm * 4)} mm/giờ theo dữ liệu thời tiết tại vị trí vườn (ước tính, có thể lệch với mưa thực tế).";
         }
 
-        $this->push->send($tokens, "🌧️ {$place} đang mưa", $body, ['iotFarmId' => $farm->id]);
+        $this->push->send($tokens, "🌧️ {$place} đang mưa", $body, ['iotFarmId' => $farm->id, 'iotFarmName' => $farm->name]);
     }
 }

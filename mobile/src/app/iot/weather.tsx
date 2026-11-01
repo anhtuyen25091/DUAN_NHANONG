@@ -13,7 +13,7 @@ export default function IotWeatherScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16 }} refreshControl={<RefreshControl refreshing={weather.refreshing} onRefresh={weather.reload} />}>
-      <Stack.Screen options={{ title: `🌦️ Thời tiết · ${name ?? ''}` }} />
+      <Stack.Screen options={{ title: name ? `🌦️ Thời tiết · ${name}` : '🌦️ Thời tiết' }} />
       <Status state={weather.state} retry={weather.reload} />
       {weather.state.status === 'error' && <RainHistory farmId={Number(farm)} />}
       {weather.state.status === 'ok' && (

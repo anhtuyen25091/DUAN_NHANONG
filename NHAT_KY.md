@@ -11,6 +11,28 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 01/11/2026 (tiếp 7): Bật / tắt máy qua mạch relay LoRaWAN, tài liệu API
+
+**Đã làm**
+- **Mạch relay LoRaWAN** (Dragino LT-22222-L, 2 relay), cho ruộng / ao không có WiFi / 4G:
+  - bấm bật / tắt (tay, luật tự động, lịch tưới, khóa an toàn) → máy chủ đẩy lệnh xuống qua The Things Stack hoặc ChirpStack v4
+  - mã lệnh lấy theo tài liệu Dragino: `03 aa bb` (`01` đóng relay, `00` mở, `11` giữ nguyên); không dùng lệnh hẹn giờ `05` vì tài liệu chưa rõ 1 byte
+  - The Things Stack: không cần cấu hình, địa chỉ + khóa đẩy lệnh tự lấy từ header của bản tin gửi lên (lưu mã hóa)
+  - mạch gửi lên `RO1_status` / `RO2_status` → lệnh thành "đã làm", app thấy máy đang chạy
+  - hết giờ chạy: máy chủ gửi lệnh tắt (nguồn lệnh mới "Hết giờ chạy"); không gửi được thì lệnh báo lỗi về điện thoại, không thử lại ngầm
+  - khi thêm máy bơm: mạch LoRaWAN phải là dòng relay đã hỗ trợ, kênh 1–2
+- Thông báo mưa / lâu ngày không mưa gửi kèm tên trang trại: mở từ thông báo thấy đúng tiêu đề "🌦️ Thời tiết · …".
+- README `iot/`: bổ sung API còn thiếu (chia sẻ, tải Excel, gợi ý theo cây, lịch tưới, khóa an toàn, relay LoRaWAN) và lệnh `schedules:run`, `weather:dry-spell`.
+
+**Kiểm tra**
+- iot 75/75 (thêm 4 test LoRaWAN: The Things Stack từ bật → xác nhận → tự tắt, ChirpStack, chưa có đường gửi thì báo lỗi, chặn thiết bị không phải relay); thư viện chung 142/142; app + web typecheck sạch, web build sạch.
+
+**Còn tồn**
+- Chưa thử với mạch LT-22222-L thật và network server thật (đúng cổng FPort, decoder trả `RO1_status`).
+- Mạch LoRaWAN mất sóng đúng lúc hết giờ thì máy không tự tắt (khác ESP32 tự đếm giờ): README đã ghi, máy bơm quan trọng nên dùng ESP32.
+
+---
+
 ## 01/11/2026 (tiếp 6): Chia sẻ trang trại cho nhiều người + tải số liệu ra Excel
 
 **Đã làm**

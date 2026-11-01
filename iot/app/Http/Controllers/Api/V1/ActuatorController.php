@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\ActuatorKind;
+use App\Enums\DeviceKind;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ActuatorResource;
 use App\Http\Resources\CommandResource;
@@ -13,6 +14,7 @@ use App\Models\Metric;
 use App\Models\Plot;
 use App\Services\Control\BlockedCommandException;
 use App\Services\Control\CommandService;
+use App\Services\LoRaWan\RelayCodec;
 use App\Support\Ownership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -113,6 +115,12 @@ class ActuatorController extends Controller
             $data['block_value'] = null;
         }
         unset($data['block_metric']);
+
+        // LoRaWAN: chỉ mạch relay đã hỗ trợ mã lệnh (VD Dragino LT-22222-L: kênh 1–2)
+        if ($device->kind === DeviceKind::LoRaWan) {
+            abort_unless(RelayCodec::supports($device->profile), 422, 'Thiết bị LoRaWAN này không điều khiển được. Chọn dòng mạch relay (VD Dragino LT-22222-L) khi thêm thiết bị.');
+            abort_if($data['channel'] > RelayCodec::PROFILES[$device->profile]['channels'], 422, 'Mạch này chỉ có '.RelayCodec::PROFILES[$device->profile]['channels'].' relay.');
+        }
 
         if (($data['plot_id'] ?? null) !== null) {
             abort_unless(Plot::query()->whereKey($data['plot_id'])->value('farm_id') === $device->farm_id, 422, 'Lô không thuộc trang trại của mạch điều khiển.');
