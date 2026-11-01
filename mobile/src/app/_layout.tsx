@@ -8,12 +8,17 @@ import { startDealWatch } from '../lib/dealWatch';
 import { startPurchaseOutbox } from '../lib/outbox';
 import { getAuth, subscribeAuth } from '../lib/auth';
 import { openLedger } from '../lib/ledger';
+import { syncIotPush } from '../lib/iot';
 import { onNotificationOpened, registerPush, type OpenedData } from '../lib/push';
 import { colors } from '../lib/theme';
 
 function openFromNotification(data: OpenedData) {
   // Thông báo nhắc hạn trả nợ: mở khoản nợ
-  if (data?.dealId) {
+  if (data?.iotFarmId) {
+    router.push({ pathname: '/iot/weather', params: { farm: String(data.iotFarmId) } });
+  } else if (data?.iotPlotId) {
+    router.push({ pathname: '/iot/plot/[id]', params: { id: String(data.iotPlotId) } });
+  } else if (data?.dealId) {
     router.push({ pathname: '/deals/[id]', params: { id: data.dealId } });
   } else if (data?.offerId) {
     router.push({ pathname: '/offers/[id]', params: { id: data.offerId } });
@@ -36,7 +41,10 @@ export default function RootLayout() {
   useEffect(() => {
     // Token có thể đổi: cập nhật mỗi lần mở app, không hỏi quyền (chỉ hỏi khi người dùng đặt cảnh báo).
     // Máy không hỗ trợ (web, Expo Go trên Android) thì registerPush / onNotificationOpened không làm gì.
-    registerPush(false).catch(() => {});
+    // Đã đăng nhập tài khoản cảm biến: gửi token cho máy chủ cảm biến để nhận cảnh báo vượt ngưỡng
+    registerPush(false)
+      .then(syncIotPush)
+      .catch(() => {});
     // Đăng nhập / đăng xuất: gửi lại để máy gắn với (hoặc gỡ khỏi) tài khoản
     let lastToken = getAuth()?.token ?? null;
     const unsubscribeAuth = subscribeAuth(() => {
@@ -75,6 +83,7 @@ export default function RootLayout() {
         <Stack.Screen name="account" options={{ title: 'Tài khoản' }} />
         <Stack.Screen name="forgot-password" options={{ title: 'Quên mật khẩu' }} />
         <Stack.Screen name="local-prices" options={{ title: '📍 Giá quanh tôi' }} />
+        <Stack.Screen name="iot/index" options={{ title: '📡 Cảm biến ruộng · ao' }} />
         <Stack.Screen name="buyer" options={{ title: '🏪 Điểm mua đăng giá' }} />
         <Stack.Screen name="shop/new" options={{ title: 'Thêm điểm' }} />
         <Stack.Screen name="shop/remove" options={{ title: 'Xin gỡ điểm' }} />

@@ -1,0 +1,7 @@
+# Thiết bị chỉ được gửi lên nhanong/<mã>/up, không đọc được dữ liệu thiết bị khác
+user nhanong-device
+topic write nhanong/+/up
+
+# Máy chủ đọc mọi số đo
+user nhanong-server
+topic read nhanong/+/up

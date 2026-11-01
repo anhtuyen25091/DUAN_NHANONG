@@ -1,0 +1,24 @@
+{
+  "deduplicationId": "3ac7e3c4-4401-4b8d-9386-a5c902f9202d",
+  "time": "2026-10-28T07:15:00.000+00:00",
+  "deviceInfo": {
+    "tenantName": "Nha Nong",
+    "applicationName": "nong-nghiep",
+    "deviceProfileName": "Dragino SE01-LB",
+    "deviceName": "dat-lo-3",
+    "devEui": "a84041000181c27a"
+  },
+  "devAddr": "01f2c3a4",
+  "dr": 3,
+  "fPort": 2,
+  "data": "DUAAAAPXCRAAAAEMAA==",
+  "object": {
+    "Bat": 3.61,
+    "TempC_DS18B20": "0.00",
+    "water_SOIL": 38.42,
+    "temp_SOIL": 27.31,
+    "conduct_SOIL": 412,
+    "Mod": 0
+  },
+  "rxInfo": [{"gatewayId": "a840411f4a7c4150", "rssi": -97, "snr": 7.5}]
+}

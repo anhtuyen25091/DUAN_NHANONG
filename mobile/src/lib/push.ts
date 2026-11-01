@@ -9,6 +9,15 @@ export type NotificationsModule = typeof import('expo-notifications');
 export const ALERT_CHANNEL = 'price-alerts';
 /** Kênh cho thông báo đơn mua bán / phiếu (backend PushNotifier::CHANNEL) */
 export const UPDATES_CHANNEL = 'updates';
+/** Kênh cho cảnh báo cảm biến ruộng / ao (iot ExpoPushClient::CHANNEL) */
+export const IOT_CHANNEL = 'iot-alerts';
+
+let lastPushToken: string | null = null;
+
+/** Expo push token lấy được ở lần registerPush gần nhất (để gửi cả cho máy chủ cảm biến) */
+export function getLastPushToken(): string | null {
+  return lastPushToken;
+}
 
 /**
  * Lý do máy này không dùng được thông báo đẩy (null = dùng được).
@@ -55,6 +64,11 @@ export type OpenedData =
       business?: string;
       /** Chào bán: lô hàng mới gần mình / có người trả giá / được chọn giá */
       offerId?: string;
+      /** Cảm biến: số đo của lô vượt ngưỡng */
+      iotPlotId?: number;
+      iotAlertId?: number;
+      /** Cảm biến: trời bắt đầu mưa tại trang trại */
+      iotFarmId?: number;
     }
   | undefined;
 
@@ -92,6 +106,11 @@ export async function registerPush(askPermission: boolean): Promise<PushResult> 
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
     });
+    await Notifications.setNotificationChannelAsync(IOT_CHANNEL, {
+      name: 'Cảnh báo cảm biến ruộng / ao',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 400, 200, 400],
+    });
   }
 
   if (!Device.isDevice) return { ok: false, reason: 'Cần chạy trên điện thoại thật để nhận thông báo.' };
@@ -109,6 +128,7 @@ export async function registerPush(askPermission: boolean): Promise<PushResult> 
 
   try {
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+    lastPushToken = token;
     // Kèm token đăng nhập: máy gắn với tài khoản để nhận thông báo đơn / phiếu cả khi app đóng
     await api.updateDevice(token, Platform.OS === 'ios' ? 'ios' : 'android', getAuth()?.token ?? null);
     return { ok: true };

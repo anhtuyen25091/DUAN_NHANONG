@@ -7,6 +7,7 @@ import { Card, Change, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { colors, font, primaryShadow, radius } from '../../lib/theme';
 import { toggleFollow, useFollowed } from '../../lib/followed';
+import { useIotAuth } from '../../lib/iot';
 import { useMyLocation } from '../../lib/myLocation';
 import { useAsync } from '../../lib/useAsync';
 
@@ -43,6 +44,7 @@ export default function PriceBoardScreen() {
         </Text>
       </View>
       <LocalBanner />
+      <IotBanner />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {TYPES.map((t) => (
           <Chip key={t} label={CATEGORY_TYPE_LABELS[t]} active={t === type} onPress={() => setType(t)} />
@@ -117,6 +119,22 @@ function LocalBanner() {
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text }}>📍 Giá quanh tôi</Text>
           <Text style={styles.muted}>{location ? describeLocation(location) : 'Chọn khu vực để xem giá các điểm mua gần bạn'}</Text>
+        </View>
+        <Text style={{ fontSize: 22, color: colors.primary }}>›</Text>
+      </Card>
+    </Pressable>
+  );
+}
+
+/** Lối vào "Cảm biến ruộng · ao": số đo do thiết bị IoT gửi về */
+function IotBanner() {
+  const auth = useIotAuth();
+  return (
+    <Pressable onPress={() => router.push('/iot')} accessibilityRole="button">
+      <Card style={{ marginBottom: 0, borderLeftWidth: 6, borderLeftColor: colors.star, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text }}>📡 Cảm biến ruộng · ao</Text>
+          <Text style={styles.muted}>{auth ? 'Xem độ ẩm, pH, độ mặn, mực nước… mới nhất' : 'Theo dõi ruộng, ao bằng thiết bị đo'}</Text>
         </View>
         <Text style={{ fontSize: 22, color: colors.primary }}>›</Text>
       </Card>

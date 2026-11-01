@@ -8,6 +8,7 @@
 | `web/` | React + Vite (sẽ làm thành PWA) |
 | `mobile/` | React Native (Expo) cho Android và iOS |
 | `packages/shared/` | Code TypeScript dùng chung: kiểu dữ liệu, định dạng tiền, logic đồng bộ |
+| `iot/` | Dự án riêng: API nhận dữ liệu thiết bị IoT nông nghiệp (cảm biến đất, nước, thời tiết), firmware ESP32 mẫu. Xem `iot/README.md` |
 
 Kế hoạch chi tiết: xem file kế hoạch dự án (`text.html` là yêu cầu gốc).
 

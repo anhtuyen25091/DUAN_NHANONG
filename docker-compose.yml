@@ -1,4 +1,4 @@
-# Môi trường dev: MySQL + Redis. Backend chạy trực tiếp bằng `composer run dev` trong ./backend
+# Môi trường dev: MySQL + Redis (+ Mosquitto cho iot/). Backend chạy trực tiếp bằng `composer run dev` trong ./backend và ./iot
 services:
   mysql:
     image: mysql:8.4
@@ -14,6 +14,8 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      # Tạo thêm database nhanong_iot cho dự án iot/
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
       interval: 5s
@@ -27,6 +29,17 @@ services:
     volumes:
       - redis_data:/data
 
+  # MQTT cho thiết bị IoT (dự án iot/, lệnh php artisan iot:mqtt-listen)
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+
 volumes:
   mysql_data:
   redis_data:
+  mosquitto_data:

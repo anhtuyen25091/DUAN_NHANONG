@@ -11,6 +11,326 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 01/11/2026 (tiếp): Chạy crawler giá + kích hoạt gói năm cho tài khoản thử
+
+- `crawl:run` lúc 11:07:
+  - Có giá: cà phê vietbao (4), sầu riêng thcl (9), phân bón sỉ Vinacam (12; nguồn vẫn ghi ngày cập nhật 23/10).
+  - Không có bài: hồ tiêu và lúa gạo vietbao (giá mới nhất 24/10 và 25/10), baohatinh (chưa từng lấy được).
+- Chạy bù `--date=2026-10-31`: chỉ Vinacam có giá. Ngày 29/10 và 31/10 thiếu giá cà phê / sầu riêng, vì lịch tự động không bật trên máy.
+- Nguồn dự phòng baoquocte / congthuong (giá mới nhất 27/10) và agro-gov (21/10) không chạy trong `crawl:run` hằng ngày.
+- Kích hoạt **Gói năm** cho `0900000099` (giống nút "Kích hoạt gói" trên admin), hạn tới 31/10/2027. Tài khoản cảm biến đã nối nhận gói ngay: xem lượng mưa 365 ngày (Vườn Cư Bao: khoảng 1.718 mm, 214 ngày có mưa).
+
+---
+
+## 01/11/2026: Báo "vườn đang mưa" + lưu lượng mưa từng ngày (miễn phí 30 ngày, có gói Nhà Nông 1 năm)
+
+**Yêu cầu:** đặt 1 vườn ở 12°50'22.3"N 108°15'26.1"E (R7Q4+RV5 Cư Bao, Đắk Lắk). Trời mưa ở đó thì báo chủ vườn. Ghi lượng mưa từng ngày: tài khoản miễn phí xem 30 ngày gần nhất, có trả phí xem 1 năm.
+Đã chốt với người dùng:
+- dùng chung gói trả phí của app Nhà Nông
+- báo mưa theo dữ liệu thời tiết, cộng thêm máy đo mưa nếu vườn có lắp
+
+**Đã làm**
+- **Vườn thử:** trang trại "Vườn Cư Bao" (Đắk Lắk, 12.83953, 108.25725) gồm lô "Vườn A" (loại vườn), thuộc tài khoản cảm biến `tuyen.tran@gody.vn`.
+- **Lưu lượng mưa từng ngày** (`farm_rain_daily`, `RainHistory`, lệnh `weather:sync-rain` mỗi giờ, job `SyncFarmRain`):
+  - Trang trại vừa có / đổi vị trí thì tự lấy 1 năm.
+  - Ngày đã qua lấy từ API lưu trữ Open-Meteo; hôm nay cộng các giờ đã qua; ngày API lưu trữ chưa có thì lấy từ API dự báo, chỉ khi đủ 24 giờ.
+  - **Lỗi đã bắt được khi chạy thật:** API dự báo trả `null` cho các giờ cũ, bản đầu coi là 0 mm nên tháng 8/2026 ra "0 mm". Đã sửa: không coi `null` là 0, ngày thiếu số liệu thì để trống.
+- **API `GET /farms/{id}/rainfall?days=`:**
+  - Mỗi ngày gồm `rain_mm` (dữ liệu thời tiết) và `gauge_mm` (máy đo mưa, lấy tổng từ bảng gộp theo giờ); kèm tổng và số ngày có mưa.
+  - Giới hạn theo gói: miễn phí 30 ngày, có gói 365 ngày; xin quá giới hạn thì `locked: true`.
+- **Nối tài khoản Nhà Nông** (`NhanongPlan`, `PUT` / `DELETE /me/nhanong`):
+  - Máy chủ cảm biến hỏi backend `GET /api/v1/user` bằng token Nhà Nông (lưu mã hóa) để biết `tier` / `premium_until`.
+  - Hỏi lại sau mỗi 6 giờ; backend không trả lời thì giữ kết quả cũ; token bị thu hồi thì về miễn phí.
+  - 1 tài khoản Nhà Nông chỉ nối với 1 tài khoản cảm biến.
+  - App tự nối khi máy đăng nhập cả 2 tài khoản (mỗi lần mở mục Cảm biến).
+  - **Lỗi đã bắt được khi chạy thật:** bản đầu gọi `/api/v1/me`, nhưng backend dùng `/api/v1/user`. Đã sửa; backend lỗi thì trả 503 kèm lời báo dễ hiểu.
+- **Báo "đang mưa"** (`RainAlerter`):
+  - Lệnh `weather:rain-watch` chạy 15 phút / lần, lấy mưa 15 phút gần nhất tại vị trí (gọi gộp 50 trang trại / lần).
+  - Mưa ≥ 0,1 mm thì coi là bắt đầu mưa và báo "🌧️ Vườn Cư Bao đang mưa – khoảng X mm/giờ…".
+  - Mỗi cơn chỉ báo 1 lần, 2 lần báo cách nhau ≥ 3 giờ; tạnh 1 giờ mới hết cơn.
+  - Máy đo mưa (chỉ số `rainfall`) ghi nhận mưa thì báo ngay: "🌧️ Vườn A (Vườn Cư Bao) đang mưa – Máy đo mưa … ghi nhận X mm lúc HH:mm".
+  - Tắt được theo từng trang trại; bấm thông báo thì mở màn thời tiết của vườn.
+- **App:**
+  - màn Thời tiết có thêm "🌧️ Lượng mưa tại vườn": chọn 7 / 30 / 90 ngày / 1 năm, tổng, số ngày có mưa, biểu đồ cột (1 năm thì gộp theo tuần), thông báo khóa kèm nút "Xem gói Nhà Nông"
+  - thẻ thời tiết hiện "🌧️ Đang mưa từ HH:mm"
+  - form trang trại có nút "Báo khi trời bắt đầu mưa"
+
+**Kiểm tra**
+- `iot`: 50 test qua (thêm `RainTest`: lấy 1 năm, giới hạn theo gói, nối tài khoản, báo 1 lần mỗi cơn, hết cơn sau 1 giờ tạnh, tắt báo, máy đo mưa). `packages/shared`: test qua. Typecheck mobile không lỗi.
+- Dữ liệu thật Vườn Cư Bao (11/2025 → 10/2026), hợp với khí hậu Đắk Lắk:
+  - mùa khô tháng 1–4: 12–52 mm / tháng
+  - mùa mưa: tháng 8 khoảng 260 mm, tháng 9 khoảng 399 mm
+- Nối thật `0900000099` (gói miễn phí) với tài khoản cảm biến: xem 30 ngày (111,9 mm, 23/30 ngày mưa); bấm "1 năm" thì hiện khóa (đã chụp màn hình).
+
+**Còn tồn**
+- Chưa thấy tận mắt thông báo "đang mưa" trên điện thoại: cần bản build có thông báo đẩy và lúc trời mưa thật.
+- Dữ liệu thời tiết là ước tính theo ô lưới khoảng vài km, có thể sót mưa cục bộ. Muốn chính xác thì lắp máy đo mưa.
+- Chưa có tài khoản Nhà Nông có gói để thử xem 1 năm trên giao diện. Muốn thử thì kích hoạt gói cho `0900000099` trong `/admin` (backend) › Tài khoản.
+- Màn thời tiết mở từ thông báo chưa có tên trang trại trên tiêu đề.
+- Chưa commit.
+
+---
+
+## 31/10/2026: IoT: nông dân tự quản lý trong app, báo thiết bị mất kết nối / yếu pin, dự báo thời tiết
+
+**Đã làm** (mục 1–3 và 10 trong danh sách việc còn thiếu của phần IoT)
+1. **Tự thêm / sửa / xóa trang trại, lô, thiết bị trong app** (trước đây chỉ làm được trên trang quản trị).
+   - Trang trại: chọn tỉnh (lấy tọa độ trung tâm tỉnh) hoặc lấy GPS khi đứng tại trang trại.
+   - Lô: tên, loại (ruộng / vườn / ao / nhà màng), cây trồng hoặc con nuôi, diện tích.
+   - Thiết bị:
+     - ESP32: lưu xong hiện ngay `DEVICE_UID` + `DEVICE_KEY` (chỉ 1 lần), có nút gửi cho người lắp đặt; có nút "Tạo khóa mới".
+     - LoRaWAN: nhập DevEUI (tự bỏ dấu `:` / `-`) và chọn dòng thiết bị.
+   - API mới `GET /device-profiles`.
+2. **Đặt ngưỡng cảnh báo trong app** (màn "⚙️ Ngưỡng cảnh báo" của lô).
+   - Gợi ý chỉ số theo loại lô: ao → nước; ruộng → nước + đất.
+   - Nhập số kiểu "7,5"; để trống một bên được.
+3. **Báo thiết bị mất kết nối / sắp hết pin.**
+   - Lệnh `devices:check-health`, chạy 30 phút/lần.
+   - Mất kết nối: không gửi số đo quá 24 giờ. Sắp hết pin: dưới 20%.
+   - Mỗi sự cố báo 1 lần. Cột `offline_notified_at` / `low_battery_notified_at` tự xóa khi thiết bị gửi lại, hoặc pin lên ≥ 30%.
+   - Lời báo khác nhau cho ESP32 và LoRaWAN; bấm thông báo thì mở đúng lô.
+10. **Dự báo thời tiết.**
+    - `WeatherService` gọi Open-Meteo (miễn phí, không cần khóa), lưu cache 1 giờ; API `GET /farms/{id}/weather`.
+    - Dự báo 7 ngày (biểu tượng, nhiệt độ, mưa, khả năng mưa, gió) + mưa 24 giờ tới.
+    - Lưu ý tự động:
+      - mưa ≥ 20 mm và có ao: pH / độ mặn giảm
+      - mưa ≥ 10 mm và có ruộng / vườn: hoãn tưới, bón, phun thuốc
+      - nắng ≥ 35°C
+      - gió ≥ 10 m/s: tránh phun thuốc
+    - App: thẻ thời tiết dưới tên từng trang trại; bấm vào xem 7 ngày.
+- `packages/shared/src/iot.ts`: thêm hàm gọi API, `parseDecimalInput`, `normalizeDevEui`, `weatherDayLabel`.
+
+**Kiểm tra**
+- `iot`: 43 test qua, thêm `DeviceHealthTest`, `WeatherApiTest`. `packages/shared`: 133 test qua. Typecheck mobile và build web không lỗi.
+- Gọi Open-Meteo thật cho "Trang trại thử" (Cà Mau, đã gắn tọa độ 9.1769, 105.1524): ra 7 ngày dông / mưa, 24–31°C.
+- Expo web + Chrome headless: chụp đủ các màn hình (danh sách có thẻ thời tiết, 7 ngày, sửa trang trại, lô có nút ngưỡng / sửa / thêm thiết bị, form lô, form thiết bị ESP32 và LoRaWAN, ngưỡng).
+  - Bấm thật qua giao diện: tạo thiết bị → hiện màn khóa → dùng khóa đó gửi `/ingest` được (1 số đo).
+  - Sau đó đã xóa thiết bị thử.
+- `devices:check-health` trên MySQL: 3 thiết bị thử (im lặng từ 29–30/10) được đánh dấu mất kết nối; không gửi thông báo vì tài khoản chưa có token điện thoại.
+
+**Còn tồn**
+- Thông báo đẩy (vượt ngưỡng, mất kết nối, yếu pin) vẫn chưa thử trên điện thoại thật.
+- Lấy GPS trong form trang trại mới thử trên trình duyệt; cần thử trên điện thoại.
+- Các mục còn lại trong danh sách việc của IoT:
+  - 4–7: tải số liệu Excel / CSV, chia sẻ trang trại cho nhiều người, mục cảm biến trên web, nối tài khoản Nhà Nông
+  - 8–9: điều khiển máy bơm / quạt oxy, tự động hóa
+  - 11–17: báo qua SMS / Zalo, firmware TLS / OTA / cấu hình từ xa, LoRaWAN gửi lệnh xuống, quản lý người dùng trên admin IoT, tài liệu API
+- Android cần `expo-build-properties` để lấy dữ liệu từ thiết bị qua WiFi (chờ quyết định).
+- Chưa commit.
+
+---
+
+## 30/10/2026 (cuối ngày): Chạy thử toàn bộ rồi tắt, để test sau
+
+**Đã làm**
+- Chạy lại cả 4 phần và mở thử từng link (đều trả về 200):
+  - backend `:8000`
+  - iot `:8001`, kèm `queue:work`
+  - web `:5180` (cổng 5173 đang bị dự án sale-admin-laravel dùng)
+  - app trên trình duyệt `:8082`
+- Tạo tài khoản admin `tuyen.tran@gody.vn` cho backend giá (`:8000/admin`). Tài khoản cùng email ở iot (`:8001/admin` + mục 📡 Cảm biến trong app) đã có từ trước.
+  - Mật khẩu không ghi vào file này (file được commit); đặt lại bằng lệnh bên dưới.
+  - Các tài khoản thử cũ (`admin@nhanong.local`, `0900000001`…) giữ nguyên.
+- Đã tắt hết server (các cổng 8000 / 8001 / 5180 / 8082 / 1883 không còn chạy).
+
+**Chạy lại để test**
+
+```bash
+# MySQL + Redis: DBngin (cổng 3306 / 6379). IP Wi-Fi lúc ghi: 192.168.2.25
+cd backend && php artisan serve --host=0.0.0.0 --port=8000            # giá: http://localhost:8000/admin
+cd iot && php artisan serve --host=0.0.0.0 --port=8001                # cảm biến: http://localhost:8001/admin
+cd iot && php artisan queue:work                                      # xét ngưỡng + thông báo đẩy
+cd web && npx vite --host 0.0.0.0 --port 5180 --strictPort            # http://localhost:5180
+cd mobile && CI=1 EXPO_PUBLIC_API_URL=http://localhost:8000 EXPO_PUBLIC_IOT_URL=http://localhost:8001 \
+  npx expo start --web --port 8082 --max-workers 1                    # app trên trình duyệt: http://localhost:8082
+
+# Thêm số đo giả cho trang trại thử (mã thiết bị xem ở /admin > Thiết bị)
+cd iot && php artisan iot:simulate <mã thiết bị> --hours=24 --offline=6 && php artisan readings:rollup
+
+# Đặt lại mật khẩu admin (máy dev)
+cd backend && php artisan tinker --execute 'App\Models\User::where("email","tuyen.tran@gody.vn")->first()->update(["password" => "mat-khau-moi"]);'
+cd iot     && php artisan tinker --execute 'App\Models\User::where("email","tuyen.tran@gody.vn")->first()->update(["password" => "mat-khau-moi"]);'
+```
+
+**Việc test sau**
+1. `:8000/admin`: đăng nhập admin mới, xem giá crawler hôm nay (hồ tiêu / lúa gạo vietbao đang thiếu giá từ 24–25/10).
+2. `:8082` › 📡 Cảm biến ruộng · ao: đăng nhập tài khoản cảm biến, xem 2 lô, biểu đồ, bấm "Đã xử lý" một cảnh báo.
+3. `:8001/admin`:
+   - Thiết bị: biểu đồ 7 ngày; thử "Tạo khóa mới"
+   - Ngưỡng: đổi ngưỡng, chạy `iot:simulate` lại, xem cảnh báo mở / tự đóng
+4. Khi có Docker / Mosquitto thật: thử `iot:mqtt-listen` (cả giao bù bản tin khi khởi động lại).
+5. Khi có mạch + điện thoại thật:
+   - nạp firmware, thử lấy dữ liệu qua WiFi của thiết bị
+   - thử SMS
+   - thử thông báo đẩy (cần quyết thêm `expo-build-properties` cho Android)
+
+---
+
+## 30/10/2026 (tiếp): IoT: MQTT, firmware biên dịch được, SMS, thông báo đẩy, màn hình trong app
+
+**Đã làm**
+- **MQTT chạy thật.** Brew không dựng được Mosquitto trên macOS 12, nên dùng broker Python `amqtt` (trong thư mục tạm) để thử. Sửa 2 lỗi của `iot:mqtt-listen`:
+  - bật cùng lúc "tự kết nối lại" và "clean session" là lỗi; giờ dùng phiên bền với mã client cố định `IOT_MQTT_CLIENT_ID`
+  - đang nói giao thức MQTT 3.1 cũ; giờ dùng 3.1.1
+- **Firmware biên dịch được** (PlatformIO cài trong `~/.platformio-venv`).
+  - Bản mặc định quá 1,25 MB vùng chương trình, nên thêm `partitions.csv`: 1,5 MB chương trình + 2,4 MB LittleFS (bỏ OTA). Hàng đợi nâng lên 2 MB.
+  - Cả bản HTTP lẫn bản MQTT + SMS đều biên dịch được.
+- **SMS trong firmware** (SIM800L, `USE_SMS`): không có WiFi thì cứ 6 giờ gửi số đo mới nhất. Máy chủ nhận thêm dạng gọn `@<t>;metric=value;…` để vừa 1 tin 160 ký tự.
+- Firmware gửi tài khoản MQTT (`MQTT_USERNAME` / `MQTT_PASSWORD`).
+- **Thông báo đẩy khi vượt ngưỡng** (`iot/`):
+  - bảng `push_tokens`; API `PUT` / `DELETE /me/push-token`
+  - `ExpoPushClient` (giống backend, kênh `iot-alerts`), `AlertNotifier` chỉ báo lúc mở cảnh báo
+  - test chặn mọi HTTP thật (`Http::preventStrayRequests`)
+- **App mobile, mục "📡 Cảm biến ruộng · ao"** (lối vào ở trang chủ):
+  - đăng nhập tài khoản cảm biến (lưu riêng)
+  - danh sách lô, ô số đo so ngưỡng (đỏ khi vượt), thiết bị (trực tuyến / pin / lần gửi cuối)
+  - biểu đồ 24 giờ / 7 ngày / 30 ngày có vạch ngưỡng
+  - cảnh báo kèm nút "Đã xử lý"
+  - bấm thông báo thì mở đúng lô
+  - **Lấy dữ liệu từ thiết bị**: app tải `http://192.168.4.1/data.csv`, lưu trên máy, có mạng thì tự gửi `/ingest/upload`
+- `packages/shared/src/iot.ts`: kiểu dữ liệu, `createIotApi`, `parseDeviceFile`, định dạng số kiểu Việt Nam không dùng Intl.
+- `iot/deploy/`: mẫu supervisor (queue + MQTT), Mosquitto chạy thật (mật khẩu, TLS 8883, ACL).
+- `mobile/app.json`: thêm mô tả quyền mạng nội bộ cho iOS.
+
+**Kiểm tra**
+- `iot`: 36 test qua. `packages/shared`: 130 test qua. Typecheck mobile và build web không lỗi.
+- MQTT với amqtt:
+  - bản tin đúng: lưu 3 số đo, cập nhật firmware / pin, cảnh báo độ mặn tự đóng
+  - bản tin sai khóa và bản tin không phải JSON: bị bỏ qua, có ghi log
+- Expo web + Chrome headless (đăng nhập sẵn): chụp trang chủ, danh sách lô, lô ruộng, lô ao, biểu đồ DO có vạch ngưỡng, màn hình lấy dữ liệu. Tất cả hiện đúng dữ liệu MySQL.
+
+**Còn tồn**
+- **Chưa xác nhận được việc giao bù bản tin MQTT** khi `iot:mqtt-listen` khởi động lại: amqtt không giao, cần thử với Mosquitto thật (Docker hoặc máy chủ).
+- **App lấy dữ liệu từ thiết bị (HTTP tới 192.168.4.1):**
+  - Android bản build chạy thật chặn HTTP không mã hóa; cần `usesCleartextTraffic` (thêm gói `expo-build-properties`, phải hỏi trước khi thêm).
+  - Android có thể vẫn đi qua 4G khi WiFi không có Internet, nên hướng dẫn đang bảo tắt 4G.
+  - Chưa thử trên điện thoại thật và mạch thật.
+- Thông báo đẩy chưa thử trên máy thật (cần bản build có EAS projectId).
+- Firmware chưa hỗ trợ HTTPS / MQTT TLS (chưa nạp chứng chỉ). Chưa thử trên mạch thật.
+- Web (`web/`) chưa có mục cảm biến.
+- Chưa commit.
+
+---
+
+## 30/10/2026: Chạy crawler giá; chạy `iot/` trên MySQL thật
+
+**Crawler giá** (`php artisan crawl:run`, 8:52):
+- Có giá mới: cà phê vietbao (5 giá), phân bón sỉ Vinacam (12 giá, nhưng vẫn là giá ngày 23/10), sầu riêng thcl (9 giá).
+- Không tìm thấy bài, kể cả khi chạy lại cho ngày 29/10:
+  - hồ tiêu vietbao: giá mới nhất 24/10
+  - lúa gạo vietbao: giá mới nhất 25/10
+  - baohatinh: chưa từng lấy được
+- Ngày 29/10 không có giá nào vì lịch tự động (`schedule:work`) không bật trên máy.
+
+**IoT: chạy trên MySQL của máy** (MySQL chạy sẵn, không qua Docker, `root` không mật khẩu)
+- Tạo database `nhanong_iot`; `iot/.env` đổi sang `DB_USERNAME=root`, `DB_PASSWORD=` (`.env.example` vẫn giữ user `nhanong` theo docker-compose); chạy `migrate --seed`.
+- Dữ liệu thử:
+  - tài khoản admin `tuyen.tran@gody.vn`
+  - "Trang trại thử" gồm "Ruộng lúa – tôm 1" (ngưỡng độ mặn ≤ 4‰) và "Ao tôm 1" (pH 7,5–8,5, DO ≥ 4)
+  - 3 thiết bị: 2 ESP32, 1 LoRaWAN; giả lập 72 giờ, có 8 giờ mất mạng
+- **Sửa lỗi:** `Metric::byCode()` lưu cả đối tượng model vào Redis. Laravel 13 không cho unserialize đối tượng từ cache (`cache.serializable_classes`), nên mọi lần nhận số đo đều lỗi. Test không thấy vì dùng cache `array`. Giờ cache chỉ giữ mảng thuộc tính rồi `hydrate` lại. Thêm `MetricCacheTest` (dùng cache file, đã thử: code cũ thì test hỏng, code mới thì qua).
+
+**Kiểm tra**
+- 31 test qua.
+- Trên MySQL đã gọi thật:
+  - login, farms, `plots/{id}/summary`
+  - `readings` cả 3 kiểu `raw` / `hour` / `day`
+  - alerts: cảnh báo DO ban đêm tự đóng khi DO lên lại; độ mặn 4,6‰ mở cảnh báo
+  - `readings:rollup --all`: 897 giờ
+  - trang `/admin/login` trả 200
+
+**Còn tồn (IoT)**
+- MQTT: máy chưa có Mosquitto, Docker đang tắt.
+- Firmware chưa biên dịch (chưa có PlatformIO).
+- Chưa có màn hình IoT trong app, chưa gửi thông báo đẩy khi có cảnh báo.
+- Firmware chưa gửi SMS.
+- Cấu hình chạy thật (supervisor, TLS cho Mosquitto, secret).
+- Chưa commit.
+
+---
+
+## 29/10/2026: Dự án mới `iot/`: API kết nối thiết bị IoT nông nghiệp (đang làm)
+
+**Mục tiêu:** nhận số đo từ cảm biến nông nghiệp (đất: độ ẩm / nhiệt độ / EC / pH / NPK; nước: mực nước / pH / oxy hòa tan / độ mặn / ORP; thời tiết) để nông dân tra cứu số đo và nhận cảnh báo khi vượt ngưỡng. Dự án độc lập với `backend/`; app Nhà Nông sẽ gọi API này sau.
+
+**Đã chốt**
+- Laravel 13 riêng (PHP 8.4, Filament 5, Sanctum), cùng quy ước với `backend/`.
+- Chạy độc lập: có tài khoản riêng (email + mật khẩu), app Nhà Nông gọi qua token.
+- Thiết bị nên dùng (xem `iot/docs/THIET_BI.md`):
+  - cảm biến RS485/Modbus giá rẻ + mạch ESP32 tự lắp
+  - hoặc cảm biến LoRaWAN mua sẵn (Dragino, Milesight, SenseCAP) + gateway
+
+**Đã làm**
+- Bảng dữ liệu:
+  - `farms`, `plots` (ruộng / vườn / ao / nhà màng)
+  - `devices`: mã `uid` in trên thiết bị; khóa lưu mã hóa + sha256; `dev_eui` cho LoRaWAN; `profile` là dòng thiết bị
+  - `metrics`: 21 chỉ số, có khoảng hợp lệ
+  - `field_maps`: tên trường decoder LoRaWAN → chỉ số
+  - `readings`: khóa duy nhất (thiết bị, chỉ số, giờ đo)
+  - `reading_hourly`, `thresholds`, `alerts`
+- `ReadingIngestor`: cửa duy nhất ghi số đo.
+  - Lưu theo giờ đo trên thiết bị.
+  - Loại từng dòng sai: `unknown_metric`, `invalid_value`, `out_of_range`, `invalid_time`, `too_old` (quá 90 ngày), `future_time`.
+  - Gửi trùng thì bỏ qua.
+  - Số đo gửi bù cũ hơn 24 giờ chỉ được lưu, không bắn cảnh báo.
+- Job `EvaluateThresholds`:
+  - mỗi ngưỡng chỉ có 1 cảnh báo đang mở
+  - tự đóng khi số đo về lại trong ngưỡng
+  - bỏ qua số đo gửi bù cũ hơn số đã có
+- API `/api/v1` (danh sách đầy đủ trong `iot/README.md`):
+  - Thiết bị: `POST /ingest`, `POST /ingest/compact` (CSV `t,metric,value`), `GET /device/time`
+  - Khi không có Internet:
+    - `POST /ingest/upload`: file điện thoại tải từ thiết bị, có chữ ký HMAC
+    - `POST /sms/inbound`
+    - `POST /lorawan/chirpstack`, `POST /lorawan/ttn`
+  - Người dùng: auth, farms, plots, `plots/{id}/summary`, devices (+ `rotate-key`, `latest`, `readings?interval=raw|hour|day`), thresholds, alerts
+- Lệnh:
+  - `iot:mqtt-listen`: nghe topic `nhanong/<uid>/up`
+  - `iot:simulate`: có `--offline` để giả lập mất mạng rồi gửi bù, `--lorawan` để đi qua webhook
+  - `readings:rollup`: 15 phút/lần, tính lại cả những giờ có dữ liệu gửi bù
+  - `readings:prune`: xóa số đo thô quá 180 ngày
+  - `admin:grant`
+- Trang `/admin`:
+  - quản lý trang trại, lô, thiết bị (tạo khóa, hiện 1 lần), chỉ số, ánh xạ trường, ngưỡng, cảnh báo
+  - trang thiết bị có biểu đồ 7 ngày
+  - trang chủ có thống kê và danh sách thiết bị mất kết nối
+- Firmware mẫu `iot/firmware/esp32-modbus` (PlatformIO):
+  - đọc Modbus (cảm biến đất 7-trong-1), siêu âm AJ-SR04M đo mực nước, đo pin
+  - hàng đợi `/queue.csv` trên LittleFS, gửi bù theo lô 200 dòng
+  - giữ giờ bằng DS3231 + NTP
+  - ngủ sâu giữa 2 lần đo
+  - bấm nút BOOT thì phát WiFi `NHANONG-<uid>` để điện thoại tải file có chữ ký
+  - tùy chọn gửi qua MQTT
+- `docker-compose.yml`: thêm Mosquitto và script tạo database `nhanong_iot` (`docker/`). `iot/` dùng Redis database 2 và 3.
+
+**Kiểm tra**
+- `cd iot && php artisan test`: 30 test qua.
+- Pint không báo lỗi.
+- Đã chạy thử đầu-cuối bằng SQLite tạm và `php -S`:
+  - giả lập 24 giờ, có 6 giờ mất mạng rồi gửi bù 144 số đo
+  - `/ingest` loại đúng giá trị pH 22
+  - upload file có chữ ký: lần 2 báo trùng
+  - `summary` có cảnh báo độ mặn mở
+  - gọi API chưa đăng nhập trả 401
+
+**Còn tồn**
+- Firmware chưa biên dịch lần nào (máy chưa có PlatformIO). Phải chạy `pio run` và sửa lỗi nếu có.
+- Chưa chạy với MySQL + Mosquitto thật (Docker đang tắt). `iot:mqtt-listen` chưa chạy lần nào.
+- Volume MySQL đã có từ trước nên phải tạo database `nhanong_iot` bằng tay (lệnh trong `iot/README.md`).
+- Tên trường decoder LoRaWAN (Dragino / Milesight / SenseCAP) lấy theo tài liệu. Cần đối chiếu với bản tin thật. Riêng EM500-SWL chưa rõ decoder trả cm hay mét.
+- Firmware chưa có gửi SMS (máy chủ đã nhận được).
+- Dòng số đo không có giờ (thiết bị chưa từng chỉnh đồng hồ) sẽ bị máy chủ lấy giờ nhận.
+- Chưa commit.
+
+**Tiếp theo**
+- Bật Docker, `migrate --seed` trên MySQL, thử `iot:mqtt-listen` bằng `mosquitto_pub`.
+- Cài PlatformIO, biên dịch firmware, thử với mạch thật và cảm biến 7-trong-1.
+- App Nhà Nông: màn hình xem lô / thiết bị / biểu đồ; nút gửi file dữ liệu tải từ thiết bị (`/ingest/upload`).
+- Gửi thông báo đẩy khi có cảnh báo (hiện mới xem được qua API và trang admin).
+- Chạy thật: tắt `allow_anonymous` trên Mosquitto, bật TLS.
+
+---
+
 ## 18/10/2026: Dọn ảnh hóa đơn thừa (trên máy và máy chủ) ✅
 
 **Vấn đề:** xóa khoản thu chi hoặc thay ảnh khác thì ảnh cũ vẫn nằm lại trên máy và trên máy chủ. Trước đây chỉ khi xóa cả sổ trên mạng thì ảnh mới bị xóa.
@@ -1704,6 +2024,9 @@ cd backend && php artisan serve --host=0.0.0.0 --port=8000
 
 # 3. Web (cổng 5180)
 cd web && npx vite --host 0.0.0.0 --port 5180 --strictPort
+
+# 3b. Cảm biến IoT (cổng 8001, database nhanong_iot)
+cd iot && php artisan serve --host=0.0.0.0 --port=8001 & php artisan queue:work
 
 # 4. App cho điện thoại (Expo Go), ép dùng IP Wi-Fi vì máy có 2 mạng
 cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.13 npx expo start --go --lan --port 8081 --max-workers 1 --clear

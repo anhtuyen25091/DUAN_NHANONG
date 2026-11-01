@@ -1,0 +1,19 @@
+{
+  "end_device_ids": {
+    "device_id": "em500-smtc-ao-1",
+    "application_ids": {"application_id": "nha-nong"},
+    "dev_eui": "24E124126B316403"
+  },
+  "received_at": "2026-10-28T07:15:02.112Z",
+  "uplink_message": {
+    "f_port": 85,
+    "frm_payload": "AXVcA2fIAARoXAV/MgE=",
+    "decoded_payload": {
+      "battery": 92,
+      "temperature": 26.4,
+      "moisture": 46,
+      "conductivity": 306
+    },
+    "received_at": "2026-10-28T07:15:01.981Z"
+  }
+}
