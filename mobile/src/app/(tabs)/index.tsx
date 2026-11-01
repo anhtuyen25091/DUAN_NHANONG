@@ -1,4 +1,4 @@
-import { CATEGORY_TYPE_LABELS, describeLocation, formatNumber, formatPriceRange, groupByProduct, matchesSearch, pinFollowed, relativeDay, summarizeProduct, type CategoryType, type PriceRow } from '@nhanong/shared';
+import { CATEGORY_TYPE_LABELS, describeLocation, formatNumber, formatPriceRange, groupByProduct, matchesSearch, pinFollowed, priceUnit, relativeDay, summarizeProduct, type CategoryType, type PriceRow } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
@@ -175,7 +175,7 @@ function ProductCard({ product, rows, followed, expandAll, onOpen }: { product: 
       <Pressable onPress={() => onOpen()}>
         <Text style={{ color: colors.text }}>
           <Text style={{ fontSize: 28, fontWeight: '800' }}>{s.min === s.max ? formatNumber(s.max) : `${formatNumber(s.min)} – ${formatNumber(s.max)}`}</Text>
-          <Text style={{ fontSize: font.body, color: colors.muted, fontWeight: '600' }}> đ/{unit}</Text>
+          <Text style={{ fontSize: font.body, color: colors.muted, fontWeight: '600' }}> {priceUnit(unit)}</Text>
         </Text>
       </Pressable>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 2 }}>

@@ -32,6 +32,14 @@ export function PriceBoard({ query }: { query: URLSearchParams }) {
         <p>{groups.length > 0 ? `${groups.length} mặt hàng · cập nhật mỗi ngày` : 'Cập nhật mỗi ngày từ nguồn tin cậy'}</p>
       </section>
       <LocalBanner />
+      <a className="card local-banner" href={href('cam-bien')} style={{ borderLeftColor: '#e8a10c' }}>
+        <span>
+          <b>📡 Cảm biến ruộng · ao</b>
+          <br />
+          <span className="small muted">Số đo độ ẩm, pH, mực nước…, điều khiển máy bơm, dự báo thời tiết và lượng mưa tại vườn</span>
+        </span>
+        <span aria-hidden>›</span>
+      </a>
       <nav className="tabs" aria-label="Nhóm hàng">
         {TYPES.map((t) => (
           <button key={t} type="button" className={t === type ? 'active' : ''} aria-pressed={t === type} onClick={() => setFilter({ type: t })}>

@@ -52,7 +52,20 @@ class PriceExtractionTest extends TestCase
         // "tăng 200 đồng/kg ... ở mốc 93.200 đồng/kg": bỏ mức tăng, lấy giá
         $this->assertSame([93200, 93200, 93200, 'kg'], $prices['ca-phe-robusta|gia-lai']);
         $this->assertSame([92500, 92500, 92500, 'kg'], $prices['ca-phe-robusta|lam-dong']);
-        $this->assertCount(5, $prices);
+        // Giá sàn London trong cùng bài ("Arabica ... 292 US cent/lb" xem test dưới)
+        $this->assertSame([3496, 3496, 3496, 'USD/tấn'], $prices['ca-phe-robusta-london|the-gioi']);
+        $this->assertSame([292, 292, 292, 'cent/lb'], $prices['ca-phe-arabica-new-york|the-gioi']);
+        $this->assertCount(7, $prices);
+    }
+
+    public function test_coffee_article_carries_world_exchange_prices(): void
+    {
+        $prices = $this->parse('vietbao-ca-phe', 'vietbao-ca-phe-2026-11-01.html');
+
+        // "Robusta ... sàn London có giá bán đang là 3.219 USD/tấn", "Arabica ... sàn New York ... 287.20 cent/lb" (làm tròn)
+        $this->assertSame([3219, 3219, 3219, 'USD/tấn'], $prices['ca-phe-robusta-london|the-gioi']);
+        $this->assertSame([287, 287, 287, 'cent/lb'], $prices['ca-phe-arabica-new-york|the-gioi']);
+        $this->assertSame([87000, 87000, 87000, 'kg'], $prices['ca-phe-robusta|dak-lak']);
     }
 
     public function test_rice_tables_use_preceding_text_to_tell_paddy_from_rice(): void

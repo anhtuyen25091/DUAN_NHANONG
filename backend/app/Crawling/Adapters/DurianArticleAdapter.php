@@ -19,11 +19,12 @@ use Dom\HTMLDocument;
  *   Dòng nhắc nhiều vùng lớn cùng lúc (câu mở bài "tại các khu vực ĐBSCL, Đông Nam Bộ, Tây Nguyên") thì bỏ vùng đang nhớ.
  *   Giá của tỉnh được lưu cho tỉnh (nếu có trong danh mục khu vực) và cho vùng lớn chứa tỉnh (lần xuất hiện đầu tiên).
  * - Giống: tên mặt hàng (alias "Ri6", "Thái" …) gần nhất; giống khác (Musang King, Chuồng Bò …) thì bỏ qua.
- * - Loại: CHỈ lấy loại A ("loại A", "loại 1", "Ri6 A"); bỏ VIP, loại B/C/2/3, hàng dạt/lỗi/kem, lột múi, xô.
- *   Loại A là mức báo nào cũng ghi và ổn định nhất qua các năm.
+ * - Loại: lấy loại A ("loại A", "loại 1", "Ri6 A"); loại B ("loại B", "loại 2") lưu vào mặt hàng riêng theo cấu hình grade_b
+ *   (chỉ các giống báo hay ghi: Ri6, Thái). Bỏ VIP, loại C/3, hàng dạt/lỗi/kem, lột múi, xô.
  *
  * Cấu hình thêm (ngoài các khóa của SitemapArticleAdapter: sitemap_url, url_pattern, content_selector, categories, price_range):
- * - other_varieties: tên các giống không lưu, vd ["Musang King", "Chuồng Bò"]
+ * - other_varieties: tên các giống không lưu, vd ["Sáu Hữu", "Dona"]
+ * - grade_b: {"mã mặt hàng loại A": "mã mặt hàng loại B"}, vd {"sau-rieng-thai": "sau-rieng-thai-b"}
  * - macro_regions: {"mã vùng lớn": ["mã tỉnh", …]}, vd {"tay-nguyen": ["dak-lak", "gia-lai"]}
  */
 class DurianArticleAdapter extends SitemapArticleAdapter
@@ -32,6 +33,9 @@ class DurianArticleAdapter extends SitemapArticleAdapter
 
     /** Loại A: "loại A", "loại 1", hoặc chữ "A" ngay sau tên giống ("Ri6 A"); không tính "A-B", "1-2" */
     private const GRADE_A = '/(?:(?<![a-z0-9])loai\s+(?:a|1)|^\s*a)(?![a-z0-9])(?!\s*-\s*[a-d0-9])/';
+
+    /** Loại B: "loại B", "loại 2"; không tính "B-C", "2-3" */
+    private const GRADE_B = '/(?<![a-z0-9])loai\s+(?:b|2)(?![a-z0-9])(?!\s*-\s*[a-d0-9])/';
 
     /** Đứng giữa tên giống và "loại A" thì không phải hàng loại A thông thường */
     private const NOT_REGULAR = '/(?<![a-z])(?:vip|hang loi|loi|dat|kem|lot mui|mui|xo|chin|cap dong)(?![a-z])/';
@@ -62,6 +66,13 @@ class DurianArticleAdapter extends SitemapArticleAdapter
         $regions = Region::query()->orderBy('id')->get(['id', 'code', 'name', 'province', 'aliases']);
         $regionMatcher = new AliasMatcher($regions->mapWithKeys(fn (Region $region): array => [$region->id => ['aliases' => [$region->name, ...($region->aliases ?? [])]]])->all());
         $macroOf = $this->macroRegions($source, $regions);
+        $codes = Product::query()->pluck('id', 'code');
+        $gradeBOf = [];
+        foreach ((array) $source->configValue('grade_b', []) as $gradeA => $gradeB) {
+            if (isset($codes[$gradeA], $codes[$gradeB])) {
+                $gradeBOf[$codes[$gradeA]] = $codes[$gradeB];
+            }
+        }
 
         [$minPrice, $maxPrice] = $source->configValue('price_range') ?? [0, PHP_INT_MAX];
         $prices = [];
@@ -100,12 +111,17 @@ class DurianArticleAdapter extends SitemapArticleAdapter
                 if ($productId === null || $productId < 0 || ($macro === null && $province === null)) {
                     continue;
                 }
-                $price = $this->gradeAPrice($segment);
-                if ($price === null || $price[2] < $minPrice || $price[2] > $maxPrice) {
-                    continue;
+                $found = [$productId => $this->gradePrice($segment, self::GRADE_A)];
+                if (isset($gradeBOf[$productId])) {
+                    $found[$gradeBOf[$productId]] = $this->gradePrice($segment, self::GRADE_B);
                 }
-                foreach (array_filter([$province, $macro]) as $regionId) {
-                    $prices[$productId.'|'.$regionId] ??= new PriceRow($productId, $regionId, $price[0], $price[1], $price[2], 'kg');
+                foreach ($found as $id => $price) {
+                    if ($price === null || $price[2] < $minPrice || $price[2] > $maxPrice) {
+                        continue;
+                    }
+                    foreach (array_filter([$province, $macro]) as $regionId) {
+                        $prices[$id.'|'.$regionId] ??= new PriceRow($id, $regionId, $price[0], $price[1], $price[2], 'kg');
+                    }
                 }
             }
         }
@@ -140,13 +156,13 @@ class DurianArticleAdapter extends SitemapArticleAdapter
     }
 
     /**
-     * Giá loại A đầu tiên trong đoạn: [min, max, avg] hoặc null.
+     * Giá đầu tiên của loại (GRADE_A / GRADE_B) trong đoạn: [min, max, avg] hoặc null.
      *
      * @return array{0: int, 1: int, 2: int}|null
      */
-    private function gradeAPrice(string $segment): ?array
+    private function gradePrice(string $segment, string $gradePattern): ?array
     {
-        if (! preg_match(self::GRADE_A, $segment, $grade, PREG_OFFSET_CAPTURE)) {
+        if (! preg_match($gradePattern, $segment, $grade, PREG_OFFSET_CAPTURE)) {
             return null;
         }
         // "Thái đống" (hàng gom đống) đứng ngay sau tên giống; không lẫn với "đồng bằng" ở chỗ khác

@@ -93,7 +93,7 @@ class NewsArchiveBackfillTest extends TestCase
         $this->assertSame(['lua-dai-thom-8' => 7900, 'gao-ir-504' => 10700], $this->riceAvg(html: $html));
     }
 
-    public function test_durian_tables_by_region_keep_grade_a_only(): void
+    public function test_durian_tables_by_region_keep_grades_a_and_b(): void
     {
         $prices = $this->durian('thcl-sau-rieng-2025-06-27.html');
 
@@ -105,21 +105,34 @@ class NewsArchiveBackfillTest extends TestCase
         $this->assertSame([80000, 82000], $prices['sau-rieng-thai|dong-nai']);
         $this->assertSame([40000, 42000], $prices['sau-rieng-ri6|tay-nguyen']);
         $this->assertSame([78000, 80000], $prices['sau-rieng-thai|dak-lak']);
-        $this->assertCount(14, $prices);
+        // "Loại 2" là loại B; bỏ loại VIP và loại 3
+        $this->assertSame([55000, 58000], $prices['sau-rieng-thai-b|dbscl']);
+        $this->assertSame([60000, 62000], $prices['sau-rieng-thai-b|dong-nai']);
+        $this->assertSame([28000, 28000], $prices['sau-rieng-ri6-b|dak-lak']);
+        // Bảng "Sầu riêng Musang King: Loại A 115.000 - 120.000"
+        $this->assertSame([115000, 120000], $prices['sau-rieng-musang-king|dbscl']);
+        $this->assertCount(29, $prices);
     }
 
     public function test_durian_sentences_in_other_layouts(): void
     {
-        // "Ri6 A ở mức …", "Thái A có giá …"; bỏ "Thái đống loại A"
+        // "Ri6 A ở mức …", "Thái A có giá …, loại B có giá từ 54.000 - 57.000"; bỏ "Thái đống loại A" và "Xô A-B"
         $this->assertSame([
             'sau-rieng-ri6|dbscl' => [62000, 65000],
             'sau-rieng-thai|dbscl' => [74000, 77000],
+            'sau-rieng-thai-b|dbscl' => [54000, 57000],
+            'sau-rieng-chuong-bo|dbscl' => [50000, 55000],
         ], $this->durian('thcl-sau-rieng-2025-02-14.html'));
 
         // Mục "Đối với sầu Thái:" / "Đối với sầu riêng Ri6:": bỏ "Thái VIP loại A", lấy "Thái mẫu thường loại A"
+        // Loại B của Thái mẫu thường / Ri6; Musang King, Chuồng Bò; bỏ Sáu Hữu và loại C-D
         $this->assertSame([
             'sau-rieng-thai|dbscl' => [162000, 165000],
+            'sau-rieng-thai-b|dbscl' => [140000, 142000],
             'sau-rieng-ri6|dbscl' => [100000, 108000],
+            'sau-rieng-ri6-b|dbscl' => [85000, 93000],
+            'sau-rieng-musang-king|dbscl' => [130000, 135000],
+            'sau-rieng-chuong-bo|dbscl' => [85000, 90000],
         ], $this->durian('thcl-sau-rieng-2026-03-05.html'));
 
         $prices = $this->durian('thcl-sau-rieng-2026-10-15.html');
@@ -128,6 +141,27 @@ class NewsArchiveBackfillTest extends TestCase
         // Tỉnh đầu tiên của Tây Nguyên trong bài là Đắk Lắk; bỏ "hàng lỗi"
         $this->assertSame([88000, 95000], $prices['sau-rieng-thai|tay-nguyen']);
         $this->assertSame([35000, 35000], $prices['sau-rieng-ri6|gia-lai']);
+    }
+
+    public function test_durian_grade_b_and_premium_varieties(): void
+    {
+        $prices = $this->durian('thcl-sau-rieng-2026-11-01.html');
+
+        // ĐBSCL: "Sầu Thái loại A 94.000 - 96.000, loại B 74.000 – 76.000, loại C 38.000"; Ri6 A 82-84, B 67-69
+        $this->assertSame([94000, 96000], $prices['sau-rieng-thai|dbscl']);
+        $this->assertSame([74000, 76000], $prices['sau-rieng-thai-b|dbscl']);
+        $this->assertSame([82000, 84000], $prices['sau-rieng-ri6|dbscl']);
+        $this->assertSame([67000, 69000], $prices['sau-rieng-ri6-b|dbscl']);
+        // Đắk Lắk: "loại B kg dao động 74.000 - 78.000"
+        $this->assertSame([74000, 78000], $prices['sau-rieng-thai-b|dak-lak']);
+        // Lâm Đồng: bỏ "Sầu Thái hàng lỗi loại A 72.000", lấy Thái loại A thường; các giống cao cấp
+        $this->assertSame([80000, 82000], $prices['sau-rieng-thai|lam-dong']);
+        $this->assertSame([150000, 150000], $prices['sau-rieng-musang-king|lam-dong']);
+        $this->assertSame([155000, 155000], $prices['sau-rieng-black-thorn|lam-dong']);
+        $this->assertSame([70000, 70000], $prices['sau-rieng-chuong-bo|lam-dong']);
+        // Không có giá loại C / hàng dạt / hàng kém
+        $this->assertSame([], array_filter(array_keys($prices), fn (string $key): bool => ! str_starts_with($key, 'sau-rieng-')));
+        $this->assertCount(24, $prices);
     }
 
     public function test_durian_articles_are_found_on_tag_pages_and_dated_by_listing(): void
@@ -147,7 +181,7 @@ class NewsArchiveBackfillTest extends TestCase
         ]);
 
         $this->artisan('crawl:backfill', ['sources' => ['thcl-sau-rieng'], '--from' => '2025-06', '--to' => '2025-06'])
-            ->expectsOutputToContain('1 bài,   0 đã có, lưu   14 giá, 0 lỗi')
+            ->expectsOutputToContain('1 bài,   0 đã có, lưu   29 giá, 0 lỗi')
             ->assertSuccessful();
 
         // Ngày giá lấy theo datePublished (JSON-LD) của bài

@@ -1,4 +1,4 @@
-import { formatDate, formatNumber, type HistoryPoint } from '@nhanong/shared'
+import { formatDate, formatNumber, priceUnit, type HistoryPoint } from '@nhanong/shared'
 import { useState } from 'react'
 
 // Khung nhỏ để chữ trên trục gần cỡ thật khi xem trên điện thoại
@@ -23,7 +23,7 @@ export function PriceChart({ points, unit, interval = 'day' }: { points: History
   if (points.length === 1)
     return (
       <p className="muted center">
-        Mới có giá {interval === 'day' ? `ngày ${formatDate(points[0].date)}` : pointLabel(points[0].date, interval)}: <strong>{formatNumber(points[0].avg)} đ/{unit}</strong>. Biểu đồ sẽ hiện khi có thêm
+        Mới có giá {interval === 'day' ? `ngày ${formatDate(points[0].date)}` : pointLabel(points[0].date, interval)}: <strong>{formatNumber(points[0].avg)} {priceUnit(unit)}</strong>. Biểu đồ sẽ hiện khi có thêm
         ngày.
       </p>
     )
@@ -64,7 +64,7 @@ export function PriceChart({ points, unit, interval = 'day' }: { points: History
       <div className="chart-readout" aria-live="polite">
         {current ? (
           <>
-            <strong>{pointLabel(current.date, interval)}</strong>: {formatNumber(current.avg)} đ/{unit}
+            <strong>{pointLabel(current.date, interval)}</strong>: {formatNumber(current.avg)} {priceUnit(unit)}
             {current.min !== current.max && (
               <span className="muted">
                 {' '}

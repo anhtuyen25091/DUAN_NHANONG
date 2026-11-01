@@ -2766,3 +2766,30 @@ a.card:hover {
     display: none !important;
   }
 }
+
+/* Cảm biến: ô số đo */
+.iot-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.iot-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: inherit;
+  text-decoration: none;
+  margin: 0;
+}
+
+.iot-tile.bad {
+  border: 2px solid #c0262d;
+  background: #fdeadf;
+}
+
+.iot-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+}

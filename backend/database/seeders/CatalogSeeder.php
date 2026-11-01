@@ -39,6 +39,9 @@ class CatalogSeeder extends Seeder
         $products = [
             ['ca-phe', 'ca-phe-robusta', 'Cà phê nhân xô (Robusta)', 'kg', ['cà phê nhân xô', 'cà phê']],
             ['ho-tieu', 'ho-tieu', 'Hồ tiêu đen', 'kg', ['hồ tiêu']],
+            // Giá sàn thế giới (kỳ hạn gần nhất) trong bản tin cà phê; không có alias để không lẫn với giá trong nước
+            ['ca-phe', 'ca-phe-robusta-london', 'Robusta sàn London (kỳ hạn gần nhất)', 'USD/tấn', []],
+            ['ca-phe', 'ca-phe-arabica-new-york', 'Arabica sàn New York (kỳ hạn gần nhất)', 'cent/lb', []],
 
             ['lua', 'lua-ds1', 'Lúa DS1 (tươi)', 'kg', ['DS1'], self::LUA_CONTEXT],
             ['lua', 'lua-om-18', 'Lúa OM 18 (tươi)', 'kg', ['OM 18'], self::LUA_CONTEXT],
@@ -82,10 +85,16 @@ class CatalogSeeder extends Seeder
             ['phan-bon-si', 'si-kali-jordan-mieng', 'Kali Jordan miểng', 'kg', []],
             ['phan-bon-si', 'si-sa-nhat-bot-vang', 'SA Nhật bột vàng', 'kg', []],
 
-            // Sầu riêng: chỉ lưu giá loại A (báo gọi "loại A" hoặc "loại 1", agro.gov.vn gọi "Ri6 đẹp") là mức hay được
-            // báo giá nhất; bỏ VIP, loại B/C, hàng dạt/lỗi/kem (xem App\Crawling\Adapters\DurianArticleAdapter)
+            // Sầu riêng: giá loại A (báo gọi "loại A" hoặc "loại 1", agro.gov.vn gọi "Ri6 đẹp") và loại B của Ri6 / Thái;
+            // bỏ VIP, loại C, hàng dạt/lỗi/kem (xem App\Crawling\Adapters\DurianArticleAdapter).
+            // Mặt hàng loại B không có alias: adapter lấy giá loại B ngay sau tên giống (cấu hình grade_b của nguồn).
             ['sau-rieng', 'sau-rieng-ri6', 'Sầu riêng Ri6 (loại A)', 'kg', ['Ri6', 'Ri 6', 'sầu riêng Ri6', 'Sầu riêng Ri6 đẹp']],
             ['sau-rieng', 'sau-rieng-thai', 'Sầu riêng Thái - Monthong (loại A)', 'kg', ['Thái', 'sầu Thái', 'sầu riêng Thái', 'Monthong', 'Mon Thong']],
+            ['sau-rieng', 'sau-rieng-ri6-b', 'Sầu riêng Ri6 (loại B)', 'kg', []],
+            ['sau-rieng', 'sau-rieng-thai-b', 'Sầu riêng Thái - Monthong (loại B)', 'kg', []],
+            ['sau-rieng', 'sau-rieng-musang-king', 'Sầu riêng Musang King (loại A)', 'kg', ['Musang King', 'Musang']],
+            ['sau-rieng', 'sau-rieng-black-thorn', 'Sầu riêng Black Thorn (loại A)', 'kg', ['Black Thorn', 'Gai đen']],
+            ['sau-rieng', 'sau-rieng-chuong-bo', 'Sầu riêng Chuồng Bò (loại A)', 'kg', ['Chuồng Bò']],
 
             // Chanh dây: chưa có nguồn đăng giá hằng ngày để crawl; giá do điểm mua đăng (Giá theo khu vực) và admin nhập tay.
             // Chia theo loại thương lái / nhà máy thu mua: quả to đẹp đi xuất khẩu, quả vừa, quả nhỏ/xấu bán múc ruột cho nhà máy.
@@ -109,6 +118,8 @@ class CatalogSeeder extends Seeder
 
         $regions = [
             ['toan-quoc', 'Toàn quốc', null, []],
+            // Giá sàn giao dịch thế giới (London, New York)
+            ['the-gioi', 'Sàn thế giới', null, []],
             ['tay-nguyen', 'Tây Nguyên', null, []],
             ['dong-nam-bo', 'Đông Nam Bộ', null, ['miền Đông']],
             ['dak-lak', 'Đắk Lắk', 'Đắk Lắk', ['Đăk Lăk', 'Đắc Lắc']],

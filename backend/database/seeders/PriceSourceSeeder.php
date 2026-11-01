@@ -12,6 +12,18 @@ use Illuminate\Database\Seeder;
  */
 class PriceSourceSeeder extends Seeder
 {
+    /**
+     * Giá sàn thế giới trong bản tin cà phê (chữ đã bỏ dấu): "Robusta ... sàn London có giá bán đang là 3.219 USD/tấn",
+     * "Arabica trên sàn New York ... 287.20 cent/lb" / "292 US cent/lb". Chữ đã chuẩn hóa đổi dấu phẩy thành khoảng trắng
+     * ("287,20" -> "287 20") nên phần lẻ có thể đứng sau dấu chấm hoặc khoảng trắng.
+     *
+     * @var list<array{product_code: string, region_code: string, pattern: string, decimal: bool}>
+     */
+    public const COFFEE_EXCHANGE_PRICES = [
+        ['product_code' => 'ca-phe-robusta-london', 'region_code' => 'the-gioi', 'pattern' => '/robusta.{0,100}?san london.{0,120}?(\d{1,2}\.\d{3}|\d{3,5}) usd\/tan/', 'decimal' => false],
+        ['product_code' => 'ca-phe-arabica-new-york', 'region_code' => 'the-gioi', 'pattern' => '/arabica.{0,100}?san new york.{0,140}?(\d{2,3}(?:[. ]\d{1,2})?) (?:us )?cent\/lb/', 'decimal' => true],
+    ];
+
     public function run(): void
     {
         $vietbao = [
@@ -24,7 +36,14 @@ class PriceSourceSeeder extends Seeder
                 'code' => 'vietbao-ca-phe',
                 'name' => 'Vietbao - Giá cà phê (theo giacaphe.com)',
                 'homepage_url' => 'https://vietbao.vn',
-                'config' => [...$vietbao, 'url_pattern' => '#vietbao\.vn/gia-ca-phe-hom-nay-#', 'mode' => 'by_region', 'product_code' => 'ca-phe-robusta'],
+                'config' => [
+                    ...$vietbao,
+                    'url_pattern' => '#vietbao\.vn/gia-ca-phe-hom-nay-#',
+                    'mode' => 'by_region',
+                    'product_code' => 'ca-phe-robusta',
+                    // "Robusta ... sàn London có giá bán đang là 3.219 USD/tấn", "Arabica trên sàn New York ... 287.20 cent/lb"
+                    'exchange_prices' => self::COFFEE_EXCHANGE_PRICES,
+                ],
             ],
             [
                 'code' => 'vietbao-ho-tieu',
@@ -95,11 +114,16 @@ class PriceSourceSeeder extends Seeder
         ];
         $sources[] = [
             'code' => 'baoquocte-ho-tieu',
-            'name' => 'Báo Thế giới & Việt Nam - Giá hồ tiêu (dữ liệu cũ từ 2021)',
+            'name' => 'Báo Thế giới & Việt Nam - Giá hồ tiêu (hằng ngày + dữ liệu cũ từ 2021)',
             'homepage_url' => 'https://baoquocte.vn',
-            'is_enabled' => false,
+            // Nguồn chính của hồ tiêu từ 11/2026 (vietbao ngừng đăng bản tin tiêu sau 24/10/2026)
+            'is_enabled' => true,
             'config' => [
                 ...$baoquocte,
+                // Hằng ngày: sitemap ~400 bài mới nhất, chọn đúng bài của ngày qua ngày trong URL (vd -31-10-2026-)
+                'sitemap_url' => 'https://baoquocte.vn/sitemaparticles-site-1.xml',
+                'url_pattern' => '#baoquocte\.vn/(gia-tieu-hom-nay|gia-nong-san-hom-nay)-{date:j-n-Y}-#',
+                'same_day_only' => true,
                 'product_code' => 'ho-tieu',
                 'price_range' => [30000, 400000],
                 'section' => ['start' => '/^gia (ho )?tieu/', 'stop' => '/^gia ca phe|^thong tin thi truong (ca phe|xuat)/'],
@@ -164,7 +188,8 @@ class PriceSourceSeeder extends Seeder
                 'content_selector' => '#content_detail',
                 'categories' => ['sau-rieng'],
                 'price_range' => [10000, 400000],
-                'other_varieties' => ['Musang King', 'Musang', 'Chuồng Bò', 'Sáu Hữu', 'Black Thorn', 'Dona', 'Khổ qua xanh', 'Cơm vàng hạt lép'],
+                'other_varieties' => ['Sáu Hữu', 'Dona', 'Khổ qua xanh', 'Cơm vàng hạt lép'],
+                'grade_b' => ['sau-rieng-ri6' => 'sau-rieng-ri6-b', 'sau-rieng-thai' => 'sau-rieng-thai-b'],
                 'macro_regions' => [
                     'tay-nguyen' => ['dak-lak', 'gia-lai', 'lam-dong', 'dak-nong'],
                     'dong-nam-bo' => ['dong-nai', 'binh-phuoc', 'ba-ria-vung-tau', 'tp-hcm'],

@@ -18,6 +18,7 @@ const DealRoutes = lazy(() => import('./pages/deals/DealRoutes'))
 const TradeRoutes = lazy(() => import('./pages/trade/TradeRoutes'))
 const BusinessPage = lazy(() => import('./pages/business/BusinessPage'))
 const OfferRoutes = lazy(() => import('./pages/offers/OfferRoutes'))
+const IotRoutes = lazy(() => import('./pages/iot/IotRoutes'))
 
 export default function App() {
   const { path, query } = useRoute()
@@ -101,6 +102,10 @@ export default function App() {
         ) : path[0] === 'doanh-nghiep' ? (
           <Suspense fallback={<p className="muted center">Đang mở…</p>}>
             <BusinessPage query={query} />
+          </Suspense>
+        ) : path[0] === 'cam-bien' ? (
+          <Suspense fallback={<p className="muted center">Đang tải…</p>}>
+            <IotRoutes path={path} query={query} />
           </Suspense>
         ) : path[0] === 'gia-quanh-toi' ? (
           <LocalPrices query={query} />

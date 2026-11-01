@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Crawling\Adapters\ParsedPage;
 use App\Crawling\Adapters\PriceRow;
+use App\Crawling\Adapters\SitemapArticleAdapter;
 use App\Crawling\CrawlRunner;
 use App\Crawling\PriceImporter;
 use App\Enums\CrawlStatus;
@@ -60,6 +61,31 @@ class CrawlRunnerTest extends TestCase
         $this->assertStringContainsString('gia-ho-tieu-hom-nay-1410', $log->url);
         $this->assertNotEmpty($log->raw_html);
         $this->assertSame(CrawlStatus::Success, $this->pepper->refresh()->last_status);
+    }
+
+    public function test_pepper_daily_from_baoquocte_picks_the_article_of_the_day(): void
+    {
+        // Sitemap "bài mới" có nhiều ngày: chỉ lấy bài có ngày cần lấy trong URL (vietbao ngừng đăng bản tin tiêu sau 24/10/2026)
+        Http::fake([
+            'baoquocte.vn/robots.txt' => Http::response(''),
+            'baoquocte.vn/sitemaparticles-site-1.xml' => Http::response('<urlset>'
+                .'<url><loc>https://baoquocte.vn/gia-nong-san-hom-nay-1-11-2026-gia-ca-phe-tang-gia-tieu-on-dinh-452100.html</loc></url>'
+                .'<url><loc>https://baoquocte.vn/gia-nong-san-hom-nay-31-10-2026-gia-ca-phe-dao-chieu-tang-451999.html</loc></url>'
+                .'<url><loc>https://baoquocte.vn/gia-nong-san-hom-nay-11-10-2026-gia-tieu-giam-450800.html</loc></url>'
+                .'</urlset>'),
+        ]);
+        $source = PriceSource::query()->where('code', 'baoquocte-ho-tieu')->sole();
+
+        $this->assertTrue($source->is_enabled);
+        $this->assertSame(
+            ['https://baoquocte.vn/gia-nong-san-hom-nay-31-10-2026-gia-ca-phe-dao-chieu-tang-451999.html'],
+            app(SitemapArticleAdapter::class)->discover($source, CarbonImmutable::parse('2026-10-31')),
+        );
+        // "1-11-2026" không lẫn với "11-10-2026"
+        $this->assertSame(
+            ['https://baoquocte.vn/gia-nong-san-hom-nay-1-11-2026-gia-ca-phe-tang-gia-tieu-on-dinh-452100.html'],
+            app(SitemapArticleAdapter::class)->discover($source, CarbonImmutable::parse('2026-11-01')),
+        );
     }
 
     public function test_running_twice_does_not_duplicate_prices(): void

@@ -1,4 +1,4 @@
-import { formatDate, formatNumber, type HistoryPoint } from '@nhanong/shared';
+import { formatDate, formatNumber, priceUnit, type HistoryPoint } from '@nhanong/shared';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
@@ -26,7 +26,7 @@ export function PriceChart({ points, unit, interval = 'day' }: { points: History
   if (points.length === 1)
     return (
       <Text style={styles.body}>
-        Mới có giá {interval === 'day' ? 'ngày ' : ''}{pointLabel(points[0].date, interval)}: {formatNumber(points[0].avg)} đ/{unit}. Biểu đồ sẽ hiện khi có thêm ngày.
+        Mới có giá {interval === 'day' ? 'ngày ' : ''}{pointLabel(points[0].date, interval)}: {formatNumber(points[0].avg)} {priceUnit(unit)}. Biểu đồ sẽ hiện khi có thêm ngày.
       </Text>
     );
 
@@ -66,7 +66,7 @@ export function PriceChart({ points, unit, interval = 'day' }: { points: History
       <Text style={[styles.body, { minHeight: 24, marginBottom: 4 }]} accessibilityLiveRegion="polite">
         {current ? (
           <>
-            <Text style={{ fontWeight: '700' }}>{pointLabel(current.date, interval)}</Text>: {formatNumber(current.avg)} đ/{unit}
+            <Text style={{ fontWeight: '700' }}>{pointLabel(current.date, interval)}</Text>: {formatNumber(current.avg)} {priceUnit(unit)}
             {current.min !== current.max && <Text style={styles.muted}> ({formatNumber(current.min)} – {formatNumber(current.max)})</Text>}
           </>
         ) : (

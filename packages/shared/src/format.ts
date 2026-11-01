@@ -7,6 +7,13 @@ export function formatNumber(amount: number): string {
     .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
+/**
+ * Đơn vị hiển thị sau giá: "đ/kg" với giá trong nước; giá sàn thế giới giữ nguyên đơn vị ngoại tệ ("USD/tấn", "cent/lb").
+ */
+export function priceUnit(unit: string): string {
+  return /usd|cent|\$/i.test(unit) ? unit : `đ/${unit}`;
+}
+
 /** Khoảng giá: "92.500 - 93.200" hoặc "93.200" nếu bằng nhau */
 export function formatPriceRange(row: Pick<PriceRow, 'price_min' | 'price_max'>): string {
   return row.price_min === row.price_max

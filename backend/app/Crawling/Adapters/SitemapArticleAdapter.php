@@ -5,6 +5,7 @@ namespace App\Crawling\Adapters;
 use App\Crawling\CrawlBlockedException;
 use App\Crawling\Extraction\AliasMatcher;
 use App\Crawling\Extraction\PriceExtractor;
+use App\Crawling\Extraction\Text;
 use App\Crawling\Fetcher;
 use App\Enums\NameKind;
 use App\Models\PriceSource;
@@ -21,7 +22,8 @@ use Throwable;
  *
  * Cấu hình (price_sources.config):
  * - sitemap_url: URL sitemap, có thể chứa {date} (Y-m-d)
- * - url_pattern: regex lọc URL bài giá, vd "#/gia-ho-tieu-hom-nay-#"
+ * - url_pattern: regex lọc URL bài giá, vd "#/gia-ho-tieu-hom-nay-#"; có thể chứa {date:định dạng} để chỉ lấy bài của ngày
+ *   cần lấy khi sitemap gồm nhiều ngày, vd "#/gia-nong-san-hom-nay-{date:j-n-Y}-#" (31-10-2026)
  * - content_selector: CSS selector phần thân bài, vd "div.article-content"
  * - mode: "by_region" (bài về 1 mặt hàng, giá theo khu vực) hoặc "by_product" (1 khu vực, nhiều mặt hàng)
  * - product_code: mặt hàng cố định khi mode = by_region
@@ -36,6 +38,9 @@ use Throwable;
  *   danh mục so sánh trong cùng bài, vd gạo nguyên liệu luôn đắt hơn lúa tươi: {"gao": ["lua", 1.05]}
  *   (tên giống trùng nhau "OM 18" lúa/gạo đôi khi bị gán nhầm giá lúa cho gạo)
  * - section: {start, stop} regex (chữ đã bỏ dấu) chọn phần bài dưới tiêu đề H2 của mặt hàng, cho bài gộp nhiều mặt hàng
+ * - exchange_prices: giá sàn thế giới trong cùng bài (giá USD, không theo khu vực), vd
+ *   [{"product_code": "ca-phe-robusta-london", "region_code": "the-gioi", "pattern": "/robusta.{0,80}?san london.{0,100}?(\\d[\\d.]*) usd\\/tan/", "decimal": false}]
+ *   pattern chạy trên chữ đã bỏ dấu, viết thường; nhóm 1 là giá. decimal = true: "287.20" là số thập phân (làm tròn), không phải hàng nghìn
  * - backfill: cấu hình lấy dữ liệu cũ theo tháng (xem App\Crawling\BackfillRunner)
  */
 class SitemapArticleAdapter implements PriceSourceAdapter
@@ -49,9 +54,12 @@ class SitemapArticleAdapter implements PriceSourceAdapter
 
         preg_match_all('#<loc>\s*(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?\s*</loc>#s', $xml, $matches);
 
+        // {date:j-n-Y} trong mẫu: ngày cần lấy, vd 31-10-2026
+        $pattern = preg_replace_callback('/\{date:([^}]+)\}/', fn (array $m): string => preg_quote($date->format($m[1]), '#'), (string) $source->configValue('url_pattern'));
+
         $urls = array_values(array_unique(array_filter(
             array_map(fn (string $url): string => html_entity_decode(trim($url)), $matches[1]),
-            fn (string $url): bool => (bool) preg_match((string) $source->configValue('url_pattern'), $url),
+            fn (string $url): bool => (bool) preg_match($pattern, $url),
         )));
 
         return array_slice($urls, 0, (int) $source->configValue('max_articles', 1));
@@ -121,10 +129,42 @@ class SitemapArticleAdapter implements PriceSourceAdapter
             );
         }
 
+        array_push($rows, ...$this->exchangePrices($source, $content->textContent ?? ''));
+
         $kind = $mode === 'by_region' ? NameKind::Region : NameKind::Product;
         $unmatched = array_map(fn (string $name): array => ['kind' => $kind, 'name' => $name], $result->unmatchedNames);
 
         return new ParsedPage($rows, $unmatched, $this->publishedOn($document));
+    }
+
+    /**
+     * Giá sàn thế giới (London, New York...) theo các mẫu exchange_prices: mỗi mẫu lấy giá đầu tiên khớp.
+     *
+     * @return list<PriceRow>
+     */
+    private function exchangePrices(PriceSource $source, string $text): array
+    {
+        $configs = (array) $source->configValue('exchange_prices', []);
+        if ($configs === []) {
+            return [];
+        }
+
+        $normalized = Text::normalize($text);
+        $rows = [];
+        foreach ($configs as $config) {
+            if (! preg_match($config['pattern'], $normalized, $match)) {
+                continue;
+            }
+            // Số thập phân: "287.20" hoặc "287 20" (dấu phẩy đã thành khoảng trắng khi chuẩn hóa)
+            $value = ($config['decimal'] ?? false) ? (int) round((float) str_replace([',', ' '], '.', $match[1])) : Text::toInt($match[1]);
+            $product = Product::query()->where('code', $config['product_code'])->first(['id', 'unit']);
+            $regionId = Region::query()->where('code', $config['region_code'])->value('id');
+            if ($value > 0 && $product !== null && $regionId !== null) {
+                $rows[] = new PriceRow($product->id, $regionId, $value, $value, $value, $product->unit);
+            }
+        }
+
+        return $rows;
     }
 
     /**

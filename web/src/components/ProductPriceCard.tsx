@@ -1,4 +1,4 @@
-import { formatNumber, formatPriceRange, relativeDay, summarizeProduct, type PriceRow } from '@nhanong/shared'
+import { formatNumber, formatPriceRange, priceUnit, relativeDay, summarizeProduct, type PriceRow } from '@nhanong/shared'
 import { useState } from 'react'
 import { toggleFollow } from '../followed'
 import { href } from '../hooks'
@@ -32,7 +32,7 @@ export function ProductPriceCard({ product, rows, followed, region, expanded: fo
 
       <a className="price-headline" href={chart}>
         <span className="price-big">{s.min === s.max ? formatNumber(s.max) : `${formatNumber(s.min)} – ${formatNumber(s.max)}`}</span>
-        <span className="price-unit"> đ/{unit}</span>
+        <span className="price-unit"> {priceUnit(unit)}</span>
       </a>
       <div className="price-meta">
         <Change value={s.change} />

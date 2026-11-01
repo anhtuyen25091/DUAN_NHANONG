@@ -11,6 +11,49 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 01/11/2026 (tiếp 3): Giá cho nông dân sầu riêng / cà phê / tiêu + mục Cảm biến trên web
+
+Người dùng chốt: ưu tiên nông dân trồng **sầu riêng, cà phê, hồ tiêu**.
+
+**1. Hồ tiêu có nguồn hằng ngày**
+- Vietbao ngừng đăng bản tin tiêu sau 24/10. Chuyển sang dùng **báo Quốc tế (baoquocte) làm nguồn chính hằng ngày** cho tiêu.
+- Bản tin "Giá nông sản hôm nay" có cả mục tiêu; đọc từ sitemap "bài mới" (`sitemaparticles-site-1.xml`, khoảng 400 bài).
+- Mẫu đường dẫn hỗ trợ ngày: `url_pattern` có thể chứa `{date:j-n-Y}` để chọn đúng bài của ngày (vd `-31-10-2026-`; "1-11-2026" không lẫn với "11-10-2026").
+- Đã bật nguồn `baoquocte-ho-tieu`. Chạy thật cho 31/10: lưu 7 giá.
+
+**2. Thêm loại giá**
+- **Sầu riêng:**
+  - Thêm loại B của Ri6 và Thái (cấu hình `grade_b`; "Loại 2" cũng là loại B).
+  - Thêm 3 giống: Musang King, Black Thorn, Chuồng Bò (loại A).
+  - Vẫn bỏ: VIP, loại C, hàng lỗi / dạt / kém.
+  - Bài 01/11: 24 giá (trước chỉ khoảng 9).
+  - Đã đối chiếu từng dòng mới với bài gốc của 4 bài mẫu (14/02/2025, 27/06/2025, 05/03/2026, 01/11/2026): đều đúng.
+- **Cà phê:** giá sàn **Robusta London (USD/tấn)** và **Arabica New York (cent/lb, làm tròn)**, đọc từ bản tin cà phê vietbao (`exchange_prices`), khu vực mới "Sàn thế giới".
+  - Hai cách viết đều đọc được: "287.20 cent/lb" và "292 US cent/lb".
+  - Đã lưu thử: 3.219 USD/tấn, 287 cent/lb.
+- **Hiển thị:** hàm `priceUnit()` trong shared. Giá ngoại tệ hiện "3.219 USD/tấn", không thêm "đ/" (bảng giá và biểu đồ, web + app).
+- **Chưa có:**
+  - Arabica trong nước (vietbao không ghi giá); tiêu trắng / giá xuất khẩu (chưa tìm nguồn).
+  - Lịch sử loại B và giống mới: chỉ có từ 01/11 (bài cũ không lưu HTML, phải tải lại hàng trăm bài).
+- **Dữ liệu dev:** đã chạy `CatalogSeeder` và sửa riêng cấu hình 3 nguồn (`vietbao-ca-phe`, `baoquocte-ho-tieu`, `thcl-sau-rieng`). **Không chạy lại `PriceSourceSeeder`**, vì seeder đó ghi đè cờ bật / tắt của mọi nguồn.
+
+**3. Mục Cảm biến trên web** (`#/cam-bien`, thẻ lối vào trên trang bảng giá)
+- Đăng nhập tài khoản cảm biến; tự nối tài khoản Nhà Nông để dùng chung gói.
+- Trang chủ: trang trại kèm thẻ thời tiết (đang mưa, lưu ý), cảnh báo kèm nút "Đã xử lý".
+- Trang lô: ô số đo so với ngưỡng, khu Điều khiển (bật 15 / 30 / 60 phút, tắt, tự cập nhật khi chờ mạch), danh sách thiết bị.
+- Biểu đồ 24 giờ / 7 ngày / 30 ngày có vạch ngưỡng; trang thời tiết 7 ngày + lượng mưa 7 ngày → 1 năm (khóa theo gói).
+- Dev: Vite proxy `/iot` sang cổng 8001; chạy thật đặt `VITE_IOT_URL`.
+- Thêm / sửa trang trại, thiết bị, ngưỡng, luật vẫn làm trong app.
+
+**Kiểm tra**
+- backend 219 test qua: thêm test tiêu báo Quốc tế theo ngày, giá sàn của 2 bài, sầu riêng loại B / giống mới; sửa 3 test cũ vì giờ đọc thêm loại B (đã đối chiếu bài gốc).
+- shared 136 test qua. iot 58 test qua. Typecheck mobile và build web không lỗi; lint web phần mới sạch.
+- Chụp web: bảng giá có giá sàn USD, trang cảm biến, trang Ao tôm 1 (điều khiển), thời tiết + lượng mưa Vườn Cư Bao.
+
+**Còn tồn:** nâng app lên Expo SDK 58 đang làm song song (agent riêng). Xong sẽ ghi tiếp.
+
+---
+
 ## 01/11/2026 (tiếp 2): Bù giá hồ tiêu / lúa gạo, bật lịch tự động, commit, điều khiển máy bơm / quạt oxy + luật tự động
 
 **1. Giá hồ tiêu / lúa gạo bị dừng**

@@ -127,3 +127,13 @@ describe('paginate', () => {
     expect(paginate([], 2, 20)).toEqual({ items: [], page: 1, pages: 1, total: 0 });
   });
 });
+
+describe('priceUnit', () => {
+  it('giá trong nước có "đ/", giá sàn giữ đơn vị ngoại tệ', async () => {
+    const { priceUnit } = await import('./format');
+    expect(priceUnit('kg')).toBe('đ/kg');
+    expect(priceUnit('bao')).toBe('đ/bao');
+    expect(priceUnit('USD/tấn')).toBe('USD/tấn');
+    expect(priceUnit('cent/lb')).toBe('cent/lb');
+  });
+});

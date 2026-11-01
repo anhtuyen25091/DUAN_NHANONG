@@ -1,0 +1,487 @@
+import {
+  ApiError,
+  formatDecimal,
+  formatIotValue,
+  thresholdLabel,
+  timeAgo,
+  weatherDayLabel,
+  type IotActuator,
+  type IotAlert,
+  type IotFarm,
+  type IotInterval,
+  type IotReading,
+  type IotWeather,
+} from '@nhanong/shared'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Status } from '../../components/Status'
+import { href, useAsync } from '../../hooks'
+import { iotApi, linkNhanongIfPossible, setIotAuth, signOutIot, useIotAuth } from '../../iot'
+import { IotLineChart, RainBars } from './IotCharts'
+
+/**
+ * Cảm biến ruộng / ao trên web: #/cam-bien (trang trại, thời tiết, cảnh báo), #/cam-bien/lo/{id} (số đo, điều khiển),
+ * #/cam-bien/thoi-tiet/{farm} (7 ngày + lượng mưa), #/cam-bien/bieu-do?device=&metric= (lịch sử 1 chỉ số).
+ * Thêm / sửa trang trại, thiết bị, ngưỡng, luật tự động làm trong app (hoặc trang quản trị).
+ */
+export default function IotRoutes({ path, query }: { path: string[]; query: URLSearchParams }) {
+  const auth = useIotAuth()
+  useEffect(() => {
+    void linkNhanongIfPossible()
+  }, [auth])
+  if (!auth) return <SignIn />
+  if (path[1] === 'lo' && path[2]) return <PlotPage id={Number(path[2])} />
+  if (path[1] === 'thoi-tiet' && path[2]) return <WeatherPage farmId={Number(path[2])} name={query.get('ten') ?? ''} />
+  if (path[1] === 'bieu-do') return <ChartPage query={query} />
+  return <Home />
+}
+
+function Back({ to = 'cam-bien', label = 'Cảm biến' }: { to?: string; label?: string }) {
+  return (
+    <a className="back" href={href(to)}>
+      ‹ {label}
+    </a>
+  )
+}
+
+function SignIn() {
+  const [tab, setTab] = useState<'login' | 'register'>('login')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      setIotAuth(tab === 'login' ? await iotApi.login(email.trim(), password) : await iotApi.register(name.trim(), email.trim(), password))
+    } catch (err) {
+      setError(err instanceof ApiError ? (Object.values(err.errors)[0]?.[0] ?? err.message) : (err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section>
+      <h1>📡 Cảm biến ruộng · ao</h1>
+      <p className="muted">Xem độ ẩm, pH, độ mặn, mực nước, oxy trong ao… do thiết bị gửi về; bật / tắt máy bơm, quạt oxy; dự báo thời tiết và lượng mưa tại vườn. Tài khoản cảm biến dùng email, riêng với tài khoản Nhà Nông.</p>
+      <div className="segmented tabs">
+        <button type="button" className={tab === 'login' ? 'active' : ''} onClick={() => setTab('login')}>
+          Đăng nhập
+        </button>
+        <button type="button" className={tab === 'register' ? 'active' : ''} onClick={() => setTab('register')}>
+          Tạo tài khoản
+        </button>
+      </div>
+      <form className="form card" onSubmit={submit}>
+        {tab === 'register' && (
+          <label className="field">
+            Tên
+            <input value={name} onChange={(e) => setName(e.target.value)} required />
+          </label>
+        )}
+        <label className="field">
+          Email
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+        </label>
+        <label className="field">
+          Mật khẩu
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </label>
+        {error && <p className="field-error">{error}</p>}
+        <button className="button primary" disabled={busy}>
+          {busy ? 'Đang gửi…' : tab === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
+        </button>
+      </form>
+    </section>
+  )
+}
+
+function Home() {
+  const auth = useIotAuth()
+  const [farms, reloadFarms] = useAsync(() => iotApi.farms(), [])
+  const [alerts, reloadAlerts] = useAsync(() => iotApi.alerts(true), [])
+
+  return (
+    <section>
+      <h1>📡 Cảm biến ruộng · ao</h1>
+      {alerts.status === 'ok' && alerts.data.length > 0 && (
+        <>
+          <h2 className="section-title">⚠️ {alerts.data.length} cảnh báo đang mở</h2>
+          {alerts.data.map((alert) => (
+            <AlertCard key={alert.id} alert={alert} onResolved={reloadAlerts} />
+          ))}
+        </>
+      )}
+      <Status state={farms} retry={reloadFarms} />
+      {farms.status === 'ok' && farms.data.length === 0 && <p className="notice">Chưa có trang trại nào. Thêm trang trại, lô và thiết bị trong app Nhà Nông (mục 📡 Cảm biến).</p>}
+      {farms.status === 'ok' &&
+        farms.data.map((farm) => (
+          <div key={farm.id}>
+            <h2 className="section-title">
+              {farm.name}
+              {farm.province ? ` · ${farm.province}` : ''}
+            </h2>
+            <WeatherCard farm={farm} />
+            {farm.plots.map((plot) => (
+              <a key={plot.id} className="card local-banner" href={href(`cam-bien/lo/${plot.id}`)}>
+                <span>
+                  <b>
+                    {plot.type === 'pond' ? '🦐' : plot.type === 'field' ? '🌾' : plot.type === 'greenhouse' ? '🏠' : '🌳'} {plot.name}
+                  </b>
+                  <br />
+                  <span className="small muted">
+                    {plot.type_label}
+                    {plot.crop ? ` · ${plot.crop}` : ''}
+                  </span>
+                </span>
+                <span aria-hidden>›</span>
+              </a>
+            ))}
+          </div>
+        ))}
+      <p className="small muted center">
+        Đăng nhập: {auth?.user.email} ·{' '}
+        <button type="button" className="linklike" onClick={() => void signOutIot()}>
+          Đăng xuất
+        </button>
+      </p>
+    </section>
+  )
+}
+
+function rainText(data: IotWeather): string {
+  const { rain_mm, rain_chance } = data.next_24h
+  return rain_mm < 0.5 ? '24 giờ tới: hầu như không mưa' : `24 giờ tới: mưa khoảng ${formatDecimal(rain_mm)} mm (khả năng ${rain_chance}%)`
+}
+
+function Hints({ hints }: { hints: string[] }) {
+  return (
+    <>
+      {hints.map((hint) => (
+        <p key={hint} className="notice small">
+          💡 {hint}
+        </p>
+      ))}
+    </>
+  )
+}
+
+function WeatherCard({ farm }: { farm: IotFarm }) {
+  const hasLocation = farm.lat !== null && farm.lng !== null
+  const [weather] = useAsync(() => (hasLocation ? iotApi.weather(farm.id) : Promise.resolve(null)), [farm.id])
+  if (!hasLocation) return <p className="muted small">🌦️ Trang trại chưa có vị trí (chọn trong app) nên chưa có dự báo.</p>
+  if (weather.status === 'error') return <p className="muted small">🌦️ {weather.error.message}</p>
+  if (weather.status !== 'ok' || !weather.data) return null
+  const today = weather.data.daily[0]
+  return (
+    <a className="card local-banner" href={href(`cam-bien/thoi-tiet/${farm.id}`, { ten: farm.name })} style={{ background: '#eef6fb' }}>
+      <span>
+        <b>
+          {today.icon} Hôm nay: {today.label}, {formatDecimal(today.temp_min)}–{formatDecimal(today.temp_max)}°C
+        </b>
+        <br />
+        <span className="small muted">{rainText(weather.data)}</span>
+        {farm.raining && (
+          <>
+            <br />
+            <b style={{ color: '#2b7bb9' }}>
+              🌧️ Đang mưa từ {timeAgo(farm.raining.since)}
+              {farm.raining.mm >= 0.5 ? `, khoảng ${formatDecimal(farm.raining.mm)} mm` : ''}
+            </b>
+          </>
+        )}
+        <Hints hints={weather.data.hints} />
+      </span>
+      <span aria-hidden>›</span>
+    </a>
+  )
+}
+
+function AlertCard({ alert, onResolved }: { alert: IotAlert; onResolved: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const limit = alert.direction === 'below' ? `thấp hơn ${formatIotValue(alert.min ?? 0, alert.metric.unit)}` : `cao hơn ${formatIotValue(alert.max ?? 0, alert.metric.unit)}`
+  return (
+    <div className="card" style={{ borderLeft: '6px solid #c0262d' }}>
+      <b>
+        {alert.plot.name}: {alert.metric.name} {formatIotValue(alert.value, alert.metric.unit)}
+      </b>
+      <p className="small muted">
+        {limit} · {timeAgo(alert.measured_at)} · {alert.device.name}
+      </p>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true)
+          await iotApi.resolveAlert(alert.id).catch(() => {})
+          setBusy(false)
+          onResolved()
+        }}
+      >
+        ✓ Đã xử lý
+      </button>
+    </div>
+  )
+}
+
+function PlotPage({ id }: { id: number }) {
+  const [summary, reload] = useAsync(() => iotApi.plotSummary(id), [id])
+  const data = summary.status === 'ok' ? summary.data : null
+  return (
+    <section>
+      <Back />
+      <h1>{data?.plot.name ?? 'Lô'}</h1>
+      <Status state={summary} retry={reload} />
+      {data && (
+        <>
+          {data.open_alerts.map((alert) => (
+            <AlertCard key={alert.id} alert={alert} onResolved={reload} />
+          ))}
+          <h2 className="section-title">Số đo mới nhất</h2>
+          {data.readings.length === 0 && <p className="muted">Chưa có số đo.</p>}
+          <div className="iot-tiles">
+            {data.readings.map((reading) => (
+              <ReadingTile key={`${reading.device_id}-${reading.metric.code}`} reading={reading} showDevice={data.devices.length > 1} />
+            ))}
+          </div>
+          <Controls plotId={id} />
+          <h2 className="section-title">Thiết bị đo</h2>
+          {data.devices.map((device) => (
+            <p key={device.id} className="card">
+              <span style={{ color: device.online ? '#0b7a4b' : '#c0262d' }}>●</span> <b>{device.name}</b>{' '}
+              <span className="small muted">
+                · {device.kind === 'lorawan' ? 'LoRaWAN' : 'WiFi / 4G'} · mã {device.uid}
+                {device.battery !== null ? ` · pin ${device.battery}%` : ''} · {device.last_seen_at ? `gửi lần cuối ${timeAgo(device.last_seen_at)}` : 'chưa gửi lần nào'}
+              </span>
+            </p>
+          ))}
+          <p className="small muted">Thêm / sửa thiết bị, ngưỡng cảnh báo, luật tự động: làm trong app Nhà Nông.</p>
+        </>
+      )}
+    </section>
+  )
+}
+
+function ReadingTile({ reading, showDevice }: { reading: IotReading; showDevice: boolean }) {
+  const bad = reading.status === 'below' || reading.status === 'above'
+  const limit = thresholdLabel(reading.min, reading.max)
+  return (
+    <a
+      className={`card iot-tile${bad ? ' bad' : ''}`}
+      href={href('cam-bien/bieu-do', {
+        device: String(reading.device_id),
+        metric: reading.metric.code,
+        ten: reading.metric.name,
+        unit: reading.metric.unit ?? '',
+        min: reading.min === null ? '' : String(reading.min),
+        max: reading.max === null ? '' : String(reading.max),
+      })}
+    >
+      <span className="small muted">{reading.metric.name}</span>
+      <span className="iot-value">{formatIotValue(reading.value, reading.metric.unit)}</span>
+      {limit && <span className="small">{bad ? `⚠️ ${limit}` : `✓ ${limit}`}</span>}
+      <span className="small muted">
+        {timeAgo(reading.measured_at)}
+        {showDevice ? ` · ${reading.device_name}` : ''}
+      </span>
+    </a>
+  )
+}
+
+function Controls({ plotId }: { plotId: number }) {
+  const [actuators, reload] = useAsync(() => iotApi.actuators(plotId), [plotId])
+  // Giữ danh sách cũ trong lúc tải lại (tránh nhấp nháy khi hỏi trạng thái mỗi 3 giây)
+  const [last, setLast] = useState<IotActuator[] | null>(null)
+  if (actuators.status === 'ok' && actuators.data !== last) setLast(actuators.data)
+  const list = last ?? []
+  const reloadRef = useRef(reload)
+  useEffect(() => {
+    reloadRef.current = reload
+  })
+  const waiting = list.some((a) => a.pending !== null)
+  // Đang chờ mạch nhận lệnh: tải lại mỗi 3 giây
+  useEffect(() => {
+    if (!waiting) return
+    const timer = setInterval(() => reloadRef.current(), 3000)
+    return () => clearInterval(timer)
+  }, [waiting])
+  if (list.length === 0) return null
+  return (
+    <>
+      <h2 className="section-title">⚙️ Điều khiển</h2>
+      {list.map((actuator) => (
+        <ActuatorCard key={actuator.id} actuator={actuator} onChanged={() => reloadRef.current()} />
+      ))}
+    </>
+  )
+}
+
+function ActuatorCard({ actuator, onChanged }: { actuator: IotActuator; onChanged: () => void }) {
+  const [minutes, setMinutes] = useState(Math.min(30, actuator.max_minutes))
+  const [error, setError] = useState<string | null>(null)
+  const pending = actuator.pending
+  const send = async (action: 'on' | 'off') => {
+    setError(null)
+    try {
+      await iotApi.command(actuator.id, action, action === 'on' ? minutes : undefined)
+      onChanged()
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+  const timeOf = (iso: string) => {
+    const d = new Date(iso)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+  return (
+    <div className="card" style={actuator.is_on ? { border: '2px solid #0b7a4b' } : undefined}>
+      <b>{actuator.name}</b>{' '}
+      <span className="small muted">
+        · {actuator.kind_label} · {actuator.device_name}, kênh {actuator.channel}
+      </span>
+      <p>
+        {pending
+          ? `⏳ Đang gửi lệnh ${pending.action === 'on' ? `bật ${pending.minutes} phút` : 'tắt'}… (mạch nhận trong vài giây)`
+          : actuator.is_on
+            ? `🟢 Đang chạy${actuator.auto_off_at ? `, tự tắt lúc ${timeOf(actuator.auto_off_at)}` : ''}`
+            : '⚪ Đang tắt'}
+      </p>
+      {!actuator.device_online && <p className="field-error">⚠️ Mạch điều khiển đang mất kết nối: lệnh sẽ hủy nếu 10 phút không nhận được.</p>}
+      <div className="segmented">
+        {[15, 30, 60]
+          .filter((m) => m <= actuator.max_minutes)
+          .map((m) => (
+            <button key={m} type="button" className={minutes === m ? 'active' : ''} onClick={() => setMinutes(m)}>
+              {m} phút
+            </button>
+          ))}
+      </div>
+      <div className="btn-row">
+        <button type="button" className="button primary" onClick={() => send('on')}>
+          Bật {minutes} phút
+        </button>
+        <button type="button" onClick={() => send('off')} disabled={!actuator.is_on && pending?.action !== 'on'}>
+          Tắt
+        </button>
+      </div>
+      {error && <p className="field-error">{error}</p>}
+    </div>
+  )
+}
+
+const RANGES: { label: string; hours: number; interval: IotInterval }[] = [
+  { label: '24 giờ', hours: 24, interval: 'raw' },
+  { label: '7 ngày', hours: 24 * 7, interval: 'hour' },
+  { label: '30 ngày', hours: 24 * 30, interval: 'day' },
+]
+
+function ChartPage({ query }: { query: URLSearchParams }) {
+  const [range, setRange] = useState(RANGES[0])
+  const device = Number(query.get('device'))
+  const metric = query.get('metric') ?? ''
+  const [history, reload] = useAsync(
+    () => iotApi.readings(device, { metric, from: new Date(Date.now() - range.hours * 3600 * 1000).toISOString(), interval: range.interval }),
+    [device, metric, range],
+  )
+  const toNumber = (v: string | null) => (v ? Number(v) : null)
+  return (
+    <section>
+      <Back />
+      <h1>{query.get('ten') ?? 'Biểu đồ'}</h1>
+      <div className="segmented tabs">
+        {RANGES.map((r) => (
+          <button key={r.label} type="button" className={r === range ? 'active' : ''} onClick={() => setRange(r)}>
+            {r.label}
+          </button>
+        ))}
+      </div>
+      <Status state={history} retry={reload} />
+      {history.status === 'ok' && (
+        <div className="card">
+          <IotLineChart points={history.data.data} unit={query.get('unit') || null} min={toNumber(query.get('min'))} max={toNumber(query.get('max'))} daily={history.data.interval === 'day'} />
+        </div>
+      )}
+    </section>
+  )
+}
+
+function WeatherPage({ farmId, name }: { farmId: number; name: string }) {
+  const [weather, reload] = useAsync(() => iotApi.weather(farmId), [farmId])
+  return (
+    <section>
+      <Back />
+      <h1>🌦️ Thời tiết{name ? ` · ${name}` : ''}</h1>
+      <Status state={weather} retry={reload} />
+      {weather.status === 'ok' && (
+        <>
+          <div className="card">
+            <b>{rainText(weather.data)}</b>
+            <Hints hints={weather.data.hints} />
+          </div>
+          <div className="card table-wrap">
+            <table className="trade-table">
+              <tbody>
+                {weather.data.daily.map((day, index) => (
+                  <tr key={day.date}>
+                    <td>
+                      <b>{weatherDayLabel(day.date, index)}</b>
+                    </td>
+                    <td>
+                      {day.icon} {day.label}
+                    </td>
+                    <td className="nowrap">
+                      {formatDecimal(day.temp_min)}–{formatDecimal(day.temp_max)}°C
+                    </td>
+                    <td className="nowrap">
+                      {day.rain_mm >= 0.5 ? `${formatDecimal(day.rain_mm)} mm` : '—'}
+                      {day.rain_chance ? ` · ${day.rain_chance}%` : ''}
+                    </td>
+                    <td className="nowrap small muted">gió {formatDecimal(day.wind_max)} m/s</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      <RainHistory farmId={farmId} />
+      <p className="small muted center">Nguồn dữ liệu thời tiết: Open-Meteo (ước tính theo vị trí, cập nhật mỗi giờ).</p>
+    </section>
+  )
+}
+
+function RainHistory({ farmId }: { farmId: number }) {
+  const [days, setDays] = useState(30)
+  const [rainfall, reload] = useAsync(() => iotApi.rainfall(farmId, days), [farmId, days])
+  return (
+    <div className="card">
+      <h2 className="section-title">🌧️ Lượng mưa tại vườn</h2>
+      <div className="segmented">
+        {[7, 30, 90, 365].map((n) => (
+          <button key={n} type="button" className={n === days ? 'active' : ''} onClick={() => setDays(n)}>
+            {n === 365 ? '1 năm' : `${n} ngày`}
+          </button>
+        ))}
+      </div>
+      <Status state={rainfall} retry={reload} />
+      {rainfall.status === 'ok' && (
+        <>
+          <p>
+            Tổng <b>{formatDecimal(rainfall.data.total_mm)} mm</b> · <b>{rainfall.data.rainy_days}</b>/{rainfall.data.days} ngày có mưa
+          </p>
+          <RainBars data={rainfall.data} />
+          {rainfall.data.locked && (
+            <p className="notice">
+              🔒 Tài khoản miễn phí chỉ xem được {rainfall.data.max_days} ngày gần nhất. Có gói Nhà Nông thì xem lượng mưa 1 năm
+              {rainfall.data.plan.linked ? '.' : ' (đăng nhập tài khoản Nhà Nông trên trình duyệt này để dùng chung gói).'} <a href={href('tai-khoan')}>Xem gói</a>
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
