@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\ExportController;
 use App\Http\Controllers\Api\V1\FarmController;
 use App\Http\Controllers\Api\V1\FarmMemberController;
+use App\Http\Controllers\Api\V1\FirmwareController;
 use App\Http\Controllers\Api\V1\IngestController;
 use App\Http\Controllers\Api\V1\LoRaWanController;
 use App\Http\Controllers\Api\V1\MetricController;
@@ -32,6 +33,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/device/time', [IngestController::class, 'time'])->name('device.time');
         // Mạch điều khiển relay: lấy lệnh bật / tắt, báo kết quả
         Route::get('/device/commands', [DeviceCommandController::class, 'index'])->name('device.commands');
+        Route::get('/device/firmware', [FirmwareController::class, 'download'])->name('device.firmware');
         Route::post('/device/commands/{command}/ack', [DeviceCommandController::class, 'ack'])->name('device.commands.ack');
     });
 

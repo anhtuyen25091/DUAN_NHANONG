@@ -8,6 +8,7 @@ use App\Filament\Resources\Devices\Pages\ViewDevice;
 use App\Models\Device;
 use App\Models\FieldMap;
 use App\Models\Reading;
+use App\Services\LoRaWan\RelayCodec;
 use App\Support\LatestReadings;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -79,9 +80,17 @@ class DeviceResource extends Resource
                     ->required(fn (Get $get): bool => $get('kind') === DeviceKind::LoRaWan || $get('kind') === DeviceKind::LoRaWan->value),
                 Select::make('profile')
                     ->label('Dòng thiết bị (ánh xạ trường)')
-                    ->options(fn () => ['generic' => 'generic (tên trường = mã chỉ số)'] + FieldMap::query()->distinct()->orderBy('profile')->pluck('profile', 'profile')->all())
+                    ->options(fn () => ['generic' => 'generic (tên trường = mã chỉ số)'] + FieldMap::query()->distinct()->orderBy('profile')->pluck('profile', 'profile')->all()
+                        + array_map(fn (array $relay): string => $relay['name'], RelayCodec::PROFILES))
                     ->default('generic')
                     ->required(),
+                TextInput::make('measure_interval_min')
+                    ->label('Chu kỳ đo (phút)')
+                    ->helperText('Đổi từ xa, thiết bị nhận ở lần gửi số đo tới. Bỏ trống: theo firmware.')
+                    ->numeric()
+                    ->minValue(5)
+                    ->maxValue(240)
+                    ->visible(fn (Get $get): bool => $get('kind') === DeviceKind::Esp32 || $get('kind') === DeviceKind::Esp32->value),
             ]);
     }
 

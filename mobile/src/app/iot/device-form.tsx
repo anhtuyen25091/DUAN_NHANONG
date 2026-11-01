@@ -1,4 +1,4 @@
-import { normalizeDevEui, type IotDevice, type IotDeviceInput, type IotFarm } from '@nhanong/shared';
+import { MEASURE_INTERVALS, normalizeDevEui, type IotDevice, type IotDeviceInput, type IotFarm } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Share, Text, View } from 'react-native';
@@ -26,6 +26,7 @@ function DeviceForm({ farms, device, profiles, farmId, plotId: initialPlot }: { 
   const [plotId, setPlotId] = useState<number | null>(initialPlot);
   const [devEui, setDevEui] = useState(device?.dev_eui ?? '');
   const [profile, setProfile] = useState(device?.profile ?? 'generic');
+  const [measureInterval, setMeasureInterval] = useState<number | null>(device?.measure_interval_min ?? null);
   const [errors, setErrors] = useState(NO_ERRORS);
   const [busy, setBusy] = useState(false);
   // Khóa vừa tạo: chỉ hiện 1 lần
@@ -38,6 +39,7 @@ function DeviceForm({ farms, device, profiles, farmId, plotId: initialPlot }: { 
     kind,
     profile: kind === 'lorawan' ? profile : 'generic',
     dev_eui: kind === 'lorawan' ? normalizeDevEui(devEui) || null : null,
+    measure_interval_min: kind === 'esp32' ? measureInterval : null,
   });
 
   const save = async () => {
@@ -90,6 +92,13 @@ function DeviceForm({ farms, device, profiles, farmId, plotId: initialPlot }: { 
           <Chip key={p.id} label={p.name} active={plotId === p.id} onPress={() => setPlotId(p.id)} small />
         ))}
       </FormSection>
+      {kind === 'esp32' && (
+        <FormSection label="Chu kỳ đo (đổi từ xa, mạch nhận ở lần gửi số đo tới)" error={errors.fields.measure_interval_min}>
+          {MEASURE_INTERVALS.map((m) => (
+            <Chip key={String(m)} small label={m === null ? 'Theo firmware' : `${m} phút`} active={measureInterval === m} onPress={() => setMeasureInterval(m)} />
+          ))}
+        </FormSection>
+      )}
       {kind === 'lorawan' && (
         <>
           <FormInput

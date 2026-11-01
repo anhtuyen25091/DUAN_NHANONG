@@ -11,6 +11,30 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 01/11/2026 (tiếp 8): Firmware: HTTPS / MQTT có mã hóa, đổi cấu hình từ xa, cập nhật qua mạng (OTA); đẩy code lên GitHub
+
+**Đã làm**
+- **HTTPS / MQTT TLS**: `API_BASE` dạng `https://` thì kiểm chứng chỉ máy chủ bằng `TLS_ROOT_CA` (dán PEM vào `config.h`); chưa có chứng chỉ thì không gửi (`TLS_INSECURE 1` chỉ để thử). MQTT: `MQTT_TLS 1`.
+- **Đổi chu kỳ đo từ xa** (5–240 phút): đặt trong app / web (form thiết bị ESP32) hoặc `/admin`; máy chủ gửi `config` kèm phản hồi `/ingest` + `/device/commands`; thiết bị lưu `/config.json`.
+- **Cập nhật firmware qua mạng**:
+  - `/admin` › Cập nhật firmware: tải file `.bin` cho đúng 1 thiết bị (khóa + WiFi nằm sẵn trong firmware), máy chủ tự tính MD5 + kích thước
+  - thiết bị thấy `firmware_update` trong phản hồi → tải `GET /device/firmware` (khóa thiết bị) → HTTPUpdate kiểm MD5 → khởi động lại; gửi số đo kèm version mới thì ghi "Đã cài"
+  - mạch điều khiển chỉ cập nhật khi không máy nào đang chạy
+  - build riêng `pio run -e esp32dev-ota` (bảng phân vùng 2 vùng chương trình 1,6 MB; hàng đợi mất mạng còn ~2–3 tuần thay vì 1–2 tháng); bản thường `esp32dev` giữ nguyên
+- `config.h` cũ vẫn biên dịch được (các mục mới có giá trị mặc định).
+- README firmware + README `iot/` ghi cách dùng.
+
+**Kiểm tra**
+- iot 78/78 (thêm 3 test: tải firmware + MD5 + ghi đã cài, không lộ firmware thiết bị khác, cấu hình từ xa), backend 219/219, thư viện chung 142/142, app + web typecheck sạch, web build sạch.
+- Firmware biên dịch được: `esp32dev` (85,8% vùng 1,5 MB), `esp32dev-ota` (81,3% vùng 1,6 MB), và chế độ mạch điều khiển + MQTT (81,0%).
+
+**Còn tồn**
+- Chưa nạp thử lên mạch thật: HTTPS với chứng chỉ thật, cập nhật qua mạng thật.
+- Firmware còn ~19% chỗ trống trong bản OTA; thêm nhiều tính năng nữa thì phải bỏ bớt (VD SMS) hoặc dùng mạch 8 MB flash.
+- Báo qua SMS / Zalo (mục 11) chưa làm: cần chọn nhà cung cấp trả phí.
+
+---
+
 ## 01/11/2026 (tiếp 7): Bật / tắt máy qua mạch relay LoRaWAN, tài liệu API
 
 **Đã làm**

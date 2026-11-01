@@ -90,3 +90,22 @@ ESP32 GPIO13 ── IN3 (kênh 3)     ESP32 GPIO23 ── IN4 (kênh 4)
 Đặt `USE_MQTT 1`. Firmware publish lên topic `nhanong/<mã thiết bị>/up` với nội dung giống `POST /ingest`, kèm thêm trường `"key"`. Trên máy chủ chạy `php artisan iot:mqtt-listen`. Broker chạy thật cần tài khoản: điền `MQTT_USERNAME` / `MQTT_PASSWORD` (xem `deploy/mosquitto-production.conf`).
 
 Lưu ý: firmware publish ở QoS 0, nghĩa là không có xác nhận từ máy chủ. Nếu cần chắc chắn dữ liệu đã tới nơi thì dùng HTTP.
+
+## HTTPS / MQTT có mã hóa
+
+- Chạy thật: đặt `API_BASE` dạng `https://…` và dán chứng chỉ gốc của máy chủ (PEM) vào `TLS_ROOT_CA`. Ví dụ máy chủ dùng Let's Encrypt thì lấy "ISRG Root X1" ở letsencrypt.org/certificates, hoặc chứng chỉ cuối cùng khi chạy `openssl s_client -connect iot.tenmien.vn:443 -showcerts </dev/null`.
+- `https` mà chưa có chứng chỉ thì thiết bị **không gửi**, để tránh gửi khóa cho máy chủ giả. `TLS_INSECURE 1` chỉ dùng để thử.
+- MQTT: `MQTT_TLS 1` + `MQTT_PORT 8883`, dùng chung `TLS_ROOT_CA`.
+
+## Đổi cấu hình từ xa
+
+Chu kỳ đo đặt trong app, web hoặc `/admin` (Thiết bị › Chu kỳ đo, 5–240 phút). Máy chủ gửi kèm phản hồi `/ingest` và `/device/commands` (`"config": {"measure_interval_min": 30}`). Thiết bị lưu vào `/config.json`, mất điện vẫn giữ. Gửi qua MQTT thì không nhận được (MQTT không có phản hồi).
+
+## Cập nhật firmware qua mạng (OTA)
+
+1. Build bằng môi trường có 2 vùng chương trình: `pio run -e esp32dev-ota -t upload`. Lần đầu nạp bằng cáp. Vùng LittleFS còn ~640 KB nên hàng đợi khi mất mạng giữ được khoảng 2–3 tuần số đo 15 phút/lần (bản thường `esp32dev`: 1–2 tháng, nhưng không cập nhật qua mạng được).
+2. Bản mới: tăng `FIRMWARE_VERSION`, chạy `pio run -e esp32dev-ota`, tải `.pio/build/esp32dev-ota/firmware.bin` lên `/admin` › Cập nhật firmware, chọn đúng thiết bị.
+   - Khóa thiết bị + WiFi nằm sẵn trong firmware, nên **mỗi file chỉ dùng cho 1 thiết bị**.
+3. Lần gửi số đo tới, máy chủ báo `firmware_update`. Thiết bị tải `GET /device/firmware` (khóa thiết bị), thư viện HTTPUpdate kiểm MD5 rồi mới ghi, xong thì khởi động lại. Gửi số đo kèm version mới thì trang quản trị ghi "Đã cài".
+   - Mạch điều khiển chỉ cập nhật khi không máy nào đang chạy.
+   - Tải lỗi (mất mạng giữa chừng, sai MD5) thì vẫn chạy bản cũ, lần sau thử lại.

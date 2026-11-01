@@ -4,7 +4,7 @@
 // ---- Thiết bị (lấy trong /admin > Thiết bị, hoặc API POST /api/v1/devices) ----
 #define DEVICE_UID "ND7K3M9QXA"
 #define DEVICE_KEY "ndk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.0.0"  // tăng mỗi lần build bản mới để cập nhật qua mạng
 
 // ---- Mạng (để trống WIFI_SSID nếu ruộng không có WiFi: chỉ lưu và chờ điện thoại tới lấy) ----
 #define WIFI_SSID "TenWifi"
@@ -13,6 +13,11 @@
 
 // ---- Máy chủ ----
 #define API_BASE "http://192.168.1.10:8001/api/v1"
+// Chạy thật nên dùng https://. Khi đó dán chứng chỉ GỐC của máy chủ (dạng PEM) vào TLS_ROOT_CA, VD Let's Encrypt "ISRG Root X1":
+//   openssl s_client -connect iot.tenmien.vn:443 -showcerts </dev/null   (chứng chỉ cuối cùng trong chuỗi), hoặc tải từ letsencrypt.org/certificates
+// Chưa có chứng chỉ thì thiết bị không gửi (tránh bị giả mạo máy chủ). TLS_INSECURE 1 chỉ để thử, không kiểm chứng chỉ.
+#define TLS_ROOT_CA ""
+#define TLS_INSECURE 0
 // 1 = gửi qua MQTT (topic nhanong/<uid>/up), 0 = gửi qua HTTP POST /ingest
 #define USE_MQTT 0
 #define MQTT_HOST "192.168.1.10"
@@ -20,9 +25,11 @@
 // Tài khoản MQTT chung cho thiết bị (deploy/mosquitto-production.conf). Để trống nếu broker cho kết nối không mật khẩu (dev)
 #define MQTT_USERNAME ""
 #define MQTT_PASSWORD ""
+// 1 = MQTT qua TLS (thường cổng 8883), dùng chung TLS_ROOT_CA. MQTT không nhận được cấu hình từ xa / bản cập nhật (cần HTTP)
+#define MQTT_TLS 0
 
 // ---- Chu kỳ ----
-#define MEASURE_INTERVAL_MIN 15   // đo mỗi 15 phút, ngủ sâu giữa 2 lần đo
+#define MEASURE_INTERVAL_MIN 15   // đo mỗi 15 phút, ngủ sâu giữa 2 lần đo (đổi từ xa được: app / trang quản trị > Thiết bị > Chu kỳ đo)
 #define UPLOAD_BATCH 200          // số dòng mỗi lần gửi bù
 #define MAX_QUEUE_BYTES 2000000   // ~2 MB (vùng LittleFS 2,4 MB) ≈ 1–2 tháng số đo 15 phút/lần; đầy thì bỏ dữ liệu cũ nhất
 

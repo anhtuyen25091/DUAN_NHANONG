@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
  * Thiết bị gửi số đo. ESP32 xác thực bằng khóa (Authorization: Bearer), LoRaWAN nhận diện qua dev_eui.
  * uid là mã công khai in trên thiết bị, dùng trong topic MQTT và file dữ liệu điện thoại chuyển tiếp.
  */
-#[Fillable(['farm_id', 'plot_id', 'name', 'kind', 'profile', 'dev_eui', 'firmware'])]
+#[Fillable(['farm_id', 'plot_id', 'name', 'kind', 'profile', 'dev_eui', 'firmware', 'measure_interval_min'])]
 #[Hidden(['api_key', 'api_key_hash', 'downlink'])]
 class Device extends Model
 {
@@ -36,6 +36,7 @@ class Device extends Model
             'offline_notified_at' => 'datetime',
             'low_battery_notified_at' => 'datetime',
             'battery' => 'integer',
+            'measure_interval_min' => 'integer',
         ];
     }
 
@@ -124,5 +125,37 @@ class Device extends Model
     public function actuators(): HasMany
     {
         return $this->hasMany(Actuator::class);
+    }
+
+    /**
+     * @return HasMany<FirmwareRelease, $this>
+     */
+    public function firmwareReleases(): HasMany
+    {
+        return $this->hasMany(FirmwareRelease::class);
+    }
+
+    /** Bản firmware mới nhất chưa cài (khác version đang chạy) */
+    public function pendingFirmware(): ?FirmwareRelease
+    {
+        return $this->firmwareReleases()->whereNull('installed_at')->where('version', '!=', (string) $this->firmware)->latest('id')->first();
+    }
+
+    /**
+     * Gửi kèm phản hồi cho mạch ESP32 (/ingest, /device/commands): cấu hình từ xa + bản firmware cần cài.
+     *
+     * @return array{config?: array{measure_interval_min: int}, firmware_update?: array{version: string, size: int, md5: string}}
+     */
+    public function syncPayload(): array
+    {
+        $payload = [];
+        if ($this->measure_interval_min !== null) {
+            $payload['config'] = ['measure_interval_min' => $this->measure_interval_min];
+        }
+        if (($release = $this->pendingFirmware()) !== null) {
+            $payload['firmware_update'] = ['version' => $release->version, 'size' => $release->size, 'md5' => $release->md5];
+        }
+
+        return $payload;
     }
 }

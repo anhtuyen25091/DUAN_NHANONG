@@ -30,7 +30,8 @@ class DeviceCommandController extends Controller
             $this->commands->syncStates($device, self::parseStates((string) $request->query('states')));
         }
 
-        return response()->json(self::payload($this->commands, $device));
+        // Kèm cấu hình từ xa + bản firmware cần cài (mạch điều khiển ít khi gọi /ingest)
+        return response()->json(self::payload($this->commands, $device) + $device->syncPayload());
     }
 
     /**

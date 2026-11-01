@@ -33,6 +33,8 @@ class ReadingIngestor
     {
         if (is_string($payload['firmware'] ?? null) && $payload['firmware'] !== $device->firmware) {
             $device->firmware = mb_substr($payload['firmware'], 0, 32);
+            // Vừa cài xong bản cập nhật qua mạng
+            $device->firmwareReleases()->where('version', $device->firmware)->whereNull('installed_at')->update(['installed_at' => now()]);
         }
 
         $rows = is_array($payload['readings'] ?? null) ? array_values($payload['readings']) : [];

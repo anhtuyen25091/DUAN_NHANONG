@@ -87,6 +87,7 @@ Gửi lại cùng số đo thì được tính vào `duplicates`, không bị nh
 | `GET /device/commands?states=1:1,2:0` | Lấy lệnh đang chờ (kèm trạng thái relay hiện tại). Trả `{"commands": [{"id": 12, "channel": 1, "action": "on", "minutes": 30}], "poll_seconds": 10}`. Lệnh chưa báo kết quả thì gửi lại; mạch bỏ qua id đã làm. |
 | `POST /device/commands/{id}/ack` | `{"ok": true, "states": "1:1,2:0"}` hoặc `{"ok": false, "message": "…"}` (báo lỗi về điện thoại) |
 | `POST /ingest` | Mạch có relay thì phản hồi kèm `commands` như trên |
+| `GET /device/firmware` | Tải bản firmware mới (header `x-MD5`). Phản hồi `/ingest`, `/device/commands` báo `"firmware_update": {"version", "size", "md5"}` khi có bản chưa cài (tải lên ở `/admin` › Cập nhật firmware), và `"config": {"measure_interval_min": 30}` khi chủ trang trại đổi chu kỳ đo |
 
 **Mạch relay LoRaWAN** (Dragino LT-22222-L, chọn dòng `dragino-lt22222` khi thêm thiết bị; kênh 1–2):
 - Bấm bật / tắt: máy chủ đẩy lệnh `03 aa bb` xuống (`01` đóng relay, `00` mở, `11` giữ nguyên) qua network server, cổng `IOT_LORAWAN_DOWNLINK_FPORT` (mặc định 2).

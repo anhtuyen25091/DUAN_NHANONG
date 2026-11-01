@@ -40,7 +40,8 @@ class IngestController extends Controller
         // Bo vừa đo vừa điều khiển relay: gửi kèm lệnh đang chờ để khỏi phải hỏi riêng
         $extra = $device->actuators()->exists() ? DeviceCommandController::payload($this->commands, $device) : [];
 
-        return response()->json($result->toArray() + $extra);
+        // Kèm cấu hình từ xa (chu kỳ đo) + bản firmware cần cài nếu có
+        return response()->json($result->toArray() + $extra + $device->syncPayload());
     }
 
     /**

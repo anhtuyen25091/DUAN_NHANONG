@@ -5,6 +5,7 @@ import {
   describeSchedule,
   formatDecimal,
   isController,
+  MEASURE_INTERVALS,
   monthsLabel,
   normalizeDevEui,
   parseDecimalInput,
@@ -294,6 +295,7 @@ function DeviceFormInner({ farm, device, plotId: initialPlot, profiles }: { farm
   const [plotId, setPlotId] = useState<number | null>(initialPlot)
   const [devEui, setDevEui] = useState(device?.dev_eui ?? '')
   const [profile, setProfile] = useState(device?.profile ?? 'generic')
+  const [measureInterval, setMeasureInterval] = useState<number | null>(device?.measure_interval_min ?? null)
   const [errors, setErrors] = useState(NO_ERRORS)
   const [busy, setBusy] = useState(false)
   const [key, setKey] = useState<{ device: IotDevice; key: string } | null>(null)
@@ -305,6 +307,7 @@ function DeviceFormInner({ farm, device, plotId: initialPlot, profiles }: { farm
     kind,
     profile: kind === 'lorawan' ? profile : 'generic',
     dev_eui: kind === 'lorawan' ? normalizeDevEui(devEui) || null : null,
+    measure_interval_min: kind === 'esp32' ? measureInterval : null,
   })
 
   const submit = async (e: FormEvent) => {
@@ -378,6 +381,12 @@ function DeviceFormInner({ farm, device, plotId: initialPlot, profiles }: { farm
           <legend>Đặt ở lô ({farm.name})</legend>
           <Choices value={plotId} options={[{ value: null, label: 'Chưa gán' }, ...farm.plots.map((p) => ({ value: p.id, label: p.name }))]} onChange={setPlotId} />
         </fieldset>
+        {kind === 'esp32' && (
+          <fieldset>
+            <legend>Chu kỳ đo (đổi từ xa, mạch nhận ở lần gửi số đo tới)</legend>
+            <Choices value={measureInterval} options={MEASURE_INTERVALS.map((m) => ({ value: m, label: m === null ? 'Theo firmware' : `${m} phút` }))} onChange={setMeasureInterval} />
+          </fieldset>
+        )}
         {kind === 'lorawan' && (
           <>
             <Field label="DevEUI" error={errors.fields.dev_eui} hint="16 ký tự in trên nhãn thiết bị, VD A8:40:41:00:01:81:C2:7A">

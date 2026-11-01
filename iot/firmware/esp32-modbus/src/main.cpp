@@ -8,16 +8,21 @@
 //   4. Ngủ sâu.
 // Ruộng không có mạng: bấm nút BOOT, thiết bị phát WiFi "NHANONG-<uid>"; điện thoại vào http://192.168.4.1
 // tải file dữ liệu (có chữ ký HMAC bằng khóa thiết bị), về nơi có mạng thì gửi file lên POST /ingest/upload.
+// API_BASE https:// thì kiểm chứng chỉ máy chủ (TLS_ROOT_CA). Máy chủ gửi kèm phản hồi:
+//   - "config": cấu hình đổi từ xa (chu kỳ đo), lưu vào /config.json
+//   - "firmware_update": có bản mới (chỉ bản build -e esp32dev-ota): tải GET /device/firmware, kiểm MD5, khởi động lại
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <HTTPUpdate.h>
 #include <LittleFS.h>
 #include <ModbusMaster.h>
 #include <PubSubClient.h>
 #include <RTClib.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <algorithm>
 #include <esp_sleep.h>
 #include <mbedtls/md.h>
@@ -26,9 +31,29 @@
 
 #include "config.h"
 
+// Mặc định cho config.h cũ (trước khi có các mục này)
+#ifndef TLS_ROOT_CA
+#define TLS_ROOT_CA ""
+#endif
+#ifndef TLS_INSECURE
+#define TLS_INSECURE 0
+#endif
+#ifndef MQTT_TLS
+#define MQTT_TLS 0
+#endif
+// Bật bằng môi trường build esp32dev-ota (2 vùng chương trình nên vùng LittleFS chỉ còn ~640 KB)
+#ifndef OTA_ENABLED
+#define OTA_ENABLED 0
+#endif
+#if OTA_ENABLED && MAX_QUEUE_BYTES > 500000
+#undef MAX_QUEUE_BYTES
+#define MAX_QUEUE_BYTES 500000  // ≈ 2–3 tuần số đo 15 phút/lần
+#endif
+
 static const char *QUEUE_FILE = "/queue.csv";
 static const char *POS_FILE = "/queue.pos";
 static const char *TMP_FILE = "/queue.tmp";
+static const char *CONFIG_FILE = "/config.json";
 // Trước mốc này coi như đồng hồ chưa được chỉnh
 static const time_t VALID_EPOCH = 1700000000;
 
@@ -42,6 +67,85 @@ String smsSnapshot;
 RTC_DS3231 rtc;
 bool rtcOk = false;
 ModbusMaster modbus;
+
+// ================= Mạng: HTTP / HTTPS =================
+
+WiFiClient plainNet;
+WiFiClientSecure secureNet;
+
+// Kết nối cho http:// hoặc https://. https mà chưa khai báo chứng chỉ gốc thì từ chối (trừ khi TLS_INSECURE để thử)
+NetworkClient *netFor(bool tls) {
+    if (!tls) return &plainNet;
+    if (strlen(TLS_ROOT_CA) > 0) {
+        secureNet.setCACert(TLS_ROOT_CA);
+    } else if (TLS_INSECURE) {
+        secureNet.setInsecure();
+    } else {
+        Serial.println("Máy chủ dùng https nhưng chưa khai báo TLS_ROOT_CA trong config.h");
+        return nullptr;
+    }
+    return &secureNet;
+}
+
+bool beginHttp(HTTPClient &http, const String &url) {
+    NetworkClient *net = netFor(url.startsWith("https://"));
+    if (net == nullptr || !http.begin(*net, url)) return false;
+    http.addHeader("Accept", "application/json");
+    http.addHeader("Authorization", String("Bearer ") + DEVICE_KEY);
+    return true;
+}
+
+// ================= Cấu hình từ xa + cập nhật firmware =================
+
+uint32_t measureIntervalMin = MEASURE_INTERVAL_MIN;
+String pendingFirmware;  // version máy chủ báo có bản mới
+
+void loadRemoteConfig() {
+    File f = LittleFS.open(CONFIG_FILE, "r");
+    if (!f) return;
+    JsonDocument doc;
+    if (!deserializeJson(doc, f) && doc["measure_interval_min"].is<uint32_t>()) measureIntervalMin = doc["measure_interval_min"];
+    f.close();
+}
+
+// Đọc "config" + "firmware_update" trong phản hồi của máy chủ
+void applyServerResponse(JsonDocument &response) {
+    uint32_t interval = response["config"]["measure_interval_min"] | 0;
+    if (interval >= 5 && interval <= 240 && interval != measureIntervalMin) {
+        measureIntervalMin = interval;
+        File f = LittleFS.open(CONFIG_FILE, "w");
+        if (f) {
+            JsonDocument doc;
+            doc["measure_interval_min"] = interval;
+            serializeJson(doc, f);
+            f.close();
+        }
+        Serial.printf("Máy chủ đổi chu kỳ đo: %lu phút\n", (unsigned long)interval);
+    }
+    const char *version = response["firmware_update"]["version"] | "";
+    if (strlen(version) > 0 && strcmp(version, FIRMWARE_VERSION) != 0) pendingFirmware = version;
+}
+
+// Tải bản firmware mới: thư viện HTTPUpdate kiểm MD5 (header x-MD5) trước khi ghi, xong thì khởi động lại
+void runFirmwareUpdate() {
+#if OTA_ENABLED
+    if (pendingFirmware.isEmpty() || WiFi.status() != WL_CONNECTED) return;
+    String url = String(API_BASE) + "/device/firmware";
+    NetworkClient *net = netFor(url.startsWith("https://"));
+    if (net == nullptr) return;
+    Serial.printf("Cập nhật firmware %s -> %s\n", FIRMWARE_VERSION, pendingFirmware.c_str());
+    httpUpdate.rebootOnUpdate(true);
+    httpUpdate.update(*net, url, FIRMWARE_VERSION, [](HTTPClient *http) {
+        http->addHeader("Authorization", String("Bearer ") + DEVICE_KEY);
+    });
+    // Tới đây là chưa cập nhật được (thành công thì đã khởi động lại); lần sau thử lại
+    Serial.printf("Cập nhật lỗi: %s\n", httpUpdate.getLastErrorString().c_str());
+    pendingFirmware = "";
+#else
+    if (!pendingFirmware.isEmpty()) Serial.println("Có firmware mới nhưng bản này không hỗ trợ cập nhật qua mạng (build -e esp32dev-ota)");
+    pendingFirmware = "";
+#endif
+}
 
 // ================= Đồng hồ =================
 
@@ -265,11 +369,13 @@ String buildBatch(File &f, size_t &next) {
 }
 
 #if USE_MQTT
-WiFiClient mqttNet;
-PubSubClient mqtt(mqttNet);
+PubSubClient mqtt;
 
 bool sendBatch(const String &body) {
     if (!mqtt.connected()) {
+        NetworkClient *net = netFor(MQTT_TLS);
+        if (net == nullptr) return false;
+        mqtt.setClient(*net);
         mqtt.setServer(MQTT_HOST, MQTT_PORT);
         mqtt.setBufferSize(24 * 1024);
         bool connected = strlen(MQTT_USERNAME) > 0 ? mqtt.connect(DEVICE_UID, MQTT_USERNAME, MQTT_PASSWORD) : mqtt.connect(DEVICE_UID);
@@ -281,10 +387,8 @@ bool sendBatch(const String &body) {
 #else
 bool sendBatch(const String &body) {
     HTTPClient http;
-    http.begin(String(API_BASE) + "/ingest");
+    if (!beginHttp(http, String(API_BASE) + "/ingest")) return false;
     http.addHeader("Content-Type", "application/json");
-    http.addHeader("Accept", "application/json");
-    http.addHeader("Authorization", String("Bearer ") + DEVICE_KEY);
     http.setTimeout(15000);
     int status = http.POST(body);
 
@@ -294,6 +398,7 @@ bool sendBatch(const String &body) {
             Serial.printf("  nhận %d, trùng %d, loại %d\n", response["accepted"].as<int>(), response["duplicates"].as<int>(), response["rejected"].size());
             // Không có NTP thì lấy giờ máy chủ
             if (nowEpoch() == 0 && response["server_time"].is<uint32_t>()) setClock(response["server_time"].as<uint32_t>());
+            applyServerResponse(response);
         }
     } else {
         Serial.printf("  gửi lỗi HTTP %d\n", status);
@@ -540,10 +645,8 @@ bool alreadyDone(uint32_t id) {
 
 void ackCommand(uint32_t id, bool ok, const char *message) {
     HTTPClient http;
-    http.begin(String(API_BASE) + "/device/commands/" + id + "/ack");
+    if (!beginHttp(http, String(API_BASE) + "/device/commands/" + id + "/ack")) return;
     http.addHeader("Content-Type", "application/json");
-    http.addHeader("Accept", "application/json");
-    http.addHeader("Authorization", String("Bearer ") + DEVICE_KEY);
     JsonDocument doc;
     doc["ok"] = ok;
     if (message) doc["message"] = message;
@@ -556,9 +659,7 @@ void ackCommand(uint32_t id, bool ok, const char *message) {
 
 void pollCommands() {
     HTTPClient http;
-    http.begin(String(API_BASE) + "/device/commands?states=" + relayStates());
-    http.addHeader("Accept", "application/json");
-    http.addHeader("Authorization", String("Bearer ") + DEVICE_KEY);
+    if (!beginHttp(http, String(API_BASE) + "/device/commands?states=" + relayStates())) return;
     http.setTimeout(10000);
     int status = http.GET();
     if (status != 200) {
@@ -574,6 +675,7 @@ void pollCommands() {
 
     if (response["poll_seconds"].is<uint32_t>()) pollMs = max(3UL, (unsigned long)response["poll_seconds"].as<uint32_t>()) * 1000UL;
     if (nowEpoch() == 0 && response["server_time"].is<uint32_t>()) setClock(response["server_time"].as<uint32_t>());
+    applyServerResponse(response);
 
     for (JsonObject command : response["commands"].as<JsonArray>()) {
         uint32_t id = command["id"];
@@ -617,12 +719,16 @@ void controllerLoop() {
         if (nowEpoch() == 0) syncClockNtp();
         pollCommands();
     }
-    if (lastMeasure == 0 || millis() - lastMeasure >= MEASURE_INTERVAL_MIN * 60000UL) {
+    if (lastMeasure == 0 || millis() - lastMeasure >= measureIntervalMin * 60000UL) {
         lastMeasure = millis();
         measure();
         compactQueue();
         if (online) flushQueue();
     }
+    // Chỉ cập nhật khi không máy nào đang chạy (khởi động lại thì relay tắt hết)
+    bool anyOn = false;
+    for (size_t i = 0; i < RELAY_COUNT; i++) anyOn = anyOn || relayOn[i];
+    if (online && !anyOn) runFirmwareUpdate();
     delay(200);
 }
 #endif
@@ -634,6 +740,7 @@ void setup() {
     LittleFS.begin(true);
     pinMode(PORTAL_BUTTON_PIN, INPUT_PULLUP);
     initClock();
+    loadRemoteConfig();
 
 #if CONTROLLER_MODE
     controllerSetup();
@@ -647,7 +754,7 @@ void setup() {
     // Bấm nút giữa 2 lần đo thì không đo lại
     if (!buttonWake || nextMeasureAt == 0 || (now != 0 && now >= nextMeasureAt)) {
         measure();
-        nextMeasureAt = nowEpoch() ? nowEpoch() + MEASURE_INTERVAL_MIN * 60 : 0;
+        nextMeasureAt = nowEpoch() ? nowEpoch() + measureIntervalMin * 60 : 0;
     }
     compactQueue();
 
@@ -656,6 +763,7 @@ void setup() {
     } else if (connectWifi()) {
         syncClockNtp();
         flushQueue();
+        runFirmwareUpdate();
     } else {
 #if USE_SMS
         sendSmsSnapshot();
@@ -665,7 +773,7 @@ void setup() {
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
 
-    uint64_t sleepSeconds = MEASURE_INTERVAL_MIN * 60;
+    uint64_t sleepSeconds = measureIntervalMin * 60;
     now = nowEpoch();
     if (now != 0 && nextMeasureAt > now) sleepSeconds = nextMeasureAt - now;
     Serial.printf("Ngủ %llu giây\n", sleepSeconds);

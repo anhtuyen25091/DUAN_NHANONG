@@ -104,6 +104,8 @@ class DeviceController extends Controller
             'name' => ['required', 'string', 'max:100'],
             'kind' => ['required', Rule::enum(DeviceKind::class)],
             'profile' => ['nullable', Rule::in($profiles)],
+            // Cấu hình từ xa cho mạch ESP32: chu kỳ đo (phút), null = theo firmware
+            'measure_interval_min' => ['nullable', 'integer', 'min:5', 'max:240'],
             'dev_eui' => [
                 Rule::requiredIf($request->input('kind') === DeviceKind::LoRaWan->value),
                 'nullable', 'regex:/^[0-9a-fA-F]{16}$/',

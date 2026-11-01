@@ -106,6 +106,8 @@ export interface IotDeviceInput {
   kind: 'esp32' | 'lorawan';
   profile: string | null;
   dev_eui: string | null;
+  /** Chu kỳ đo đổi từ xa (phút, mạch ESP32); null = theo firmware */
+  measure_interval_min?: number | null;
 }
 
 export interface IotDeviceProfile {
@@ -158,6 +160,8 @@ export interface IotDevice {
   profile: string;
   dev_eui: string | null;
   battery: number | null;
+  firmware: string | null;
+  measure_interval_min: number | null;
   online: boolean;
   last_seen_at: string | null;
 }
@@ -555,6 +559,9 @@ export const LORAWAN_RELAY_PROFILES = ['dragino-lt22222'];
 export function isController(device: Pick<IotDevice, 'kind' | 'profile'>): boolean {
   return device.kind === 'esp32' || LORAWAN_RELAY_PROFILES.includes(device.profile ?? '');
 }
+
+/** Chu kỳ đo chọn được (phút); null = theo firmware */
+export const MEASURE_INTERVALS: (number | null)[] = [null, 5, 10, 15, 30, 60];
 
 /** Được sửa (thêm / xóa) hay chỉ xem / bật tắt */
 export function canManage(role: IotRole | undefined): boolean {
