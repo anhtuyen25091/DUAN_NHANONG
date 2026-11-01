@@ -50,7 +50,18 @@ Người dùng chốt: ưu tiên nông dân trồng **sầu riêng, cà phê, h�
 - shared 136 test qua. iot 58 test qua. Typecheck mobile và build web không lỗi; lint web phần mới sạch.
 - Chụp web: bảng giá có giá sàn USD, trang cảm biến, trang Ao tôm 1 (điều khiển), thời tiết + lượng mưa Vườn Cư Bao.
 
-**Còn tồn:** nâng app lên Expo SDK 58 đang làm song song (agent riêng). Xong sẽ ghi tiếp.
+**4. App lên Expo SDK 58** (mở được bằng Expo Go mới; làm song song trên nhánh riêng rồi gộp, commit `c0f2b4e`)
+- Phiên bản: expo 57.0.28 → 58.0.22, react-native 0.86.3 → 0.88.1, React 19.2.3 → 19.3.0 (root `overrides` và `web/package.json` cũng lên 19.3.0), react-native-webview 13 → 14.
+- Sửa code bắt buộc:
+  - `File.write()` (SDK 58 thành async) → `writeSync()` ở 4 chỗ (sao lưu sổ, in phiếu, ảnh hóa đơn)
+  - kiểu ref chặt hơn (`TextInputInstance`, `ScrollViewInstance`)
+  - `ListFooterComponent` không nhận `null` nữa
+  - `WebView<object>` ở bản đồ điểm bán
+- Kiểm tra sau khi gộp:
+  - `npm ci` sạch; typecheck mobile (gồm các màn hình IoT mới) không lỗi; shared 136 test; build web; `expo export` Android 1.529 module; `expo-doctor` 20/20
+  - Metro trả manifest `sdkVersion 58.0.0` và bundle Android qua LAN; bản web của app chạy đúng trang chủ và trang lô
+- **Chưa thử:** mở bằng Expo Go 58 trên điện thoại thật.
+  - Lưu ý SDK 58: trên bản web, `useSafeAreaInsets` không còn tự cộng vùng an toàn (thanh tab có thể lệch nhẹ trên web).
 
 ---
 
