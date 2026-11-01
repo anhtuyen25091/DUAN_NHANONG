@@ -23,7 +23,7 @@ class ReadingController extends Controller
 
     public function index(Request $request, Device $device): JsonResponse
     {
-        Ownership::device($request, $device);
+        Ownership::device($request, $device, Ownership::VIEW);
 
         $data = $request->validate([
             'metric' => ['required', 'string', Rule::exists('metrics', 'code')],

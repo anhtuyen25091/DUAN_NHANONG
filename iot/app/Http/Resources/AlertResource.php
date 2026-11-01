@@ -17,7 +17,7 @@ class AlertResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'plot' => ['id' => $threshold->plot->id, 'name' => $threshold->plot->name],
+            'plot' => ['id' => $threshold->plot->id, 'name' => $threshold->plot->name, 'farm_id' => $threshold->plot->farm_id],
             'device' => ['id' => $this->device->id, 'name' => $this->device->name],
             'metric' => new MetricResource($threshold->metric),
             'direction' => $this->direction,

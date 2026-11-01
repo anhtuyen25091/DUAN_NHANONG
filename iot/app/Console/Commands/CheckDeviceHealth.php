@@ -14,7 +14,7 @@ class CheckDeviceHealth extends Command
 {
     public function handle(DeviceHealthNotifier $notifier): int
     {
-        $relations = ['plot', 'farm.user.pushTokens'];
+        $relations = ['plot', 'farm'];
 
         $offline = Device::query()->with($relations)
             ->whereNotNull('last_seen_at')

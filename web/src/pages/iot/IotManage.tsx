@@ -9,6 +9,7 @@ import {
   parseDecimalInput,
   parseDeviceFile,
   planLabel,
+  ROLE_LABELS,
   PROVINCE_CENTERS,
   PROVINCE_NAMES,
   thresholdLabel,
@@ -22,6 +23,7 @@ import {
   type IotMetric,
   type IotPlot,
   type IotPlotType,
+  type IotRole,
   type IotRule,
   type IotSchedule,
   type IotThreshold,
@@ -29,7 +31,7 @@ import {
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Status } from '../../components/Status'
 import { go, href, useAsync } from '../../hooks'
-import { iotApi } from '../../iot'
+import { iotApi, useIotAuth } from '../../iot'
 
 /**
  * Thêm / sửa trên web (giống app): trang trại, lô, thiết bị đo, ngưỡng (+ gợi ý theo cây), máy bơm / quạt (+ khóa an toàn),
@@ -1085,5 +1087,134 @@ export function PlanCard() {
         </button>
       )}
     </div>
+  )
+}
+
+// ---------- Chia sẻ trang trại ----------
+
+const SHARE_ROLES: { value: Exclude<IotRole, 'owner'>; label: string }[] = [
+  { value: 'operator', label: ROLE_LABELS.operator },
+  { value: 'viewer', label: ROLE_LABELS.viewer },
+]
+
+export function MembersPage({ farmId, farmName }: { farmId: number; farmName: string }) {
+  const auth = useIotAuth()
+  const [members, reload] = useAsync(() => iotApi.members(farmId), [farmId])
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<Exclude<IotRole, 'owner'>>('operator')
+  const [errors, setErrors] = useState(NO_ERRORS)
+  const [busy, setBusy] = useState(false)
+  if (members.status !== 'ok') return <Status state={members} retry={reload} />
+  const isOwner = members.data[0]?.user_id === auth?.user.id
+  const me = members.data.find((m) => m.user_id === auth?.user.id)
+
+  const invite = async (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    setErrors(NO_ERRORS)
+    try {
+      await iotApi.addMember(farmId, email.trim(), role)
+      setEmail('')
+      reload()
+    } catch (err) {
+      setErrors(toErrors(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section>
+      <Back to="cam-bien" label="Cảm biến" />
+      <h1>👥 Người dùng chung{farmName ? ` · ${farmName}` : ''}</h1>
+      <p className="muted">Người được chia sẻ xem được số đo, thời tiết, lượng mưa và cũng nhận thông báo của trang trại. Chỉ chủ trang trại được thêm / sửa / xóa.</p>
+      {members.data.map((m) => (
+        <div key={m.user_id} className="card">
+          <b>{m.name}</b> <span className="small muted">· {m.email}</span>
+          <br />
+          {isOwner && m.id !== null ? (
+            <>
+              <Choices value={m.role as Exclude<IotRole, 'owner'>} options={SHARE_ROLES} onChange={(r) => void iotApi.updateMember(m.id as number, r).then(reload)} />
+              <button
+                type="button"
+                className="linklike"
+                style={{ color: 'var(--error)' }}
+                onClick={() => {
+                  if (window.confirm(`Bỏ chia sẻ cho ${m.name}?`)) void iotApi.removeMember(m.id as number).then(reload)
+                }}
+              >
+                Bỏ chia sẻ
+              </button>
+            </>
+          ) : (
+            <span className="small">{ROLE_LABELS[m.role]}</span>
+          )}
+        </div>
+      ))}
+      {isOwner && (
+        <form className="form card" onSubmit={invite}>
+          <b>＋ Chia sẻ cho người khác</b>
+          <Field label="Email tài khoản cảm biến của người đó" error={errors.fields.email} hint="Người đó cần đăng ký tài khoản cảm biến trước (app Nhà Nông › 📡 Cảm biến).">
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </Field>
+          <fieldset>
+            <legend>Quyền</legend>
+            <Choices value={role} options={SHARE_ROLES} onChange={setRole} />
+          </fieldset>
+          <Message errors={errors} />
+          <button className="button primary" disabled={busy}>
+            {busy ? 'Đang chia sẻ…' : 'Chia sẻ'}
+          </button>
+        </form>
+      )}
+      {!isOwner && me?.id && (
+        <DeleteLink
+          label="Rời trang trại này"
+          confirmText="Rời trang trại? Bạn sẽ không xem được và không nhận thông báo nữa."
+          onConfirm={() => iotApi.removeMember(me.id as number).then(() => go('cam-bien'))}
+        />
+      )}
+    </section>
+  )
+}
+
+// ---------- Tải số liệu (Excel) ----------
+
+export function ExportButton({ plotId }: { plotId: number }) {
+  const [days, setDays] = useState(30)
+  const [state, setState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null })
+
+  const download = async () => {
+    setState({ busy: true, error: null })
+    try {
+      const { url, headers } = iotApi.exportRequest(plotId, days)
+      const response = await fetch(url, { headers })
+      if (!response.ok) throw new Error((await response.json().catch(() => null))?.message ?? `Lỗi máy chủ (${response.status})`)
+      const name = /filename="?([^";]+)"?/.exec(response.headers.get('content-disposition') ?? '')?.[1] ?? `so-do-${plotId}.xlsx`
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(await response.blob())
+      link.download = name
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(link.href), 10_000)
+      setState({ busy: false, error: null })
+    } catch (err) {
+      setState({ busy: false, error: (err as Error).message })
+    }
+  }
+
+  return (
+    <span>
+      <select value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Số ngày">
+        {[7, 30, 90, 180].map((d) => (
+          <option key={d} value={d}>
+            {d} ngày
+          </option>
+        ))}
+      </select>{' '}
+      <button type="button" className="button" disabled={state.busy} onClick={() => void download()}>
+        {state.busy ? 'Đang tải…' : '📊 Tải Excel'}
+      </button>
+      {state.error && <span className="field-error"> {state.error}</span>}
+    </span>
   )
 }

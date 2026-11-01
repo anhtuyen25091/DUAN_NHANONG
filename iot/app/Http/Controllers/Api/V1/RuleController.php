@@ -22,7 +22,7 @@ class RuleController extends Controller
 {
     public function index(Request $request, Plot $plot): AnonymousResourceCollection
     {
-        Ownership::plot($request, $plot);
+        Ownership::plot($request, $plot, Ownership::VIEW);
 
         return RuleResource::collection($plot->rules()->with(['metric', 'actuator'])->get());
     }

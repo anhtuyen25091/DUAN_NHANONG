@@ -46,7 +46,7 @@ class PlotController extends Controller
      */
     public function summary(Request $request, Plot $plot): JsonResponse
     {
-        Ownership::plot($request, $plot);
+        Ownership::plot($request, $plot, Ownership::VIEW);
 
         $devices = $plot->devices()->orderBy('name')->get();
         $thresholds = $plot->thresholds()->get()->keyBy('metric_id');
@@ -74,6 +74,7 @@ class PlotController extends Controller
             'devices' => DeviceResource::collection($devices),
             'readings' => $readings,
             'open_alerts' => AlertResource::collection($alerts),
+            'role' => $plot->farm->roleOf($request->user()),
         ]]);
     }
 

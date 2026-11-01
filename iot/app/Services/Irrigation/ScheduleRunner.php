@@ -30,7 +30,7 @@ class ScheduleRunner
         $skipped = 0;
 
         $due = ActuatorSchedule::query()
-            ->with('actuator.device.farm.user.pushTokens')
+            ->with('actuator.device.farm')
             ->where('enabled', true)
             ->whereDate('next_run_on', '<=', $now->toDateString())
             ->get()

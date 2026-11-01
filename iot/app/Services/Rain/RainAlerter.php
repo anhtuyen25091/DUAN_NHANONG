@@ -51,7 +51,7 @@ class RainAlerter
 
     private function notify(Farm $farm, float $mm, CarbonImmutable $at, ?Device $gauge): void
     {
-        $tokens = $farm->user->pushTokens;
+        $tokens = $farm->recipientTokens();
         if ($tokens->isEmpty()) {
             return;
         }

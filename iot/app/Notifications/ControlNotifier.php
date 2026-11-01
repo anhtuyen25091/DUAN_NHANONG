@@ -70,7 +70,7 @@ class ControlNotifier
 
     private function send(Farm $farm, string $title, string $body, ?int $plotId): int
     {
-        $tokens = $farm->user->pushTokens;
+        $tokens = $farm->recipientTokens();
 
         return $tokens->isEmpty() ? 0 : $this->client->send($tokens, $title, $body, array_filter(['iotPlotId' => $plotId]));
     }

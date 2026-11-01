@@ -11,6 +11,31 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 01/11/2026 (tiếp 6): Chia sẻ trang trại cho nhiều người + tải số liệu ra Excel
+
+**Đã làm**
+- **Chia sẻ trang trại** (người nhà, người làm công): chủ mời bằng email tài khoản cảm biến, chọn quyền:
+  - "Được bật / tắt máy": xem + bật / tắt máy bơm, quạt + bấm "Đã xử lý" cảnh báo
+  - "Chỉ xem": xem số đo, thời tiết, lượng mưa, lịch sử, tải Excel
+  - chỉ chủ được thêm / sửa / xóa; người được chia sẻ tự rời được; mọi người đều nhận thông báo (vượt ngưỡng, mưa, máy bơm, mất kết nối…)
+  - API: `GET/POST /farms/{id}/members`, `PUT/DELETE /farm-members/{id}`; quyền gom ở `App\Support\Ownership` (xem / bật tắt / quản lý; không liên quan → 404, thiếu quyền → 403)
+  - app (màn "Người dùng chung") + web (`#/cam-bien/chia-se/{id}`): ẩn nút sửa khi không phải chủ, ẩn nút bật / tắt khi "Chỉ xem"
+- **Tải số liệu của lô ra Excel** (7 / 30 / 90 / 180 ngày, giờ Việt Nam): `GET /plots/{id}/export?days=&format=xlsx|csv`
+  - xuất file .xlsx thật (tự ghi bằng ZipArchive, không thêm gói) vì CSV mở bằng Excel máy tiếng Việt hay bị dồn 1 cột
+  - app: tải xong mở bảng chia sẻ (gửi Zalo, lưu Drive…); web: tải file thẳng
+
+**Kiểm tra**
+- iot 71/71 (thêm 6 test chia sẻ + xuất file), thư viện chung 142/142, app typecheck sạch, web build + lint sạch.
+- File .xlsx thật từ DB dev mở được bằng openpyxl, số là số thật, dòng tiêu đề cố định.
+- Tạo tài khoản thứ 2 trên DB dev, chia sẻ "Chỉ xem" vườn Cư Bao: chụp màn hình web + app thấy đúng quyền.
+
+**Còn tồn**
+- Chưa có gửi lời mời qua SMS / Zalo: người được chia sẻ phải tự tạo tài khoản cảm biến trước.
+- Màn lịch tưới, luật tự động, ngưỡng chỉ hiện cho chủ (người được chia sẻ chưa xem được danh sách này trong app).
+- Chú ý khi làm: `npx expo lint` tự cài `eslint` + `eslint-config-expo` vào app; đã hoàn tác (thêm gói cần hỏi trước).
+
+---
+
 ## 01/11/2026 (tiếp 5): Đồng bộ web / app / trang quản trị cho phần cảm biến
 
 **Đã làm**

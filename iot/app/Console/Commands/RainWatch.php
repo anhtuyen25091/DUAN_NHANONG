@@ -20,7 +20,7 @@ class RainWatch extends Command
 
     public function handle(OpenMeteo $openMeteo, RainAlerter $alerter): int
     {
-        $farms = Farm::query()->with('user.pushTokens')->whereNotNull('lat')->whereNotNull('lng')->get();
+        $farms = Farm::query()->whereNotNull('lat')->whereNotNull('lng')->get();
         $raining = 0;
 
         foreach ($farms->chunk(self::BATCH) as $chunk) {

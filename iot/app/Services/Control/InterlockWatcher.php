@@ -21,7 +21,7 @@ class InterlockWatcher
     public function onReadings(Device $device, array $latest): void
     {
         $actuators = Actuator::query()
-            ->with(['openCommand', 'blockMetric', 'blockDevice', 'device.farm.user.pushTokens'])
+            ->with(['openCommand', 'blockMetric', 'blockDevice', 'device.farm'])
             ->where('block_device_id', $device->id)
             ->whereIn('block_metric_id', array_keys($latest))
             ->whereNotNull('block_value')

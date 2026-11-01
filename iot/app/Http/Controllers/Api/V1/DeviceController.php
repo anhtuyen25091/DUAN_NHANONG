@@ -6,6 +6,7 @@ use App\Enums\DeviceKind;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DeviceResource;
 use App\Models\Device;
+use App\Models\Farm;
 use App\Models\FieldMap;
 use App\Models\Plot;
 use App\Support\LatestReadings;
@@ -20,7 +21,9 @@ class DeviceController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        return DeviceResource::collection($request->user()->devices()->orderBy('devices.name')->get());
+        $farmIds = Farm::query()->accessibleBy($request->user())->select('id');
+
+        return DeviceResource::collection(Device::query()->whereIn('farm_id', $farmIds)->orderBy('name')->get());
     }
 
     /**
@@ -50,7 +53,7 @@ class DeviceController extends Controller
 
     public function show(Request $request, Device $device): DeviceResource
     {
-        return new DeviceResource(Ownership::device($request, $device));
+        return new DeviceResource(Ownership::device($request, $device, Ownership::VIEW));
     }
 
     public function update(Request $request, Device $device): DeviceResource
@@ -79,7 +82,7 @@ class DeviceController extends Controller
 
     public function latest(Request $request, Device $device): JsonResponse
     {
-        Ownership::device($request, $device);
+        Ownership::device($request, $device, Ownership::VIEW);
 
         return response()->json(['data' => LatestReadings::forDevices([$device->id])->map(LatestReadings::present(...))]);
     }

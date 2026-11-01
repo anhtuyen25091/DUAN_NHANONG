@@ -13,7 +13,7 @@ class DryNotifier
 
     public function send(Farm $farm, int $days, float $totalMm, ?string $forecast): int
     {
-        $tokens = $farm->user->pushTokens;
+        $tokens = $farm->recipientTokens();
         if ($tokens->isEmpty()) {
             return 0;
         }

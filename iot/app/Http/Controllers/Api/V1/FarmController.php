@@ -23,7 +23,11 @@ class FarmController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        return FarmResource::collection($request->user()->farms()->with('plots')->orderBy('name')->get());
+        // Trang trại của mình trước, rồi tới trang trại được chia sẻ
+        $farms = Farm::query()->accessibleBy($request->user())->with(['plots', 'user'])->get()
+            ->sortBy(fn (Farm $farm) => [$farm->user_id !== $request->user()->id, $farm->name])->values();
+
+        return FarmResource::collection($farms);
     }
 
     public function store(Request $request): JsonResponse
@@ -45,7 +49,7 @@ class FarmController extends Controller
      */
     public function weather(Request $request, Farm $farm, WeatherService $weather): JsonResponse
     {
-        Ownership::farm($request, $farm);
+        Ownership::farm($request, $farm, Ownership::VIEW);
         if ($farm->lat === null || $farm->lng === null) {
             return response()->json(['message' => 'Trang trại chưa có vị trí. Sửa trang trại để chọn tỉnh hoặc lấy vị trí GPS.'], 422);
         }
@@ -65,7 +69,7 @@ class FarmController extends Controller
      */
     public function rainfall(Request $request, Farm $farm, NhanongPlan $plan): JsonResponse
     {
-        Ownership::farm($request, $farm);
+        Ownership::farm($request, $farm, Ownership::VIEW);
         $data = $request->validate(['days' => ['nullable', 'integer', 'min:1', 'max:366']]);
 
         $user = $request->user();

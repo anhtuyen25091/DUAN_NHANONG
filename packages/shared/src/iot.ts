@@ -44,7 +44,21 @@ export interface IotFarm {
   dry_alert_days: number | null;
   /** Số ngày liên tiếp không mưa tới hôm qua (null: chưa có vị trí) */
   dry_days: number | null;
+  /** owner: chủ; operator: được bật / tắt máy; viewer: chỉ xem (trang trại người khác chia sẻ) */
+  role: IotRole;
+  owner_name?: string;
   plots: IotPlot[];
+}
+
+export type IotRole = 'owner' | 'operator' | 'viewer';
+
+/** Người dùng chung trang trại (dòng đầu là chủ, id = null) */
+export interface IotMember {
+  id: number | null;
+  user_id: number;
+  name: string;
+  email: string;
+  role: IotRole;
 }
 
 export interface IotFarmInput {
@@ -167,7 +181,7 @@ export interface IotReading {
 
 export interface IotAlert {
   id: number;
-  plot: { id: number; name: string };
+  plot: { id: number; name: string; farm_id: number };
   device: { id: number; name: string };
   metric: IotMetricRef & { group: string; decimals: number };
   direction: 'below' | 'above';
@@ -179,6 +193,7 @@ export interface IotAlert {
 }
 
 export interface IotPlotSummary {
+  role: IotRole;
   plot: IotPlot;
   devices: IotDevice[];
   readings: IotReading[];
@@ -386,6 +401,21 @@ export function createIotApi({ baseUrl, getToken, fetch: fetchFn = globalThis.fe
     saveThreshold: (plotId: number, input: { metric: string; min: number | null; max: number | null; note: string | null }) =>
       request<{ data: IotThreshold }>('POST', `/plots/${plotId}/thresholds`, { body: input }).then((r) => r.data),
     deleteThreshold: (id: number) => request<void>('DELETE', `/thresholds/${id}`),
+    members: (farmId: number) => request<{ data: IotMember[] }>('GET', `/farms/${farmId}/members`).then((r) => r.data),
+    addMember: (farmId: number, email: string, role: Exclude<IotRole, 'owner'>) =>
+      request<{ data: IotMember }>('POST', `/farms/${farmId}/members`, { body: { email, role } }).then((r) => r.data),
+    updateMember: (memberId: number, role: Exclude<IotRole, 'owner'>) =>
+      request<{ data: IotMember }>('PUT', `/farm-members/${memberId}`, { body: { role } }).then((r) => r.data),
+    /** Chủ bỏ chia sẻ, hoặc người được chia sẻ tự rời */
+    removeMember: (memberId: number) => request<void>('DELETE', `/farm-members/${memberId}`),
+    /** Địa chỉ + header để tải file số đo của lô (Excel / CSV); web tải bằng fetch, app bằng expo-file-system */
+    exportRequest: (plotId: number, days: number, format: 'xlsx' | 'csv' = 'xlsx') => {
+      const token = getToken();
+      return {
+        url: `${root}/plots/${plotId}/export?days=${days}&format=${format}`,
+        headers: token ? { Authorization: `Bearer ${token}` } : ({} as Record<string, string>),
+      };
+    },
     plotSummary: (plotId: number) => request<{ data: IotPlotSummary }>('GET', `/plots/${plotId}/summary`).then((r) => r.data),
     readings: (deviceId: number, query: { metric: string; from?: string; to?: string; interval?: IotInterval }) =>
       request<IotHistory>('GET', `/devices/${deviceId}/readings`, { query }),
@@ -512,6 +542,21 @@ export function describeCommand(command: Pick<IotCommand, 'action' | 'minutes' |
 }
 
 /** "Có gói Nhà Nông tới 31/10/2027 · xem lượng mưa 365 ngày" / "Miễn phí · xem lượng mưa 30 ngày" */
+export const ROLE_LABELS: Record<IotRole, string> = {
+  owner: 'Chủ trang trại',
+  operator: 'Được bật / tắt máy',
+  viewer: 'Chỉ xem',
+};
+
+/** Được sửa (thêm / xóa) hay chỉ xem / bật tắt */
+export function canManage(role: IotRole | undefined): boolean {
+  return role === undefined || role === 'owner';
+}
+
+export function canControl(role: IotRole | undefined): boolean {
+  return role !== 'viewer';
+}
+
 export function planLabel(plan: IotPlan): string {
   const days = `xem lượng mưa ${plan.rain_history_days} ngày`;
   if (!plan.premium) return `Miễn phí · ${days}`;

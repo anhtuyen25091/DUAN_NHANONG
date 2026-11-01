@@ -29,7 +29,7 @@ class ActuatorController extends Controller
 
     public function index(Request $request, Plot $plot): AnonymousResourceCollection
     {
-        Ownership::plot($request, $plot);
+        Ownership::plot($request, $plot, Ownership::VIEW);
 
         return ActuatorResource::collection($plot->actuators()->with(['device', 'openCommand', 'blockDevice', 'blockMetric'])->orderBy('name')->get());
     }
@@ -63,7 +63,7 @@ class ActuatorController extends Controller
      */
     public function command(Request $request, Actuator $actuator): JsonResponse
     {
-        Ownership::device($request, $actuator->device);
+        Ownership::device($request, $actuator->device, Ownership::CONTROL);
         $data = $request->validate([
             'action' => ['required', Rule::in([ActuatorCommand::ON, ActuatorCommand::OFF])],
             'minutes' => ['nullable', 'integer', 'min:1', 'max:'.$actuator->max_minutes],
@@ -80,7 +80,7 @@ class ActuatorController extends Controller
 
     public function history(Request $request, Actuator $actuator): AnonymousResourceCollection
     {
-        Ownership::device($request, $actuator->device);
+        Ownership::device($request, $actuator->device, Ownership::VIEW);
 
         return CommandResource::collection($actuator->commands()->latest('id')->limit(30)->get());
     }

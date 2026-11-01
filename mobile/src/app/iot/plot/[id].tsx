@@ -1,8 +1,8 @@
-import { formatIotValue, thresholdLabel, timeAgo, type IotReading } from '@nhanong/shared';
+import { canControl, canManage, formatIotValue, thresholdLabel, timeAgo, type IotReading } from '@nhanong/shared';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { AlertCard, SectionTitle } from '../../../components/iot';
+import { AlertCard, ExportButton, SectionTitle } from '../../../components/iot';
 import { ControlSection } from '../../../components/iotControl';
 import { Button, Card, Status, styles } from '../../../components/ui';
 import { iotApi } from '../../../lib/iot';
@@ -29,7 +29,7 @@ export default function IotPlotScreen() {
       {data && (
         <>
           {data.open_alerts.map((alert) => (
-            <AlertCard key={alert.id} alert={alert} onResolved={summary.refetch} />
+            <AlertCard key={alert.id} alert={alert} canResolve={canControl(data.role)} onResolved={summary.refetch} />
           ))}
 
           <SectionTitle text="Số đo mới nhất" />
@@ -61,20 +61,24 @@ export default function IotPlotScreen() {
             ))}
           </View>
 
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-            <View style={{ flex: 1 }}>
-              <Button
-                label="⚙️ Ngưỡng cảnh báo"
-                variant="outline"
-                onPress={() => router.push({ pathname: '/iot/thresholds', params: { plot: String(data.plot.id), name: data.plot.name, type: data.plot.type } })}
-              />
+          {canManage(data.role) && (
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="⚙️ Ngưỡng cảnh báo"
+                  variant="outline"
+                  onPress={() => router.push({ pathname: '/iot/thresholds', params: { plot: String(data.plot.id), name: data.plot.name, type: data.plot.type } })}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button label="✏️ Sửa lô" variant="outline" onPress={() => router.push({ pathname: '/iot/plot-form', params: { id: String(data.plot.id) } })} />
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Button label="✏️ Sửa lô" variant="outline" onPress={() => router.push({ pathname: '/iot/plot-form', params: { id: String(data.plot.id) } })} />
-            </View>
-          </View>
+          )}
+          <View style={{ height: 12 }} />
+          <ExportButton plotId={data.plot.id} plotName={data.plot.name} />
 
-          <ControlSection plotId={data.plot.id} plotName={data.plot.name} plotType={data.plot.type} farmId={data.plot.farm_id} />
+          <ControlSection plotId={data.plot.id} plotName={data.plot.name} plotType={data.plot.type} farmId={data.plot.farm_id} role={data.role} />
 
           <SectionTitle text="Thiết bị đo" />
           {data.devices.length === 0 && (
@@ -83,7 +87,7 @@ export default function IotPlotScreen() {
             </Card>
           )}
           {data.devices.map((device) => (
-            <Pressable key={device.id} onPress={() => router.push({ pathname: '/iot/device-form', params: { id: String(device.id) } })} accessibilityRole="button">
+            <Pressable key={device.id} disabled={!canManage(data.role)} onPress={() => router.push({ pathname: '/iot/device-form', params: { id: String(device.id) } })} accessibilityRole="button">
             <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Text style={{ fontSize: 14, color: device.online ? colors.primary : colors.error }}>●</Text>
               <View style={{ flex: 1 }}>
@@ -101,11 +105,13 @@ export default function IotPlotScreen() {
             </Card>
             </Pressable>
           ))}
-          <Button
-            label="＋ Thêm thiết bị"
-            variant="outline"
-            onPress={() => router.push({ pathname: '/iot/device-form', params: { farm: String(data.plot.farm_id), plot: String(data.plot.id) } })}
-          />
+          {canManage(data.role) && (
+            <Button
+              label="＋ Thêm thiết bị"
+              variant="outline"
+              onPress={() => router.push({ pathname: '/iot/device-form', params: { farm: String(data.plot.farm_id), plot: String(data.plot.id) } })}
+            />
+          )}
           <View style={{ height: 16 }} />
         </>
       )}

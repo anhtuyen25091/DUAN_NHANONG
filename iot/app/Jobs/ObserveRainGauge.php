@@ -19,7 +19,7 @@ class ObserveRainGauge implements ShouldQueue
 
     public function handle(RainAlerter $alerter): void
     {
-        $device = Device::query()->with(['farm.user.pushTokens', 'plot'])->find($this->deviceId);
+        $device = Device::query()->with(['farm', 'plot'])->find($this->deviceId);
         if ($device !== null) {
             $alerter->observe($device->farm, $this->mm, CarbonImmutable::parse($this->measuredAt), $device);
         }

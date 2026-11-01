@@ -22,7 +22,7 @@ class DrySpellAlerts extends Command
 
     public function handle(DrySpell $drySpell, DryNotifier $notifier, WeatherService $weather): int
     {
-        $farms = Farm::query()->with(['user.pushTokens', 'plots'])->whereNotNull('lat')->whereNotNull('lng')->where('dry_alert_days', '>', 0)->get();
+        $farms = Farm::query()->with(['plots'])->whereNotNull('lat')->whereNotNull('lng')->where('dry_alert_days', '>', 0)->get();
         $sent = 0;
 
         foreach ($farms as $farm) {

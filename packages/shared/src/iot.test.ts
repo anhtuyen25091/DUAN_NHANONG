@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from './api';
-import { createIotApi, describeCommand, planLabel, describeRule, describeSchedule, monthsLabel, formatDecimal, formatIotValue, normalizeDevEui, parseDecimalInput, parseDeviceFile, pointValue, rainOfDay, thresholdLabel, timeAgo, weatherDayLabel } from './iot';
+import { canControl, canManage, createIotApi, describeCommand, planLabel, describeRule, describeSchedule, monthsLabel, formatDecimal, formatIotValue, normalizeDevEui, parseDecimalInput, parseDeviceFile, pointValue, rainOfDay, thresholdLabel, timeAgo, weatherDayLabel } from './iot';
 
 function fakeFetch(status: number, body: unknown) {
   return vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(status === 204 ? null : JSON.stringify(body), { status }));
@@ -145,5 +145,15 @@ describe('lệnh và gói', () => {
   it('gói', () => {
     expect(planLabel({ linked: true, phone: '0900000099', premium: true, premium_until: '2027-10-31', rain_history_days: 365 })).toBe('Có gói Nhà Nông tới 31/10/2027 · xem lượng mưa 365 ngày');
     expect(planLabel({ linked: false, phone: null, premium: false, premium_until: null, rain_history_days: 30 })).toBe('Miễn phí · xem lượng mưa 30 ngày');
+  });
+
+  it('quyền theo vai trò', () => {
+    expect([canManage('owner'), canManage('operator'), canManage(undefined)]).toEqual([true, false, true]);
+    expect([canControl('owner'), canControl('operator'), canControl('viewer')]).toEqual([true, true, false]);
+  });
+
+  it('địa chỉ tải file số đo kèm token', () => {
+    const api = createIotApi({ baseUrl: 'http://iot:8001/', getToken: () => 'tok', fetch: fakeFetch(200, {}) });
+    expect(api.exportRequest(3, 30)).toEqual({ url: 'http://iot:8001/api/v1/plots/3/export?days=30&format=xlsx', headers: { Authorization: 'Bearer tok' } });
   });
 });

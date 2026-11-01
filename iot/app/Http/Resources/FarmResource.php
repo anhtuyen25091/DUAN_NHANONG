@@ -29,6 +29,9 @@ class FarmResource extends JsonResource
                 'since' => $this->raining_since->toIso8601String(),
                 'mm' => $this->rain_episode_mm,
             ],
+            // owner / operator (được bật / tắt máy) / viewer (chỉ xem): app ẩn nút sửa khi không phải chủ
+            'role' => $this->roleOf($request->user()),
+            'owner_name' => $this->whenLoaded('user', fn () => $this->user->name),
             'plots' => PlotResource::collection($this->whenLoaded('plots')),
         ];
     }

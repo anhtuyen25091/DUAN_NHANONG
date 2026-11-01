@@ -128,7 +128,7 @@ class CommandService
     public function expire(): int
     {
         $expired = ActuatorCommand::query()
-            ->with('actuator.device.farm.user.pushTokens')
+            ->with('actuator.device.farm')
             ->where('status', CommandStatus::Pending)
             ->where('expires_at', '<=', now())
             ->get();

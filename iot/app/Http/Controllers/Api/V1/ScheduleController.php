@@ -21,7 +21,7 @@ class ScheduleController extends Controller
 {
     public function index(Request $request, Plot $plot): AnonymousResourceCollection
     {
-        Ownership::plot($request, $plot);
+        Ownership::plot($request, $plot, Ownership::VIEW);
 
         return ScheduleResource::collection(
             ActuatorSchedule::query()->with('actuator')->whereIn('actuator_id', $plot->actuators()->select('id'))->orderBy('start_time')->get()

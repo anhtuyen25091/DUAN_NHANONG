@@ -18,7 +18,7 @@ class ThresholdController extends Controller
 {
     public function index(Request $request, Plot $plot): AnonymousResourceCollection
     {
-        return ThresholdResource::collection(Ownership::plot($request, $plot)->thresholds()->with('metric')->get());
+        return ThresholdResource::collection(Ownership::plot($request, $plot, Ownership::VIEW)->thresholds()->with('metric')->get());
     }
 
     /**

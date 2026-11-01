@@ -34,7 +34,7 @@ class DeviceHealthNotifier
 
     private function send(Device $device, string $title, string $body): int
     {
-        $tokens = $device->farm->user->pushTokens;
+        $tokens = $device->farm->recipientTokens();
 
         return $tokens->isEmpty() ? 0 : $this->client->send($tokens, $title, $body, array_filter([
             'iotPlotId' => $device->plot_id,

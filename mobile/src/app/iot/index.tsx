@@ -1,4 +1,4 @@
-import { ApiError, planLabel } from '@nhanong/shared';
+import { ApiError, canControl, canManage, planLabel, ROLE_LABELS } from '@nhanong/shared';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
@@ -134,7 +134,12 @@ function Farms() {
         <>
           <SectionTitle text={`⚠️ ${alerts.state.data.length} cảnh báo đang mở`} />
           {alerts.state.data.map((alert) => (
-            <AlertCard key={alert.id} alert={alert} onResolved={alerts.refetch} />
+            <AlertCard
+              key={alert.id}
+              alert={alert}
+              canResolve={canControl(farms.state.status === 'ok' ? farms.state.data.find((f) => f.id === alert.plot.farm_id)?.role : undefined)}
+              onResolved={alerts.refetch}
+            />
           ))}
         </>
       )}
@@ -153,13 +158,27 @@ function Farms() {
                 <SectionTitle text={`${farm.name}${farm.province ? ` · ${farm.province}` : ''}`} />
               </View>
               <Text
-                onPress={() => router.push({ pathname: '/iot/farm-form', params: { id: String(farm.id) } })}
+                onPress={() => router.push({ pathname: '/iot/members', params: { farm: String(farm.id), name: farm.name } })}
                 accessibilityRole="button"
                 style={{ color: colors.primary, fontWeight: '700', padding: 8 }}
               >
-                Sửa
+                👥 {canManage(farm.role) ? 'Chia sẻ' : 'Người dùng chung'}
               </Text>
+              {canManage(farm.role) && (
+                <Text
+                  onPress={() => router.push({ pathname: '/iot/farm-form', params: { id: String(farm.id) } })}
+                  accessibilityRole="button"
+                  style={{ color: colors.primary, fontWeight: '700', padding: 8 }}
+                >
+                  Sửa
+                </Text>
+              )}
             </View>
+            {!canManage(farm.role) && (
+              <Text style={[styles.muted, { marginBottom: 6, marginLeft: 4 }]}>
+                👥 {farm.owner_name} chia sẻ cho bạn · {ROLE_LABELS[farm.role]}
+              </Text>
+            )}
             <WeatherCard farm={farm} />
             {farm.plots.map((plot) => (
               <Pressable key={plot.id} onPress={() => router.push({ pathname: '/iot/plot/[id]', params: { id: String(plot.id), name: plot.name } })} accessibilityRole="button">
@@ -176,13 +195,15 @@ function Farms() {
                 </Card>
               </Pressable>
             ))}
-            <Text
-              onPress={() => router.push({ pathname: '/iot/plot-form', params: { farm: String(farm.id) } })}
-              accessibilityRole="button"
-              style={{ color: colors.primary, fontWeight: '700', fontSize: font.body, paddingVertical: 10, paddingHorizontal: 4, marginBottom: 8 }}
-            >
-              ＋ Thêm lô / ruộng / ao
-            </Text>
+            {canManage(farm.role) && (
+              <Text
+                onPress={() => router.push({ pathname: '/iot/plot-form', params: { farm: String(farm.id) } })}
+                accessibilityRole="button"
+                style={{ color: colors.primary, fontWeight: '700', fontSize: font.body, paddingVertical: 10, paddingHorizontal: 4, marginBottom: 8 }}
+              >
+                ＋ Thêm lô / ruộng / ao
+              </Text>
+            )}
           </View>
         ))}
       {farms.state.status === 'ok' && <Button label="＋ Thêm trang trại" onPress={() => router.push('/iot/farm-form')} variant={farms.state.data.length === 0 ? 'primary' : 'outline'} />}

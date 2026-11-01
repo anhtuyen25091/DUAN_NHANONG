@@ -1,5 +1,8 @@
 import {
   ApiError,
+  canControl,
+  canManage,
+  ROLE_LABELS,
   describeSchedule,
   formatDecimal,
   formatIotValue,
@@ -10,6 +13,7 @@ import {
   type IotAlert,
   type IotFarm,
   type IotInterval,
+  type IotRole,
   type IotPlotType,
   type IotReading,
   type IotWeather,
@@ -19,7 +23,7 @@ import { Status } from '../../components/Status'
 import { href, useAsync } from '../../hooks'
 import { iotApi, linkNhanongIfPossible, setIotAuth, signOutIot, useIotAuth } from '../../iot'
 import { IotLineChart, RainBars } from './IotCharts'
-import { ActuatorForm, DeviceForm, FarmForm, HistoryPage, PlanCard, PlotForm, RulesPage, SchedulesPage, ThresholdsPage, UploadPage } from './IotManage'
+import { ActuatorForm, DeviceForm, ExportButton, FarmForm, HistoryPage, MembersPage, PlanCard, PlotForm, RulesPage, SchedulesPage, ThresholdsPage, UploadPage } from './IotManage'
 
 /**
  * Cảm biến ruộng / ao trên web: #/cam-bien (trang trại, thời tiết, cảnh báo), #/cam-bien/lo/{id} (số đo, điều khiển),
@@ -48,6 +52,7 @@ export default function IotRoutes({ path, query }: { path: string[]; query: URLS
   if (path[1] === 'lich' && id) return <SchedulesPage plotId={id} plotName={query.get('ten') ?? ''} />
   if (path[1] === 'lich-su' && id) return <HistoryPage actuatorId={id} name={query.get('ten') ?? ''} plotId={query.get('plot')} />
   if (path[1] === 'gui-file') return <UploadPage />
+  if (path[1] === 'chia-se' && id) return <MembersPage farmId={id} farmName={query.get('ten') ?? ''} />
   return <Home />
 }
 
@@ -128,7 +133,12 @@ function Home() {
         <>
           <h2 className="section-title">⚠️ {alerts.data.length} cảnh báo đang mở</h2>
           {alerts.data.map((alert) => (
-            <AlertCard key={alert.id} alert={alert} onResolved={reloadAlerts} />
+            <AlertCard
+              key={alert.id}
+              alert={alert}
+              canResolve={canControl(farms.status === 'ok' ? farms.data.find((f) => f.id === alert.plot.farm_id)?.role : undefined)}
+              onResolved={reloadAlerts}
+            />
           ))}
         </>
       )}
@@ -140,10 +150,20 @@ function Home() {
             <h2 className="section-title">
               {farm.name}
               {farm.province ? ` · ${farm.province}` : ''}{' '}
-              <a className="small" href={href(`cam-bien/trang-trai/${farm.id}`)}>
-                Sửa
+              {canManage(farm.role) && (
+                <a className="small" href={href(`cam-bien/trang-trai/${farm.id}`)}>
+                  Sửa
+                </a>
+              )}{' '}
+              <a className="small" href={href(`cam-bien/chia-se/${farm.id}`, { ten: farm.name })}>
+                👥 {canManage(farm.role) ? 'Chia sẻ' : 'Người dùng chung'}
               </a>
             </h2>
+            {!canManage(farm.role) && (
+              <p className="small muted">
+                👥 {farm.owner_name} chia sẻ cho bạn · {ROLE_LABELS[farm.role]}
+              </p>
+            )}
             <WeatherCard farm={farm} />
             {farm.plots.map((plot) => (
               <a key={plot.id} className="card local-banner" href={href(`cam-bien/lo/${plot.id}`)}>
@@ -160,14 +180,16 @@ function Home() {
                 <span aria-hidden>›</span>
               </a>
             ))}
-            <div className="btn-row">
-              <a className="button" href={href('cam-bien/lo-moi', { farm: String(farm.id) })}>
-                ＋ Thêm lô
-              </a>
-              <a className="button" href={href('cam-bien/thiet-bi/moi', { farm: String(farm.id) })}>
-                ＋ Thêm thiết bị đo
-              </a>
-            </div>
+            {canManage(farm.role) && (
+              <div className="btn-row">
+                <a className="button" href={href('cam-bien/lo-moi', { farm: String(farm.id) })}>
+                  ＋ Thêm lô
+                </a>
+                <a className="button" href={href('cam-bien/thiet-bi/moi', { farm: String(farm.id) })}>
+                  ＋ Thêm thiết bị đo
+                </a>
+              </div>
+            )}
           </div>
         ))}
       <div className="btn-row">
@@ -243,8 +265,9 @@ function WeatherCard({ farm }: { farm: IotFarm }) {
   )
 }
 
-function AlertCard({ alert, onResolved }: { alert: IotAlert; onResolved: () => void }) {
+function AlertCard({ alert, canResolve = true, onResolved }: { alert: IotAlert; canResolve?: boolean; onResolved: () => void }) {
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const limit = alert.direction === 'below' ? `thấp hơn ${formatIotValue(alert.min ?? 0, alert.metric.unit)}` : `cao hơn ${formatIotValue(alert.max ?? 0, alert.metric.unit)}`
   return (
     <div className="card" style={{ borderLeft: '6px solid #c0262d' }}>
@@ -254,18 +277,27 @@ function AlertCard({ alert, onResolved }: { alert: IotAlert; onResolved: () => v
       <p className="small muted">
         {limit} · {timeAgo(alert.measured_at)} · {alert.device.name}
       </p>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true)
-          await iotApi.resolveAlert(alert.id).catch(() => {})
-          setBusy(false)
-          onResolved()
-        }}
-      >
-        ✓ Đã xử lý
-      </button>
+      {canResolve && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            setError(null)
+            try {
+              await iotApi.resolveAlert(alert.id)
+              onResolved()
+            } catch (err) {
+              setError((err as Error).message)
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          ✓ Đã xử lý
+        </button>
+      )}
+      {error && <p className="field-error">{error}</p>}
     </div>
   )
 }
@@ -281,7 +313,7 @@ function PlotPage({ id }: { id: number }) {
       {data && (
         <>
           {data.open_alerts.map((alert) => (
-            <AlertCard key={alert.id} alert={alert} onResolved={reload} />
+            <AlertCard key={alert.id} alert={alert} canResolve={canControl(data.role)} onResolved={reload} />
           ))}
           <h2 className="section-title">Số đo mới nhất</h2>
           {data.readings.length === 0 && <p className="muted">Chưa có số đo.</p>}
@@ -291,17 +323,22 @@ function PlotPage({ id }: { id: number }) {
             ))}
           </div>
           <div className="btn-row">
-            <a className="button" href={href(`cam-bien/nguong/${id}`, { ten: data.plot.name, type: data.plot.type })}>
-              🎯 Ngưỡng cảnh báo
-            </a>
-            <a className="button" href={href(`cam-bien/sua-lo/${id}`)}>
-              ✏️ Sửa lô
-            </a>
+            {canManage(data.role) && (
+              <>
+                <a className="button" href={href(`cam-bien/nguong/${id}`, { ten: data.plot.name, type: data.plot.type })}>
+                  🎯 Ngưỡng cảnh báo
+                </a>
+                <a className="button" href={href(`cam-bien/sua-lo/${id}`)}>
+                  ✏️ Sửa lô
+                </a>
+              </>
+            )}
+            <ExportButton plotId={id} />
           </div>
-          <Controls plotId={id} plotName={data.plot.name} type={data.plot.type} />
+          <Controls plotId={id} plotName={data.plot.name} type={data.plot.type} role={data.role} />
           <h2 className="section-title">Thiết bị đo</h2>
           {data.devices.map((device) => (
-            <a key={device.id} className="card" style={{ display: 'block' }} href={href(`cam-bien/thiet-bi/${device.id}`)}>
+            <a key={device.id} className="card" style={{ display: 'block' }} href={canManage(data.role) ? href(`cam-bien/thiet-bi/${device.id}`) : undefined}>
               <span style={{ color: device.online ? '#0b7a4b' : '#c0262d' }}>●</span> <b>{device.name}</b>{' '}
               <span className="small muted">
                 · {device.kind === 'lorawan' ? 'LoRaWAN' : 'WiFi / 4G'} · mã {device.uid}
@@ -309,9 +346,11 @@ function PlotPage({ id }: { id: number }) {
               </span>
             </a>
           ))}
-          <a className="button" href={href('cam-bien/thiet-bi/moi', { farm: String(data.plot.farm_id), plot: String(id) })}>
-            ＋ Thêm thiết bị đo
-          </a>
+          {canManage(data.role) && (
+            <a className="button" href={href('cam-bien/thiet-bi/moi', { farm: String(data.plot.farm_id), plot: String(id) })}>
+              ＋ Thêm thiết bị đo
+            </a>
+          )}
         </>
       )}
     </section>
@@ -344,7 +383,7 @@ function ReadingTile({ reading, showDevice }: { reading: IotReading; showDevice:
   )
 }
 
-function Controls({ plotId, plotName, type }: { plotId: number; plotName: string; type: IotPlotType }) {
+function Controls({ plotId, plotName, type, role }: { plotId: number; plotName: string; type: IotPlotType; role: IotRole }) {
   const [actuators, reload] = useAsync(() => iotApi.actuators(plotId), [plotId])
   // Giữ danh sách cũ trong lúc tải lại (tránh nhấp nháy khi hỏi trạng thái mỗi 3 giây)
   const [last, setLast] = useState<IotActuator[] | null>(null)
@@ -363,26 +402,28 @@ function Controls({ plotId, plotName, type }: { plotId: number; plotName: string
   }, [waiting])
   return (
     <>
-      <h2 className="section-title">⚙️ Điều khiển</h2>
+      {(list.length > 0 || canManage(role)) && <h2 className="section-title">⚙️ Điều khiển</h2>}
       {list.map((actuator) => (
-        <ActuatorCard key={actuator.id} actuator={actuator} plotId={plotId} onChanged={() => reloadRef.current()} />
+        <ActuatorCard key={actuator.id} actuator={actuator} plotId={plotId} role={role} onChanged={() => reloadRef.current()} />
       ))}
-      <div className="btn-row">
-        <a className="button" href={href('cam-bien/may/moi', { plot: String(plotId) })}>
-          ＋ Thêm máy bơm / quạt
-        </a>
-        {list.length > 0 && (
-          <a className="button" href={href(`cam-bien/luat/${plotId}`, { ten: plotName, type })}>
-            ⚡ Luật tự động
+      {canManage(role) && (
+        <div className="btn-row">
+          <a className="button" href={href('cam-bien/may/moi', { plot: String(plotId) })}>
+            ＋ Thêm máy bơm / quạt
           </a>
-        )}
-      </div>
-      {list.length > 0 && <Schedules plotId={plotId} plotName={plotName} />}
+          {list.length > 0 && (
+            <a className="button" href={href(`cam-bien/luat/${plotId}`, { ten: plotName, type })}>
+              ⚡ Luật tự động
+            </a>
+          )}
+        </div>
+      )}
+      {list.length > 0 && <Schedules plotId={plotId} plotName={plotName} editable={canManage(role)} />}
     </>
   )
 }
 
-function ActuatorCard({ actuator, plotId, onChanged }: { actuator: IotActuator; plotId: number; onChanged: () => void }) {
+function ActuatorCard({ actuator, plotId, role, onChanged }: { actuator: IotActuator; plotId: number; role: IotRole; onChanged: () => void }) {
   const [minutes, setMinutes] = useState(Math.min(30, actuator.max_minutes))
   const [error, setError] = useState<string | null>(null)
   const pending = actuator.pending
@@ -419,43 +460,54 @@ function ActuatorCard({ actuator, plotId, onChanged }: { actuator: IotActuator; 
         </p>
       )}
       {!actuator.device_online && <p className="field-error">⚠️ Mạch điều khiển đang mất kết nối: lệnh sẽ hủy nếu 10 phút không nhận được.</p>}
-      <div className="segmented">
-        {[15, 30, 60]
-          .filter((m) => m <= actuator.max_minutes)
-          .map((m) => (
-            <button key={m} type="button" className={minutes === m ? 'active' : ''} onClick={() => setMinutes(m)}>
-              {m} phút
+      {canControl(role) && (
+        <>
+          <div className="segmented">
+            {[15, 30, 60]
+              .filter((m) => m <= actuator.max_minutes)
+              .map((m) => (
+                <button key={m} type="button" className={minutes === m ? 'active' : ''} onClick={() => setMinutes(m)}>
+                  {m} phút
+                </button>
+              ))}
+          </div>
+          <div className="btn-row">
+            <button type="button" className="button primary" onClick={() => send('on')}>
+              Bật {minutes} phút
             </button>
-          ))}
-      </div>
-      <div className="btn-row">
-        <button type="button" className="button primary" onClick={() => send('on')}>
-          Bật {minutes} phút
-        </button>
-        <button type="button" onClick={() => send('off')} disabled={!actuator.is_on && pending?.action !== 'on'}>
-          Tắt
-        </button>
-      </div>
+            <button type="button" onClick={() => send('off')} disabled={!actuator.is_on && pending?.action !== 'on'}>
+              Tắt
+            </button>
+          </div>
+        </>
+      )}
       {error && <p className="field-error">{error}</p>}
       <p className="small">
-        <a href={href(`cam-bien/lich-su/${actuator.id}`, { ten: actuator.name, plot: String(plotId) })}>🕘 Lịch sử bật / tắt</a> ·{' '}
-        <a href={href(`cam-bien/may/${actuator.id}`, { plot: String(plotId) })}>Sửa</a>
+        <a href={href(`cam-bien/lich-su/${actuator.id}`, { ten: actuator.name, plot: String(plotId) })}>🕘 Lịch sử bật / tắt</a>
+        {canManage(role) && (
+          <>
+            {' · '}
+            <a href={href(`cam-bien/may/${actuator.id}`, { plot: String(plotId) })}>Sửa</a>
+          </>
+        )}
       </p>
     </div>
   )
 }
 
 /** Lịch tưới của lô (thêm / sửa ở trang Lịch tưới) */
-function Schedules({ plotId, plotName }: { plotId: number; plotName: string }) {
+function Schedules({ plotId, plotName, editable }: { plotId: number; plotName: string; editable: boolean }) {
   const [schedules] = useAsync(() => iotApi.schedules(plotId), [plotId])
-  if (schedules.status !== 'ok') return null
+  if (schedules.status !== 'ok' || (!editable && schedules.data.length === 0)) return null
   return (
     <>
       <h2 className="section-title">
         🗓️ Lịch tưới{' '}
-        <a className="small" href={href(`cam-bien/lich/${plotId}`, { ten: plotName })}>
-          {schedules.data.length ? 'Sửa' : '＋ Thêm'}
-        </a>
+        {editable && (
+          <a className="small" href={href(`cam-bien/lich/${plotId}`, { ten: plotName })}>
+            {schedules.data.length ? 'Sửa' : '＋ Thêm'}
+          </a>
+        )}
       </h2>
       {schedules.data.map((schedule) => (
         <p key={schedule.id} className="card" style={schedule.enabled ? undefined : { opacity: 0.6 }}>

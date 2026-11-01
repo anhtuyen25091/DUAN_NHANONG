@@ -12,12 +12,12 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 class AlertController extends Controller
 {
     /**
-     * Cảnh báo của mọi lô thuộc người dùng; ?open=1 chỉ lấy cảnh báo đang mở.
+     * Cảnh báo của mọi lô thuộc trang trại của mình hoặc được chia sẻ; ?open=1 chỉ lấy cảnh báo đang mở.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
         $alerts = Alert::query()
-            ->whereHas('threshold.plot.farm', fn ($query) => $query->where('user_id', $request->user()->id))
+            ->whereHas('threshold.plot.farm', fn ($query) => $query->accessibleBy($request->user()))
             ->when($request->boolean('open'), fn ($query) => $query->open())
             ->with(['threshold.plot', 'threshold.metric', 'device'])
             ->latest('measured_at')
@@ -31,7 +31,7 @@ class AlertController extends Controller
      */
     public function resolve(Request $request, Alert $alert): AlertResource
     {
-        Ownership::plot($request, $alert->threshold->plot);
+        Ownership::plot($request, $alert->threshold->plot, Ownership::CONTROL);
 
         if ($alert->resolved_at === null) {
             $alert->update(['resolved_at' => now()]);

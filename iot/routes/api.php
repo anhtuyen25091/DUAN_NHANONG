@@ -6,7 +6,9 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CropPresetController;
 use App\Http\Controllers\Api\V1\DeviceCommandController;
 use App\Http\Controllers\Api\V1\DeviceController;
+use App\Http\Controllers\Api\V1\ExportController;
 use App\Http\Controllers\Api\V1\FarmController;
+use App\Http\Controllers\Api\V1\FarmMemberController;
 use App\Http\Controllers\Api\V1\IngestController;
 use App\Http\Controllers\Api\V1\LoRaWanController;
 use App\Http\Controllers\Api\V1\MetricController;
@@ -58,11 +60,16 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::delete('/farms/{farm}', [FarmController::class, 'destroy'])->name('farms.destroy');
         Route::get('/farms/{farm}/weather', [FarmController::class, 'weather'])->middleware('throttle:30,1')->name('farms.weather');
         Route::get('/farms/{farm}/rainfall', [FarmController::class, 'rainfall'])->name('farms.rainfall');
+        Route::get('/farms/{farm}/members', [FarmMemberController::class, 'index'])->name('farm-members.index');
+        Route::post('/farms/{farm}/members', [FarmMemberController::class, 'store'])->middleware('throttle:20,1')->name('farm-members.store');
+        Route::put('/farm-members/{member}', [FarmMemberController::class, 'update'])->name('farm-members.update');
+        Route::delete('/farm-members/{member}', [FarmMemberController::class, 'destroy'])->name('farm-members.destroy');
 
         Route::post('/farms/{farm}/plots', [PlotController::class, 'store'])->name('plots.store');
         Route::put('/plots/{plot}', [PlotController::class, 'update'])->name('plots.update');
         Route::delete('/plots/{plot}', [PlotController::class, 'destroy'])->name('plots.destroy');
         Route::get('/plots/{plot}/summary', [PlotController::class, 'summary'])->name('plots.summary');
+        Route::get('/plots/{plot}/export', [ExportController::class, 'plot'])->middleware('throttle:10,1')->name('plots.export');
 
         Route::get('/plots/{plot}/thresholds', [ThresholdController::class, 'index'])->name('thresholds.index');
         Route::post('/plots/{plot}/thresholds', [ThresholdController::class, 'store'])->name('thresholds.store');

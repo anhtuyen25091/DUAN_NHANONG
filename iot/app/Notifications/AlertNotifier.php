@@ -14,10 +14,10 @@ class AlertNotifier
 
     public function opened(Alert $alert): int
     {
-        $alert->loadMissing(['threshold.plot.farm.user.pushTokens', 'threshold.metric', 'device']);
+        $alert->loadMissing(['threshold.plot.farm', 'threshold.metric', 'device']);
         $threshold = $alert->threshold;
         $metric = $threshold->metric;
-        $tokens = $threshold->plot->farm->user->pushTokens;
+        $tokens = $threshold->plot->farm->recipientTokens();
         if ($tokens->isEmpty()) {
             return 0;
         }

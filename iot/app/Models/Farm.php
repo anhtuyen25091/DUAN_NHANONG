@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Jobs\SyncFarmRain;
 use Database\Factories\FarmFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,6 +36,18 @@ class Farm extends Model
         ];
     }
 
+    /**
+     * Trang trại người dùng làm chủ hoặc được chia sẻ.
+     *
+     * @param  Builder<Farm>  $query
+     */
+    public function scopeAccessibleBy(Builder $query, User $user): void
+    {
+        $query->where(fn (Builder $query) => $query
+            ->where('farms.user_id', $user->id)
+            ->orWhereIn('farms.id', FarmMember::query()->select('farm_id')->where('user_id', $user->id)));
+    }
+
     public function hasLocation(): bool
     {
         return $this->lat !== null && $this->lng !== null;
@@ -55,6 +69,39 @@ class Farm extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return HasMany<FarmMember, $this>
+     */
+    public function members(): HasMany
+    {
+        return $this->hasMany(FarmMember::class);
+    }
+
+    /**
+     * Vai trò của người dùng với trang trại: owner / operator / viewer; null = không liên quan.
+     */
+    public function roleOf(User $user): ?string
+    {
+        if ($this->user_id === $user->id) {
+            return 'owner';
+        }
+
+        return $this->members()->where('user_id', $user->id)->value('role');
+    }
+
+    /**
+     * Điện thoại nhận thông báo của trang trại: chủ + mọi người được chia sẻ.
+     *
+     * @return Collection<int, PushToken>
+     */
+    public function recipientTokens(): Collection
+    {
+        return PushToken::query()
+            ->where('user_id', $this->user_id)
+            ->orWhereIn('user_id', $this->members()->select('user_id'))
+            ->get();
     }
 
     /**
