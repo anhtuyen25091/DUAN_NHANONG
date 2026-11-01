@@ -33,7 +33,7 @@ export default function LedgerSettingsScreen() {
       const file = new File(Paths.cache, name);
       if (file.exists) file.delete();
       file.create();
-      file.write(json);
+      file.writeSync(json);
       await Sharing.shareAsync(file.uri, { mimeType: 'application/json', dialogTitle: 'Lưu file sao lưu sổ thu chi' });
     } catch (error) {
       Alert.alert('Không tạo được file sao lưu', (error as Error).message);

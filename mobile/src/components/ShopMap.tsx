@@ -34,7 +34,8 @@ const toMapShop = (s: Shop): MapShop => {
  * Dùng WebView + Leaflet (Expo Go có sẵn WebView, không cần khóa bản đồ).
  */
 export function ShopMap({ filters, position }: { filters: ShopFilters; position: { lat: number; lng: number } | null }) {
-  const web = useRef<WebView>(null);
+  // Kiểu của react-native-webview 14 mặc định P = undefined làm props thành never: ghi rõ <object>
+  const web = useRef<WebView<object>>(null);
   const shops = useRef(new Map<number, Shop>());
   const request = useRef(0);
   const [view, setView] = useState<ShopMapView | null>(null);
@@ -96,7 +97,7 @@ export function ShopMap({ filters, position }: { filters: ShopFilters; position:
         </Text>
       )}
       <View style={{ flex: 1, minHeight: 280, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
-        <WebView ref={web} key={html.length + (filters.province ?? '') + (filters.type ?? '') + (filters.q ?? '')} originWhitelist={['*']} source={{ html }} onMessage={onMessage} style={{ flex: 1 }} setSupportMultipleWindows={false} />
+        <WebView<object> ref={web} key={html.length + (filters.province ?? '') + (filters.type ?? '') + (filters.q ?? '')} originWhitelist={['*']} source={{ html }} onMessage={onMessage} style={{ flex: 1 }} setSupportMultipleWindows={false} />
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         {(Object.keys(SHOP_TYPE_COLORS) as (keyof typeof SHOP_TYPE_COLORS)[]).map((t) => (
