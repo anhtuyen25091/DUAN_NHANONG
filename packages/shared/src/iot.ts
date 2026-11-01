@@ -273,7 +273,7 @@ export interface IotCommand {
   actuator_id: number;
   action: 'on' | 'off';
   minutes: number | null;
-  source: 'manual' | 'rule';
+  source: 'manual' | 'rule' | 'schedule' | 'safety';
   reason: string | null;
   status: IotCommandStatus;
   status_label: string;
@@ -496,6 +496,27 @@ export function describeRule(rule: IotRule): string {
   const when = `Khi ${rule.metric.name} ${rule.operator === 'below' ? 'thấp hơn' : 'cao hơn'} ${formatDecimal(rule.value)}${unit}`;
   const off = rule.off_value === null ? '' : `, tắt khi ${rule.operator === 'below' ? '≥' : '≤'} ${formatDecimal(rule.off_value)}`;
   return `${when} → bật ${rule.actuator.name} ${rule.minutes} phút${off}`;
+}
+
+const COMMAND_SOURCES: Record<IotCommand['source'], string> = {
+  manual: 'Bấm tay',
+  rule: 'Luật tự động',
+  schedule: 'Lịch tưới',
+  safety: 'Khóa an toàn',
+};
+
+/** "Bật 30 phút · Lịch tưới" / "Tắt · Khóa an toàn" */
+export function describeCommand(command: Pick<IotCommand, 'action' | 'minutes' | 'source'>): string {
+  const action = command.action === 'on' ? `Bật ${command.minutes} phút` : 'Tắt';
+  return `${action} · ${COMMAND_SOURCES[command.source] ?? command.source}`;
+}
+
+/** "Có gói Nhà Nông tới 31/10/2027 · xem lượng mưa 365 ngày" / "Miễn phí · xem lượng mưa 30 ngày" */
+export function planLabel(plan: IotPlan): string {
+  const days = `xem lượng mưa ${plan.rain_history_days} ngày`;
+  if (!plan.premium) return `Miễn phí · ${days}`;
+  const until = plan.premium_until ? ` tới ${plan.premium_until.split('-').reverse().join('/')}` : '';
+  return `Có gói Nhà Nông${until} · ${days}`;
 }
 
 /** [12, 1, 2, 3, 4] -> "tháng 12 → 4"; [3, 5] -> "tháng 3, 5"; null -> "cả năm" */

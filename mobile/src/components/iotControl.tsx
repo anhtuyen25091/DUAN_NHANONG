@@ -107,6 +107,13 @@ function ActuatorCard({ actuator, onChanged }: { actuator: IotActuator; onChange
         </Text>
       </View>
       <Text style={{ fontSize: font.body, fontWeight: '600', color: pending ? '#7a4a00' : actuator.is_on ? colors.primary : colors.muted, marginBottom: 8 }}>{state}</Text>
+      <Text
+        onPress={() => router.push({ pathname: '/iot/history', params: { actuator: String(actuator.id), name: actuator.name } })}
+        accessibilityRole="button"
+        style={{ color: colors.primary, fontWeight: '600', marginBottom: 8 }}
+      >
+        🕘 Lịch sử bật / tắt
+      </Text>
       {actuator.block && (
         <Text style={{ fontSize: font.small, color: colors.muted, marginBottom: 8 }}>
           🔒 Khóa an toàn: không bơm khi {actuator.block.metric_name} {actuator.block.operator === 'above' ? '>' : '<'} {formatDecimal(actuator.block.value)}

@@ -12,7 +12,9 @@ use App\Filament\Resources\Farms\FarmResource;
 use App\Filament\Resources\FieldMaps\FieldMapResource;
 use App\Filament\Resources\Metrics\MetricResource;
 use App\Filament\Resources\Plots\PlotResource;
+use App\Filament\Resources\Schedules\ScheduleResource;
 use App\Filament\Resources\Thresholds\ThresholdResource;
+use App\Filament\Resources\Users\UserResource;
 use App\Filament\Widgets\DeviceReadingsChart;
 use App\Filament\Widgets\IotStats;
 use App\Filament\Widgets\OfflineDevices;
@@ -49,7 +51,7 @@ class AdminPanelTest extends TestCase
         Livewire::test(IotStats::class)->assertSee('Thiết bị trực tuyến')->assertSee('1 / 1');
         Livewire::test(OfflineDevices::class)->assertSee('Mọi thiết bị đều đang gửi dữ liệu');
         Livewire::test(DeviceReadingsChart::class, ['record' => $device])->assertSee('pH đất 7 ngày qua');
-        foreach ([FarmResource::class, PlotResource::class, DeviceResource::class, MetricResource::class, ThresholdResource::class, AlertResource::class, FieldMapResource::class, ActuatorResource::class, AutomationRuleResource::class, ActuatorCommandResource::class] as $resource) {
+        foreach ([FarmResource::class, PlotResource::class, DeviceResource::class, MetricResource::class, ThresholdResource::class, AlertResource::class, FieldMapResource::class, ActuatorResource::class, AutomationRuleResource::class, ActuatorCommandResource::class, ScheduleResource::class, UserResource::class] as $resource) {
             $this->get($resource::getUrl())->assertOk();
         }
         $this->get(DeviceResource::getUrl('view', ['record' => $device]))

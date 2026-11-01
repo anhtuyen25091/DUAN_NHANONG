@@ -1,4 +1,4 @@
-import { ApiError } from '@nhanong/shared';
+import { ApiError, planLabel } from '@nhanong/shared';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
@@ -7,6 +7,7 @@ import { AlertCard, SectionTitle } from '../../components/iot';
 import { WeatherCard } from '../../components/iotWeather';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
 import { flushDeviceFiles, iotApi, linkNhanongIfPossible, setIotAuth, signOutIot, syncIotPush, useIotAuth, usePendingDeviceFiles } from '../../lib/iot';
+import { confirmAsync } from '../../lib/confirm';
 import { registerPush } from '../../lib/push';
 import { colors, font } from '../../lib/theme';
 import { showToast } from '../../lib/toast';
@@ -193,10 +194,44 @@ function Farms() {
         <Button label="📥 Lấy dữ liệu từ thiết bị" onPress={() => router.push('/iot/collect')} variant="outline" />
       </Card>
 
+      <PlanCard />
       <Text style={[styles.muted, { textAlign: 'center', marginTop: 8 }]}>Đăng nhập: {auth?.user.email}</Text>
       <Text onPress={() => void signOutIot()} accessibilityRole="button" style={{ color: colors.error, textAlign: 'center', padding: 12, fontSize: font.body }}>
         Đăng xuất tài khoản cảm biến
       </Text>
     </ScrollView>
+  );
+}
+
+/** Gói đang dùng (dùng chung với tài khoản Nhà Nông đã nối) */
+function PlanCard() {
+  const me = useAsync(() => iotApi.me(), []);
+  const [busy, setBusy] = useState(false);
+  if (me.state.status !== 'ok') return null;
+  const plan = me.state.data.plan;
+  return (
+    <Card>
+      <Text style={[styles.body, { fontWeight: '700' }]}>⭐ {planLabel(plan)}</Text>
+      <Text style={[styles.muted, { marginBottom: plan.linked ? 6 : 0 }]}>
+        {plan.linked
+          ? `Đã nối tài khoản Nhà Nông ${plan.phone ?? ''}: dùng chung gói trả phí.`
+          : 'Đăng nhập tài khoản Nhà Nông (mục 👤 Tài khoản) trên máy này để dùng chung gói (xem lượng mưa 1 năm).'}
+      </Text>
+      {plan.linked && (
+        <Text
+          onPress={async () => {
+            if (!(await confirmAsync('Bỏ nối tài khoản Nhà Nông?', 'Tài khoản cảm biến sẽ về gói miễn phí.', 'Bỏ nối'))) return;
+            setBusy(true);
+            await iotApi.unlinkNhanong().catch(() => {});
+            setBusy(false);
+            me.refetch();
+          }}
+          accessibilityRole="button"
+          style={{ color: colors.error, opacity: busy ? 0.5 : 1 }}
+        >
+          Bỏ nối tài khoản
+        </Text>
+      )}
+    </Card>
   );
 }

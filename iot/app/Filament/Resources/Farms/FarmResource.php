@@ -9,6 +9,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -52,6 +53,16 @@ class FarmResource extends Resource
                 TextInput::make('lng')
                     ->label('Kinh độ')
                     ->numeric(),
+                Toggle::make('rain_alerts')
+                    ->label('Báo khi trời bắt đầu mưa')
+                    ->default(true),
+                TextInput::make('dry_alert_days')
+                    ->label('Nhắc khi đã N ngày không mưa')
+                    ->helperText('0 = tắt')
+                    ->integer()
+                    ->minValue(0)
+                    ->maxValue(60)
+                    ->default(7),
             ]);
     }
 

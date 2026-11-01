@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from './api';
-import { createIotApi, describeRule, describeSchedule, monthsLabel, formatDecimal, formatIotValue, normalizeDevEui, parseDecimalInput, parseDeviceFile, pointValue, rainOfDay, thresholdLabel, timeAgo, weatherDayLabel } from './iot';
+import { createIotApi, describeCommand, planLabel, describeRule, describeSchedule, monthsLabel, formatDecimal, formatIotValue, normalizeDevEui, parseDecimalInput, parseDeviceFile, pointValue, rainOfDay, thresholdLabel, timeAgo, weatherDayLabel } from './iot';
 
 function fakeFetch(status: number, body: unknown) {
   return vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(status === 204 ? null : JSON.stringify(body), { status }));
@@ -133,5 +133,17 @@ describe('lịch tưới', () => {
       '05:30 · 40 phút · mỗi 20 ngày · tháng 12 → 4 · bỏ lượt nếu đã mưa ≥ 10 mm',
     );
     expect(describeSchedule({ start_time: '17:00', minutes: 15, every_days: 1, months: null, skip_rain_mm: null })).toBe('17:00 · 15 phút · mỗi ngày · cả năm');
+  });
+});
+
+describe('lệnh và gói', () => {
+  it('mô tả lệnh', () => {
+    expect(describeCommand({ action: 'on', minutes: 30, source: 'schedule' })).toBe('Bật 30 phút · Lịch tưới');
+    expect(describeCommand({ action: 'off', minutes: null, source: 'safety' })).toBe('Tắt · Khóa an toàn');
+  });
+
+  it('gói', () => {
+    expect(planLabel({ linked: true, phone: '0900000099', premium: true, premium_until: '2027-10-31', rain_history_days: 365 })).toBe('Có gói Nhà Nông tới 31/10/2027 · xem lượng mưa 365 ngày');
+    expect(planLabel({ linked: false, phone: null, premium: false, premium_until: null, rain_history_days: 30 })).toBe('Miễn phí · xem lượng mưa 30 ngày');
   });
 });

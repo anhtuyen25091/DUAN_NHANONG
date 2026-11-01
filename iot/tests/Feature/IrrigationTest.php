@@ -103,6 +103,16 @@ class IrrigationTest extends TestCase
         $this->assertSame('2027-01-15', $schedule->fresh()->next_run_on->toDateString());
     }
 
+    public function test_months_from_admin_checkboxes_are_numbers(): void
+    {
+        // Ô chọn tháng của trang quản trị gửi chuỗi
+        $schedule = $this->pump->schedules()->create(['start_time' => '05:30', 'minutes' => 30, 'every_days' => 1, 'months' => ['12', '1'], 'next_run_on' => '2026-12-05']);
+
+        $this->assertSame([12, 1], $schedule->fresh()->months);
+        $this->assertTrue($schedule->fresh()->inSeason(12));
+        $this->assertNull($this->pump->schedules()->create(['start_time' => '06:00', 'minutes' => 30, 'every_days' => 1, 'months' => [], 'next_run_on' => '2026-12-05'])->fresh()->months);
+    }
+
     public function test_schedule_skipped_after_enough_rain(): void
     {
         $schedule = $this->pump->schedules()->create(['start_time' => '05:30', 'minutes' => 30, 'every_days' => 7, 'skip_rain_mm' => 10, 'next_run_on' => '2026-12-05']);

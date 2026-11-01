@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -21,12 +22,28 @@ class ActuatorSchedule extends Model
         return [
             'minutes' => 'integer',
             'every_days' => 'integer',
-            'months' => 'array',
             'skip_rain_mm' => 'float',
             'enabled' => 'boolean',
             'next_run_on' => 'date',
             'last_run_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Tháng luôn lưu dạng số (ô chọn tháng trên trang quản trị gửi chuỗi "12"); mảng rỗng = cả năm.
+     *
+     * @return Attribute<array<int, int>|null, array<int, int|string>|null>
+     */
+    protected function months(): Attribute
+    {
+        return Attribute::make(
+            get: function (?string $value): ?array {
+                $months = array_map('intval', json_decode((string) $value, true) ?: []);
+
+                return $months === [] ? null : $months;
+            },
+            set: fn (?array $value) => empty($value) ? null : json_encode(array_values(array_map('intval', $value))),
+        );
     }
 
     /** "05:30:00" (MySQL) / "05:30" -> "05:30" */

@@ -11,6 +11,32 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 01/11/2026 (tiếp 5): Đồng bộ web / app / trang quản trị cho phần cảm biến
+
+**Đã làm**
+- **Web** (`#/cam-bien`, file `web/src/pages/iot/IotManage.tsx`): trước chỉ xem, giờ thêm / sửa / xóa được như app:
+  - trang trại (chọn tỉnh hoặc lấy vị trí hiện tại, bật / tắt báo mưa, nhắc lâu ngày không mưa)
+  - lô; thiết bị đo (hiện khóa 1 lần, tạo khóa mới); ngưỡng cảnh báo + gợi ý theo cây trồng (kèm ghi chú và nguồn tài liệu)
+  - máy bơm / quạt + khóa an toàn; luật tự động; lịch tưới (gợi ý chu kỳ / mùa theo cây)
+  - lịch sử bật / tắt từng máy; gửi file dữ liệu tải từ thiết bị; thẻ gói đang dùng (bỏ nối tài khoản Nhà Nông)
+  - trang chủ và trang lô có nút dẫn tới các trang trên
+- **App**: màn hình Lịch sử bật / tắt (`iot/history`), nút "＋ Thêm máy bơm / quạt", thẻ gói đang dùng ở trang Cảm biến.
+- **Trang quản trị** (`/admin`): thêm mục Lịch tưới, Người dùng (đổi mật khẩu khi điền); trang trại có bật / tắt báo mưa và số ngày nhắc không mưa.
+- Sửa lỗi: tháng chọn trên trang quản trị lưu dạng chuỗi ("12") làm lịch tưới không nhận mùa → luôn đổi về số (có test).
+- Thư viện chung: `describeCommand`, `planLabel`.
+
+**Kiểm tra**
+- iot 65/65, backend 219/219, thư viện chung 140/140; app typecheck sạch; web build + lint sạch.
+- Chụp màn hình 10 trang web mới (trình duyệt cỡ điện thoại) với dữ liệu thật trên MySQL dev: hiện đúng.
+
+**Còn tồn**
+- Chưa thử bấm Lưu từng form trên web bằng tay (form gọi cùng API với app, API đã có test).
+
+**Tiếp theo**
+- Gộp nhánh `iot-cam-bien` vào `main`, thử trên điện thoại thật.
+
+---
+
 ## 01/11/2026 (tiếp 4): Phần B: lịch tưới, nhắc lâu ngày không mưa, gợi ý theo cây trồng, chặn bơm khi nước mặn
 
 **Số liệu gợi ý theo cây trồng: chỉ lấy từ tài liệu kỹ thuật chính thức, có ghi nguồn trong app**

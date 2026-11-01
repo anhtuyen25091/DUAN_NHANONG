@@ -10,6 +10,7 @@ import {
   type IotAlert,
   type IotFarm,
   type IotInterval,
+  type IotPlotType,
   type IotReading,
   type IotWeather,
 } from '@nhanong/shared'
@@ -18,11 +19,12 @@ import { Status } from '../../components/Status'
 import { href, useAsync } from '../../hooks'
 import { iotApi, linkNhanongIfPossible, setIotAuth, signOutIot, useIotAuth } from '../../iot'
 import { IotLineChart, RainBars } from './IotCharts'
+import { ActuatorForm, DeviceForm, FarmForm, HistoryPage, PlanCard, PlotForm, RulesPage, SchedulesPage, ThresholdsPage, UploadPage } from './IotManage'
 
 /**
  * Cảm biến ruộng / ao trên web: #/cam-bien (trang trại, thời tiết, cảnh báo), #/cam-bien/lo/{id} (số đo, điều khiển),
  * #/cam-bien/thoi-tiet/{farm} (7 ngày + lượng mưa), #/cam-bien/bieu-do?device=&metric= (lịch sử 1 chỉ số).
- * Thêm / sửa trang trại, thiết bị, ngưỡng, luật tự động làm trong app (hoặc trang quản trị).
+ * Thêm / sửa (trang trại, lô, thiết bị, ngưỡng, máy bơm, luật, lịch tưới, lịch sử, gửi file): IotManage.tsx.
  */
 export default function IotRoutes({ path, query }: { path: string[]; query: URLSearchParams }) {
   const auth = useIotAuth()
@@ -33,6 +35,19 @@ export default function IotRoutes({ path, query }: { path: string[]; query: URLS
   if (path[1] === 'lo' && path[2]) return <PlotPage id={Number(path[2])} />
   if (path[1] === 'thoi-tiet' && path[2]) return <WeatherPage farmId={Number(path[2])} name={query.get('ten') ?? ''} />
   if (path[1] === 'bieu-do') return <ChartPage query={query} />
+  const id = path[2] && path[2] !== 'moi' ? Number(path[2]) : null
+  const num = (key: string) => (query.get(key) ? Number(query.get(key)) : null)
+  const plotType = (query.get('type') ?? 'other') as IotPlotType
+  if (path[1] === 'trang-trai') return <FarmForm id={id} />
+  if (path[1] === 'lo-moi') return <PlotForm id={null} farmId={num('farm')} />
+  if (path[1] === 'sua-lo' && id) return <PlotForm id={id} farmId={null} />
+  if (path[1] === 'thiet-bi') return <DeviceForm id={id} farmId={num('farm')} plotId={num('plot')} />
+  if (path[1] === 'nguong' && id) return <ThresholdsPage plotId={id} plotName={query.get('ten') ?? ''} type={plotType} />
+  if (path[1] === 'may' && num('plot')) return <ActuatorForm id={id} plotId={num('plot') ?? 0} />
+  if (path[1] === 'luat' && id) return <RulesPage plotId={id} plotName={query.get('ten') ?? ''} type={plotType} />
+  if (path[1] === 'lich' && id) return <SchedulesPage plotId={id} plotName={query.get('ten') ?? ''} />
+  if (path[1] === 'lich-su' && id) return <HistoryPage actuatorId={id} name={query.get('ten') ?? ''} plotId={query.get('plot')} />
+  if (path[1] === 'gui-file') return <UploadPage />
   return <Home />
 }
 
@@ -118,13 +133,16 @@ function Home() {
         </>
       )}
       <Status state={farms} retry={reloadFarms} />
-      {farms.status === 'ok' && farms.data.length === 0 && <p className="notice">Chưa có trang trại nào. Thêm trang trại, lô và thiết bị trong app Nhà Nông (mục 📡 Cảm biến).</p>}
+      {farms.status === 'ok' && farms.data.length === 0 && <p className="notice">Chưa có trang trại nào. Bấm "＋ Thêm trang trại" để bắt đầu.</p>}
       {farms.status === 'ok' &&
         farms.data.map((farm) => (
           <div key={farm.id}>
             <h2 className="section-title">
               {farm.name}
-              {farm.province ? ` · ${farm.province}` : ''}
+              {farm.province ? ` · ${farm.province}` : ''}{' '}
+              <a className="small" href={href(`cam-bien/trang-trai/${farm.id}`)}>
+                Sửa
+              </a>
             </h2>
             <WeatherCard farm={farm} />
             {farm.plots.map((plot) => (
@@ -142,8 +160,25 @@ function Home() {
                 <span aria-hidden>›</span>
               </a>
             ))}
+            <div className="btn-row">
+              <a className="button" href={href('cam-bien/lo-moi', { farm: String(farm.id) })}>
+                ＋ Thêm lô
+              </a>
+              <a className="button" href={href('cam-bien/thiet-bi/moi', { farm: String(farm.id) })}>
+                ＋ Thêm thiết bị đo
+              </a>
+            </div>
           </div>
         ))}
+      <div className="btn-row">
+        <a className="button primary" href={href('cam-bien/trang-trai/moi')}>
+          ＋ Thêm trang trại
+        </a>
+        <a className="button" href={href('cam-bien/gui-file')}>
+          📥 Gửi file dữ liệu
+        </a>
+      </div>
+      <PlanCard />
       <p className="small muted center">
         Đăng nhập: {auth?.user.email} ·{' '}
         <button type="button" className="linklike" onClick={() => void signOutIot()}>
@@ -174,7 +209,7 @@ function Hints({ hints }: { hints: string[] }) {
 function WeatherCard({ farm }: { farm: IotFarm }) {
   const hasLocation = farm.lat !== null && farm.lng !== null
   const [weather] = useAsync(() => (hasLocation ? iotApi.weather(farm.id) : Promise.resolve(null)), [farm.id])
-  if (!hasLocation) return <p className="muted small">🌦️ Trang trại chưa có vị trí (chọn trong app) nên chưa có dự báo.</p>
+  if (!hasLocation) return <p className="muted small">🌦️ Trang trại chưa có vị trí (bấm Sửa để chọn) nên chưa có dự báo.</p>
   if (weather.status === 'error') return <p className="muted small">🌦️ {weather.error.message}</p>
   if (weather.status !== 'ok' || !weather.data) return null
   const today = weather.data.daily[0]
@@ -255,18 +290,28 @@ function PlotPage({ id }: { id: number }) {
               <ReadingTile key={`${reading.device_id}-${reading.metric.code}`} reading={reading} showDevice={data.devices.length > 1} />
             ))}
           </div>
-          <Controls plotId={id} />
+          <div className="btn-row">
+            <a className="button" href={href(`cam-bien/nguong/${id}`, { ten: data.plot.name, type: data.plot.type })}>
+              🎯 Ngưỡng cảnh báo
+            </a>
+            <a className="button" href={href(`cam-bien/sua-lo/${id}`)}>
+              ✏️ Sửa lô
+            </a>
+          </div>
+          <Controls plotId={id} plotName={data.plot.name} type={data.plot.type} />
           <h2 className="section-title">Thiết bị đo</h2>
           {data.devices.map((device) => (
-            <p key={device.id} className="card">
+            <a key={device.id} className="card" style={{ display: 'block' }} href={href(`cam-bien/thiet-bi/${device.id}`)}>
               <span style={{ color: device.online ? '#0b7a4b' : '#c0262d' }}>●</span> <b>{device.name}</b>{' '}
               <span className="small muted">
                 · {device.kind === 'lorawan' ? 'LoRaWAN' : 'WiFi / 4G'} · mã {device.uid}
                 {device.battery !== null ? ` · pin ${device.battery}%` : ''} · {device.last_seen_at ? `gửi lần cuối ${timeAgo(device.last_seen_at)}` : 'chưa gửi lần nào'}
               </span>
-            </p>
+            </a>
           ))}
-          <p className="small muted">Thêm / sửa thiết bị, ngưỡng cảnh báo, luật tự động: làm trong app Nhà Nông.</p>
+          <a className="button" href={href('cam-bien/thiet-bi/moi', { farm: String(data.plot.farm_id), plot: String(id) })}>
+            ＋ Thêm thiết bị đo
+          </a>
         </>
       )}
     </section>
@@ -299,7 +344,7 @@ function ReadingTile({ reading, showDevice }: { reading: IotReading; showDevice:
   )
 }
 
-function Controls({ plotId }: { plotId: number }) {
+function Controls({ plotId, plotName, type }: { plotId: number; plotName: string; type: IotPlotType }) {
   const [actuators, reload] = useAsync(() => iotApi.actuators(plotId), [plotId])
   // Giữ danh sách cũ trong lúc tải lại (tránh nhấp nháy khi hỏi trạng thái mỗi 3 giây)
   const [last, setLast] = useState<IotActuator[] | null>(null)
@@ -316,19 +361,28 @@ function Controls({ plotId }: { plotId: number }) {
     const timer = setInterval(() => reloadRef.current(), 3000)
     return () => clearInterval(timer)
   }, [waiting])
-  if (list.length === 0) return null
   return (
     <>
       <h2 className="section-title">⚙️ Điều khiển</h2>
       {list.map((actuator) => (
-        <ActuatorCard key={actuator.id} actuator={actuator} onChanged={() => reloadRef.current()} />
+        <ActuatorCard key={actuator.id} actuator={actuator} plotId={plotId} onChanged={() => reloadRef.current()} />
       ))}
-      <Schedules plotId={plotId} />
+      <div className="btn-row">
+        <a className="button" href={href('cam-bien/may/moi', { plot: String(plotId) })}>
+          ＋ Thêm máy bơm / quạt
+        </a>
+        {list.length > 0 && (
+          <a className="button" href={href(`cam-bien/luat/${plotId}`, { ten: plotName, type })}>
+            ⚡ Luật tự động
+          </a>
+        )}
+      </div>
+      {list.length > 0 && <Schedules plotId={plotId} plotName={plotName} />}
     </>
   )
 }
 
-function ActuatorCard({ actuator, onChanged }: { actuator: IotActuator; onChanged: () => void }) {
+function ActuatorCard({ actuator, plotId, onChanged }: { actuator: IotActuator; plotId: number; onChanged: () => void }) {
   const [minutes, setMinutes] = useState(Math.min(30, actuator.max_minutes))
   const [error, setError] = useState<string | null>(null)
   const pending = actuator.pending
@@ -383,17 +437,26 @@ function ActuatorCard({ actuator, onChanged }: { actuator: IotActuator; onChange
         </button>
       </div>
       {error && <p className="field-error">{error}</p>}
+      <p className="small">
+        <a href={href(`cam-bien/lich-su/${actuator.id}`, { ten: actuator.name, plot: String(plotId) })}>🕘 Lịch sử bật / tắt</a> ·{' '}
+        <a href={href(`cam-bien/may/${actuator.id}`, { plot: String(plotId) })}>Sửa</a>
+      </p>
     </div>
   )
 }
 
-/** Lịch tưới của lô (chỉ xem; thêm / sửa trong app) */
-function Schedules({ plotId }: { plotId: number }) {
+/** Lịch tưới của lô (thêm / sửa ở trang Lịch tưới) */
+function Schedules({ plotId, plotName }: { plotId: number; plotName: string }) {
   const [schedules] = useAsync(() => iotApi.schedules(plotId), [plotId])
-  if (schedules.status !== 'ok' || schedules.data.length === 0) return null
+  if (schedules.status !== 'ok') return null
   return (
     <>
-      <h2 className="section-title">🗓️ Lịch tưới</h2>
+      <h2 className="section-title">
+        🗓️ Lịch tưới{' '}
+        <a className="small" href={href(`cam-bien/lich/${plotId}`, { ten: plotName })}>
+          {schedules.data.length ? 'Sửa' : '＋ Thêm'}
+        </a>
+      </h2>
       {schedules.data.map((schedule) => (
         <p key={schedule.id} className="card" style={schedule.enabled ? undefined : { opacity: 0.6 }}>
           <b>{schedule.actuator.name}</b>: {describeSchedule(schedule)}
