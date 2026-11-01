@@ -29,11 +29,18 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 - iot 65/65, backend 219/219, thư viện chung 140/140; app typecheck sạch; web build + lint sạch.
 - Chụp màn hình 10 trang web mới (trình duyệt cỡ điện thoại) với dữ liệu thật trên MySQL dev: hiện đúng.
 
+- Bấm thử thật trên web bằng Chrome tự động (cỡ điện thoại), 11 bước đều qua:
+  - tạo trang trại → thêm lô → thêm thiết bị (hiện khóa) → áp gợi ý sầu riêng → sửa ngưỡng pH
+  - thêm máy bơm có khóa an toàn → lịch tưới theo gợi ý cà phê → luật tự động
+  - luật sai (mức tắt nhỏ hơn mức bật) hiện lỗi đúng → đổi tên lô → xóa trang trại
+  - kiểm lại DB: dữ liệu thử xóa sạch, dữ liệu cũ còn nguyên
+- Ghi chú: chạy kịch bản 3 lần liền thì chạm giới hạn 120 lần gọi / phút / tài khoản ("Too Many Attempts"); dùng bình thường không chạm.
+
 **Còn tồn**
-- Chưa thử bấm Lưu từng form trên web bằng tay (form gọi cùng API với app, API đã có test).
+- Chưa thử trên điện thoại thật.
 
 **Tiếp theo**
-- Gộp nhánh `iot-cam-bien` vào `main`, thử trên điện thoại thật.
+- Đẩy `main` lên GitHub (cần bạn đồng ý), thử trên điện thoại thật.
 
 ---
 
