@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Actuator;
 use App\Models\ActuatorCommand;
 use App\Models\AutomationRule;
 use App\Models\Farm;
@@ -48,6 +49,23 @@ class ControlNotifier
             'Mạch báo không làm được'.($command->message ? ": {$command->message}" : '.'),
             $actuator->plot_id,
         );
+    }
+
+    /** Khóa an toàn chặn lượt bật tự động (luật / lịch tưới) */
+    public function blocked(Actuator $actuator, string $message): int
+    {
+        return $this->send($actuator->device->farm, "⛔ Chặn bật {$actuator->name}", $message, $actuator->plot_id);
+    }
+
+    /** Đang chạy thì số đo nguồn nước vượt mức: đã tự tắt */
+    public function safetyOff(Actuator $actuator, string $reason): int
+    {
+        return $this->send($actuator->device->farm, "⛔ Đã tự tắt {$actuator->name}", "Vì {$reason}. Chỉ bật lại khi số đo trở lại an toàn.", $actuator->plot_id);
+    }
+
+    public function scheduleSkipped(Actuator $actuator, string $reason): int
+    {
+        return $this->send($actuator->device->farm, "🌧️ Bỏ lượt tưới {$actuator->name}", $reason, $actuator->plot_id);
     }
 
     private function send(Farm $farm, string $title, string $body, ?int $plotId): int

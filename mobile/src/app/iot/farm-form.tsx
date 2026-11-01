@@ -26,6 +26,7 @@ function FarmForm({ farm }: { farm?: IotFarm }) {
   const [point, setPoint] = useState<{ lat: number; lng: number } | null>(farm?.lat != null && farm?.lng != null ? { lat: farm.lat, lng: farm.lng } : null);
   const [fromGps, setFromGps] = useState(false);
   const [rainAlerts, setRainAlerts] = useState(farm?.rain_alerts ?? true);
+  const [dryDays, setDryDays] = useState<number>(farm?.dry_alert_days ?? 7);
   const [search, setSearch] = useState('');
   const [errors, setErrors] = useState(NO_ERRORS);
   const [busy, setBusy] = useState(false);
@@ -60,7 +61,7 @@ function FarmForm({ farm }: { farm?: IotFarm }) {
     setBusy(true);
     setErrors(NO_ERRORS);
     try {
-      const input = { name: name.trim(), province: province || null, lat: point?.lat ?? null, lng: point?.lng ?? null, rain_alerts: rainAlerts };
+      const input = { name: name.trim(), province: province || null, lat: point?.lat ?? null, lng: point?.lng ?? null, rain_alerts: rainAlerts, dry_alert_days: dryDays };
       if (farm) await iotApi.updateFarm(farm.id, input);
       else await iotApi.createFarm(input);
       router.back();
@@ -106,6 +107,13 @@ function FarmForm({ farm }: { farm?: IotFarm }) {
         <Chip label="Không" active={!rainAlerts} onPress={() => setRainAlerts(false)} />
       </FormSection>
       <Text style={[styles.muted, { marginTop: -6, marginBottom: 12 }]}>Theo dữ liệu thời tiết tại vị trí vườn (15 phút / lần), hoặc máy đo mưa nếu vườn có lắp. Mỗi cơn mưa báo 1 lần.</Text>
+
+      <FormSection label="☀️ Nhắc khi lâu ngày không mưa">
+        {[0, 5, 7, 10, 14].map((n) => (
+          <Chip key={n} small label={n === 0 ? 'Tắt' : `${n} ngày`} active={dryDays === n} onPress={() => setDryDays(n)} />
+        ))}
+      </FormSection>
+      <Text style={[styles.muted, { marginTop: -6, marginBottom: 12 }]}>Mỗi sáng 7:00 xem lượng mưa tại vườn; khô liên tục đủ số ngày thì nhắc (kèm dự báo 3 ngày tới), khô tiếp thì 3 ngày nhắc lại.</Text>
 
       <FormMessage errors={errors} />
       <Button label={busy ? 'Đang lưu…' : 'Lưu'} onPress={save} disabled={busy || name.trim() === ''} />

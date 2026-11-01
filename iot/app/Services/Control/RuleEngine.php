@@ -45,9 +45,14 @@ class RuleEngine
                 if ($turningOn || ! $cooledDown) {
                     continue;
                 }
-                $command = $this->commands->issue($actuator, ActuatorCommand::ON, $rule->minutes, ActuatorCommand::SOURCE_RULE, rule: $rule, reason: $this->reason($rule->metric, $value, $rule));
                 $rule->forceFill(['last_triggered_at' => now()])->save();
-                $this->notifier->ruleTurnedOn($rule, $command, $value);
+                try {
+                    $command = $this->commands->issue($actuator, ActuatorCommand::ON, $rule->minutes, ActuatorCommand::SOURCE_RULE, rule: $rule, reason: $this->reason($rule->metric, $value, $rule));
+                    $this->notifier->ruleTurnedOn($rule, $command, $value);
+                } catch (BlockedCommandException $e) {
+                    // Báo 1 lần mỗi thời gian nghỉ của luật (last_triggered_at đã cập nhật)
+                    $this->notifier->blocked($actuator, $e->getMessage());
+                }
             } elseif ($rule->shouldTurnOff($value) && $turningOn && $this->lastOnBy($rule)) {
                 $this->commands->issue($actuator, ActuatorCommand::OFF, null, ActuatorCommand::SOURCE_RULE, rule: $rule, reason: $this->reason($rule->metric, $value, $rule, true));
             }

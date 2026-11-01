@@ -1,4 +1,4 @@
-import { ApiError, timeAgo, type IotActuator, type IotPlotType } from '@nhanong/shared';
+import { ApiError, formatDecimal, timeAgo, type IotActuator, type IotPlotType } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
@@ -50,12 +50,15 @@ export function ControlSection({ plotId, plotName, plotType, farmId }: { plotId:
       {list.map((actuator) => (
         <ActuatorCard key={actuator.id} actuator={actuator} onChanged={actuators.refetch} />
       ))}
+      <View style={{ marginBottom: 8 }}>
+        <Button label="🗓️ Lịch tưới" variant="outline" onPress={() => router.push({ pathname: '/iot/schedules', params: { plot: String(plotId), name: plotName } })} />
+      </View>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
         <View style={{ flex: 1 }}>
           <Button label="⚡ Luật tự động" variant="outline" onPress={() => router.push({ pathname: '/iot/rules', params: { plot: String(plotId), name: plotName, type: plotType } })} />
         </View>
         <View style={{ flex: 1 }}>
-          <Button label="＋ Thêm thiết bị" variant="outline" onPress={() => router.push({ pathname: '/iot/actuator-form', params: { plot: String(plotId), farm: String(farmId) } })} />
+          <Button label="＋ Thêm máy bơm / quạt" variant="outline" onPress={() => router.push({ pathname: '/iot/actuator-form', params: { plot: String(plotId), farm: String(farmId) } })} />
         </View>
       </View>
     </View>
@@ -104,6 +107,12 @@ function ActuatorCard({ actuator, onChanged }: { actuator: IotActuator; onChange
         </Text>
       </View>
       <Text style={{ fontSize: font.body, fontWeight: '600', color: pending ? '#7a4a00' : actuator.is_on ? colors.primary : colors.muted, marginBottom: 8 }}>{state}</Text>
+      {actuator.block && (
+        <Text style={{ fontSize: font.small, color: colors.muted, marginBottom: 8 }}>
+          🔒 Khóa an toàn: không bơm khi {actuator.block.metric_name} {actuator.block.operator === 'above' ? '>' : '<'} {formatDecimal(actuator.block.value)}
+          {actuator.block.unit ? ` ${actuator.block.unit}` : ''} ({actuator.block.device_name})
+        </Text>
+      )}
       {!actuator.device_online && (
         <Text style={{ color: colors.error, fontSize: font.small, marginBottom: 8 }}>⚠️ Mạch điều khiển đang mất kết nối: lệnh sẽ hủy nếu 10 phút không nhận được.</Text>
       )}

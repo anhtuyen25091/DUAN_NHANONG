@@ -142,6 +142,8 @@ class FarmController extends Controller
             'lat' => ['nullable', 'numeric', 'between:-90,90'],
             'lng' => ['nullable', 'numeric', 'between:-180,180'],
             'rain_alerts' => ['sometimes', 'boolean'],
+            // Nhắc khi đã N ngày liên tiếp không mưa (0 = tắt)
+            'dry_alert_days' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:60'],
         ]);
     }
 }

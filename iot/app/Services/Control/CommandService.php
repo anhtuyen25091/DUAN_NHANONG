@@ -18,12 +18,19 @@ use InvalidArgumentException;
  */
 class CommandService
 {
-    public function __construct(private readonly ControlNotifier $notifier) {}
+    public function __construct(private readonly ControlNotifier $notifier, private readonly InterlockGuard $guard) {}
 
+    /**
+     * @throws BlockedCommandException bật khi khóa an toàn đang chặn (VD nước nguồn mặn)
+     */
     public function issue(Actuator $actuator, string $action, ?int $minutes, string $source, ?User $user = null, ?AutomationRule $rule = null, ?string $reason = null): ActuatorCommand
     {
         if (! in_array($action, [ActuatorCommand::ON, ActuatorCommand::OFF], true)) {
             throw new InvalidArgumentException("Lệnh không hợp lệ: {$action}");
+        }
+
+        if ($action === ActuatorCommand::ON && ($blocked = $this->guard->reasonToBlock($actuator)) !== null) {
+            throw new BlockedCommandException("Không bật {$actuator->name}: {$blocked}.");
         }
 
         // Bật luôn có giờ tắt (mạch tự tắt khi hết giờ, kể cả lúc mất mạng)

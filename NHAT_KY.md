@@ -11,6 +11,62 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 01/11/2026 (tiếp 4): Phần B: lịch tưới, nhắc lâu ngày không mưa, gợi ý theo cây trồng, chặn bơm khi nước mặn
+
+**Số liệu gợi ý theo cây trồng: chỉ lấy từ tài liệu kỹ thuật chính thức, có ghi nguồn trong app**
+- **Cà phê vối** (Kỹ thuật sản xuất cà phê vối bền vững, Trung tâm Khuyến nông Quốc gia 2018):
+  - pHKCl 4,0 – 6,0
+  - tưới gốc chu kỳ 20 – 25 ngày mùa khô; bung hoa 250 rồi 150 lít/gốc
+  - trước bung hoa cần giai đoạn khô hạn nhẹ
+- **Hồ tiêu** (tài liệu TOT sản xuất hồ tiêu bền vững, Cục BVTV):
+  - pHKCl 4,5 – 6,5
+  - tiêu kinh doanh trên đất bazan: 100 – 120 lít/trụ, chu kỳ 20 – 25 ngày
+  - không để úng dù chỉ 24 giờ; xiết nước khi phân hóa mầm hoa
+- **Sầu riêng** (quy trình kèm QĐ 34/2025/QĐ-UBND Tiền Giang): pH 5,5 – 6,5; **nước tưới mặn < 0,3‰**.
+- **Không đặt sẵn ngưỡng độ ẩm đất:** tài liệu tính theo % sức chứa ẩm đồng ruộng, khác đơn vị % thể tích của cảm biến.
+- pH trong tài liệu là pHKCl; cảm biến đo pH đất ẩm thường cao hơn 0,5 – 1. Đã ghi chú trong gợi ý.
+- Số phút bơm tùy công suất bơm và số gốc, người dùng tự đặt.
+
+**Đã làm** (`iot/`)
+- **Lịch tưới** (`actuator_schedules`, `ScheduleRunner`, `schedules:run` mỗi phút):
+  - giờ bắt đầu, số phút (≤ `max_minutes`), lặp mỗi N ngày, chỉ trong các tháng chọn (VD mùa khô T12 → T4)
+  - bỏ lượt khi từ hôm qua tới giờ đã mưa ≥ X mm (hoặc đang mưa), có báo
+  - máy chủ tắt lỡ giờ thì chạy bù 1 lần trong ngày, không dồn lượt
+- **Khóa an toàn chặn bơm** (`block_device_id` / `block_metric_id` / `block_operator` / `block_value` trên thiết bị điều khiển; `InterlockGuard` và `InterlockWatcher`):
+  - số đo cảm biến nguồn nước vượt mức (VD độ mặn > 0,3‰) thì không cho bật, cả bấm tay, lịch tưới lẫn luật tự động; có báo
+  - đang chạy mà số đo vượt mức thì tự tắt ngay và báo "⛔ Đã tự tắt…"
+  - số đo cũ hơn 12 giờ thì không chặn (không chặn khi không có dữ liệu)
+  - dùng được cả cho "mực nước thấp hơn" để bơm không chạy khô
+- **Nhắc khô hạn** (`DrySpell`, `weather:dry-spell` lúc 7:00):
+  - đủ N ngày liên tiếp mưa < 1 mm (mặc định 7, tắt được theo trang trại) thì nhắc "☀️ … đã 9 ngày không mưa", kèm tổng mưa và dự báo 3 ngày tới
+  - khô tiếp thì 3 ngày nhắc lại; mưa lại thì tính đợt mới
+  - API trang trại có thêm `dry_days`
+- **Gợi ý theo cây** (`CropPresets`, `GET /crop-presets`, `POST /plots/{id}/apply-preset`): đặt ngưỡng gợi ý cho lô; lịch tưới / khóa an toàn gợi ý được điền vào form.
+- **App:**
+  - màn "🗓️ Lịch tưới" (nút gợi ý theo cây, chọn tháng, mùa khô, bỏ lượt khi mưa)
+  - phần "🔒 Khóa an toàn" trong form máy bơm
+  - thẻ thời tiết hiện "☀️ Đã N ngày không mưa"
+  - form trang trại có chỗ chọn số ngày nhắc
+  - màn ngưỡng có "Gợi ý theo cây trồng", hiện lưu ý và link tài liệu nguồn
+- **Web:** hiện số ngày không mưa, khóa an toàn trên thẻ máy bơm, danh sách lịch tưới của lô (chỉ xem).
+
+**Kiểm tra**
+- `iot` 64 test qua (thêm `IrrigationTest`, 6 test). `backend` 219, `shared` 138 test qua. Typecheck mobile và build web không lỗi.
+- **Chạy thật trên MySQL** (hàng đợi launchd + mạch giả lập "Tủ bơm vườn A" `ND8QWTTKJE`, cảm biến "Đo mặn kênh" `NDP25RQENX`):
+  - độ mặn 0,2‰: bật bơm 20 phút được
+  - lên 0,5‰: 6 giây sau bơm tự tắt, lý do "Độ mặn 0,5 ‰ > 0,3 ‰ (Đo mặn kênh)"
+  - bấm bật lại bị từ chối
+  - đã trả độ mặn về 0,2‰ để thử tiếp
+- Vườn A (Vườn Cư Bao) đã có: gợi ý sầu riêng (pH 5,5 – 6,5), lịch tưới 05:30 · 40 phút · mỗi 20 ngày · tháng 12 → 4 · bỏ lượt nếu mưa ≥ 10 mm.
+- Đã chụp màn hình lô, lịch tưới, ngưỡng, form khóa an toàn.
+
+**Còn tồn**
+- Các con số gợi ý cần cán bộ kỹ thuật địa phương xem lại trước khi khuyên dùng rộng.
+- Chưa có cảm biến / mạch thật để thử lịch tưới và khóa an toàn ngoài vườn.
+- Web chưa thêm / sửa được lịch tưới (làm trong app).
+
+---
+
 ## 01/11/2026 (tiếp 3): Giá cho nông dân sầu riêng / cà phê / tiêu + mục Cảm biến trên web
 
 Người dùng chốt: ưu tiên nông dân trồng **sầu riêng, cà phê, hồ tiêu**.

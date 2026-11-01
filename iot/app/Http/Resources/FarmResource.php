@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Farm;
+use App\Services\Irrigation\DrySpell;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,6 +21,9 @@ class FarmResource extends JsonResource
             'lat' => $this->lat,
             'lng' => $this->lng,
             'rain_alerts' => $this->rain_alerts,
+            'dry_alert_days' => $this->dry_alert_days,
+            // Số ngày liên tiếp không mưa tới hôm qua (theo lượng mưa đã lưu)
+            'dry_days' => $this->hasLocation() ? app(DrySpell::class)->days($this->resource) : null,
             // Đang mưa tại vị trí trang trại (dữ liệu thời tiết hoặc máy đo mưa)
             'raining' => $this->raining_since === null ? null : [
                 'since' => $this->raining_since->toIso8601String(),

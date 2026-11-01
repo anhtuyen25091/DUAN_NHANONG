@@ -13,3 +13,6 @@ Schedule::command('weather:rain-watch')->everyFifteenMinutes()->withoutOverlappi
 Schedule::command('weather:sync-rain --days=2')->hourly()->withoutOverlapping();
 // Lệnh bật / tắt quá hạn (mạch không nhận kịp): hủy và báo
 Schedule::command('commands:expire')->everyMinute()->withoutOverlapping();
+// Lịch tưới (mỗi phút) và nhắc nhiều ngày không mưa (7:00 sáng)
+Schedule::command('schedules:run')->everyMinute()->withoutOverlapping();
+Schedule::command('weather:dry-spell')->dailyAt('07:00')->withoutOverlapping();

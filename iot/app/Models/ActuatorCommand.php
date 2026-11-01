@@ -20,6 +20,12 @@ class ActuatorCommand extends Model
     /** Luật tự động */
     public const SOURCE_RULE = 'rule';
 
+    /** Lịch tưới */
+    public const SOURCE_SCHEDULE = 'schedule';
+
+    /** Khóa an toàn tự tắt (VD nước mặn) */
+    public const SOURCE_SAFETY = 'safety';
+
     /**
      * @return array<string, string>
      */

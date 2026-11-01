@@ -13,8 +13,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * Máy bơm / quạt oxy / van... nối vào kênh relay số `channel` của mạch điều khiển `device`.
  * is_on là trạng thái mạch báo về gần nhất (không phải trạng thái mong muốn).
+ * Khóa an toàn (block_*): số đo `block_metric` của cảm biến `block_device` (VD độ mặn nguồn nước) vượt `block_value`
+ * thì không cho bật, đang chạy thì tự tắt (App\Services\Control\InterlockGuard).
  */
-#[Fillable(['device_id', 'plot_id', 'name', 'kind', 'channel', 'max_minutes'])]
+#[Fillable(['device_id', 'plot_id', 'name', 'kind', 'channel', 'max_minutes', 'block_device_id', 'block_metric_id', 'block_operator', 'block_value'])]
 class Actuator extends Model
 {
     /**
@@ -29,6 +31,7 @@ class Actuator extends Model
             'is_on' => 'boolean',
             'state_changed_at' => 'datetime',
             'auto_off_at' => 'datetime',
+            'block_value' => 'float',
         ];
     }
 
@@ -46,6 +49,41 @@ class Actuator extends Model
     public function plot(): BelongsTo
     {
         return $this->belongsTo(Plot::class);
+    }
+
+    public function hasInterlock(): bool
+    {
+        return $this->block_device_id !== null && $this->block_metric_id !== null && $this->block_value !== null;
+    }
+
+    /** Số đo này có làm khóa an toàn chặn máy không */
+    public function blockedBy(float $value): bool
+    {
+        return $this->block_operator === 'below' ? $value < $this->block_value : $value > $this->block_value;
+    }
+
+    /**
+     * @return BelongsTo<Device, $this>
+     */
+    public function blockDevice(): BelongsTo
+    {
+        return $this->belongsTo(Device::class, 'block_device_id');
+    }
+
+    /**
+     * @return BelongsTo<Metric, $this>
+     */
+    public function blockMetric(): BelongsTo
+    {
+        return $this->belongsTo(Metric::class, 'block_metric_id');
+    }
+
+    /**
+     * @return HasMany<ActuatorSchedule, $this>
+     */
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(ActuatorSchedule::class);
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\Device;
 use App\Models\Reading;
 use App\Models\Threshold;
 use App\Notifications\AlertNotifier;
+use App\Services\Control\InterlockWatcher;
 use App\Services\Control\RuleEngine;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -24,10 +25,16 @@ class EvaluateThresholds implements ShouldQueue
      */
     public function __construct(public int $deviceId, public array $latest) {}
 
-    public function handle(AlertNotifier $notifier, RuleEngine $rules): void
+    public function handle(AlertNotifier $notifier, RuleEngine $rules, InterlockWatcher $interlocks): void
     {
         $device = Device::query()->find($this->deviceId);
-        if ($device?->plot_id === null) {
+        if ($device === null) {
+            return;
+        }
+
+        // Khóa an toàn (cảm biến nguồn nước có thể không thuộc lô nào)
+        $interlocks->onReadings($device, $this->latest);
+        if ($device->plot_id === null) {
             return;
         }
 

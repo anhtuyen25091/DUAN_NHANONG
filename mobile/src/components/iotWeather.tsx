@@ -49,6 +49,11 @@ export function WeatherCard({ farm }: { farm: IotFarm }) {
             {farm.raining.mm >= 0.5 ? `, khoảng ${formatDecimal(farm.raining.mm)} mm` : ''}
           </Text>
         )}
+        {farm.dry_days !== null && farm.dry_days >= 3 && !farm.raining && (
+          <Text style={{ marginTop: 10, fontSize: font.body, fontWeight: '700', color: '#7a4a00', backgroundColor: colors.accentSoft, padding: 10, borderRadius: 10, overflow: 'hidden' }}>
+            ☀️ Đã {farm.dry_days} ngày không mưa
+          </Text>
+        )}
         <Hints hints={data.hints} />
       </Card>
     </Pressable>

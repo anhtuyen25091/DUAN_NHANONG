@@ -1,7 +1,7 @@
-import { formatDecimal, parseDecimalInput, thresholdLabel, type IotMetric, type IotPlotType, type IotThreshold } from '@nhanong/shared';
+import { formatDecimal, parseDecimalInput, thresholdLabel, type IotCropPreset, type IotMetric, type IotPlotType, type IotThreshold } from '@nhanong/shared';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SectionTitle } from '../../components/iot';
 import { FormInput, FormMessage, NO_ERRORS, toFormErrors } from '../../components/iotForm';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
@@ -22,12 +22,23 @@ const GROUPS: Record<IotPlotType, IotMetric['group'][]> = {
 /** Ngưỡng cảnh báo của 1 lô: vượt ngưỡng thì báo về điện thoại */
 export default function IotThresholdsScreen() {
   const { plot, name, type } = useLocalSearchParams<{ plot: string; name?: string; type?: IotPlotType }>();
-  const data = useAsync(() => Promise.all([iotApi.thresholds(Number(plot)), iotApi.metrics()]), [plot]);
+  const data = useAsync(() => Promise.all([iotApi.thresholds(Number(plot)), iotApi.metrics(), iotApi.cropPresets()]), [plot]);
+  const [applied, setApplied] = useState<IotCropPreset | null>(null);
+  const [applying, setApplying] = useState(false);
   const [editing, setEditing] = useState<{ metric: string; threshold?: IotThreshold } | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   if (data.state.status !== 'ok') return <Status state={data.state} retry={data.reload} />;
-  const [thresholds, metrics] = data.state.data;
+  const [thresholds, metrics, presets] = data.state.data;
+
+  const apply = async (preset: IotCropPreset) => {
+    const ok = await confirmAsync(`Dùng gợi ý cho ${preset.name}?`, 'Đặt các ngưỡng theo tài liệu kỹ thuật (ghi đè ngưỡng cùng chỉ số đang có).', 'Dùng gợi ý');
+    if (!ok) return;
+    setApplying(true);
+    await iotApi.applyPreset(Number(plot), preset.code).then(() => setApplied(preset), () => {});
+    setApplying(false);
+    data.refetch();
+  };
   const metricOf = (code: string) => metrics.find((m) => m.code === code);
   const groups = GROUPS[type ?? 'other'];
   const choices = metrics.filter((m) => m.group !== 'device' && (showAll || groups.includes(m.group)) && !thresholds.some((t) => t.metric === m.code));
@@ -76,6 +87,14 @@ export default function IotThresholdsScreen() {
         );
       })}
 
+      <SectionTitle text="Gợi ý theo cây trồng" />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+        {presets.map((p) => (
+          <Chip key={p.code} small label={p.name} active={applied?.code === p.code} onPress={() => !applying && void apply(p)} />
+        ))}
+      </View>
+      {applied && <PresetNotes preset={applied} />}
+
       <SectionTitle text="Thêm ngưỡng" />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {choices.map((m) => (
@@ -86,6 +105,25 @@ export default function IotThresholdsScreen() {
         {showAll ? 'Chỉ hiện chỉ số hay dùng' : 'Hiện tất cả chỉ số'}
       </Text>
     </ScrollView>
+  );
+}
+
+/** Lưu ý + nguồn tài liệu của gợi ý (người dùng tự kiểm tra lại) */
+function PresetNotes({ preset }: { preset: IotCropPreset }) {
+  return (
+    <Card style={{ borderLeftWidth: 6, borderLeftColor: colors.star }}>
+      <Text style={[styles.body, { fontWeight: '700', marginBottom: 4 }]}>Đã đặt ngưỡng gợi ý cho {preset.name}</Text>
+      {[...preset.thresholds.map((t) => t.note), ...(preset.schedule ? [`Lịch tưới: ${preset.schedule.note}`] : []), ...(preset.interlock ? [preset.interlock.note] : []), ...preset.notes].map((note) => (
+        <Text key={note} style={[styles.muted, { marginBottom: 4 }]}>
+          • {note}
+        </Text>
+      ))}
+      {preset.sources.map((source) => (
+        <Text key={source.url} onPress={() => void Linking.openURL(source.url)} style={{ color: colors.primary, marginTop: 4 }} accessibilityRole="link">
+          📄 {source.title}
+        </Text>
+      ))}
+    </Card>
   );
 }
 

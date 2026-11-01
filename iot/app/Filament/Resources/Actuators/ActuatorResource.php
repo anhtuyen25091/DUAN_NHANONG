@@ -7,6 +7,7 @@ use App\Filament\Resources\Actuators\Pages\ManageActuators;
 use App\Models\Actuator;
 use App\Models\ActuatorCommand;
 use App\Models\Device;
+use App\Services\Control\BlockedCommandException;
 use App\Services\Control\CommandService;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -73,6 +74,19 @@ class ActuatorResource extends Resource
                     ->integer()
                     ->default(60)
                     ->required(),
+                Select::make('block_device_id')
+                    ->label('Khóa an toàn: cảm biến nguồn nước')
+                    ->helperText('VD đo độ mặn kênh cấp nước: vượt mức thì không cho bơm, đang chạy thì tự tắt')
+                    ->relationship('blockDevice', 'name', fn ($query, Get $get) => $query->whereIn('farm_id', Device::query()->whereKey($get('device_id'))->select('farm_id'))),
+                Select::make('block_metric_id')
+                    ->label('Chỉ số chặn')
+                    ->relationship('blockMetric', 'name'),
+                Select::make('block_operator')
+                    ->label('Chặn khi')
+                    ->options(['above' => 'Cao hơn', 'below' => 'Thấp hơn']),
+                TextInput::make('block_value')
+                    ->label('Mức chặn')
+                    ->numeric(),
             ]);
     }
 
@@ -105,8 +119,12 @@ class ActuatorResource extends Resource
                     ->color('success')
                     ->schema([TextInput::make('minutes')->label('Số phút')->integer()->minValue(1)->default(30)->required()])
                     ->action(function (Actuator $record, array $data) {
-                        app(CommandService::class)->issue($record, ActuatorCommand::ON, (int) $data['minutes'], ActuatorCommand::SOURCE_MANUAL, Auth::user());
-                        Notification::make()->title('Đã gửi lệnh bật, mạch nhận trong vài giây')->success()->send();
+                        try {
+                            app(CommandService::class)->issue($record, ActuatorCommand::ON, (int) $data['minutes'], ActuatorCommand::SOURCE_MANUAL, Auth::user());
+                            Notification::make()->title('Đã gửi lệnh bật, mạch nhận trong vài giây')->success()->send();
+                        } catch (BlockedCommandException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                        }
                     }),
                 Action::make('turnOff')
                     ->label('Tắt')

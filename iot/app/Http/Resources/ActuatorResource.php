@@ -27,6 +27,16 @@ class ActuatorResource extends JsonResource
             'is_on' => $this->is_on,
             'state_changed_at' => $this->state_changed_at?->toIso8601String(),
             'auto_off_at' => $this->auto_off_at?->toIso8601String(),
+            // Khóa an toàn: cảm biến nguồn nước vượt mức thì không bơm
+            'block' => $this->hasInterlock() ? [
+                'device_id' => $this->block_device_id,
+                'device_name' => $this->blockDevice?->name,
+                'metric' => $this->blockMetric?->code,
+                'metric_name' => $this->blockMetric?->name,
+                'unit' => $this->blockMetric?->unit,
+                'operator' => $this->block_operator,
+                'value' => $this->block_value,
+            ] : null,
             // Lệnh đang chờ mạch làm (app hiện "Đang gửi lệnh…")
             'pending' => $this->openCommand === null ? null : [
                 'id' => $this->openCommand->id,

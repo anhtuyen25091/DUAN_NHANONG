@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['user_id', 'name', 'province', 'lat', 'lng', 'rain_alerts'])]
+#[Fillable(['user_id', 'name', 'province', 'lat', 'lng', 'rain_alerts', 'dry_alert_days'])]
 class Farm extends Model
 {
     /** @use HasFactory<FarmFactory> */
@@ -29,6 +29,8 @@ class Farm extends Model
             'last_rain_at' => 'datetime',
             'rain_episode_mm' => 'float',
             'rain_alerted_at' => 'datetime',
+            'dry_alert_days' => 'integer',
+            'dry_alerted_at' => 'datetime',
         ];
     }
 

@@ -1,4 +1,4 @@
-import { type IotActuator, type IotActuatorKind, type IotDevice } from '@nhanong/shared';
+import { formatDecimal, parseDecimalInput, type IotActuator, type IotActuatorKind, type IotDevice } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text } from 'react-native';
@@ -28,24 +28,47 @@ export default function IotActuatorFormScreen() {
   const farmId = actuator ? devices.find((d) => d.id === actuator.device_id)?.farm_id : Number(farm);
   // Mạch điều khiển: thiết bị ESP32 cùng trang trại (ưu tiên mạch đặt ở lô này)
   const controllers = devices.filter((d) => d.kind === 'esp32' && d.farm_id === farmId).sort((a, b) => Number(b.plot_id === Number(plot)) - Number(a.plot_id === Number(plot)));
-  return <ActuatorForm actuator={actuator} controllers={controllers} plotId={plot ? Number(plot) : null} />;
+  return <ActuatorForm actuator={actuator} controllers={controllers} sensors={devices.filter((d) => d.farm_id === farmId)} plotId={plot ? Number(plot) : null} />;
 }
 
-function ActuatorForm({ actuator, controllers, plotId }: { actuator?: IotActuator; controllers: IotDevice[]; plotId: number | null }) {
+/** Chỉ số hay dùng làm khóa an toàn của máy bơm */
+const BLOCK_METRICS = [
+  { code: 'salinity', label: 'Độ mặn (‰)' },
+  { code: 'water_ec', label: 'EC nước (µS/cm)' },
+  { code: 'water_level', label: 'Mực nước (cm)' },
+];
+
+function ActuatorForm({ actuator, controllers, sensors, plotId }: { actuator?: IotActuator; controllers: IotDevice[]; sensors: IotDevice[]; plotId: number | null }) {
   const [deviceId, setDeviceId] = useState<number | null>(actuator?.device_id ?? controllers[0]?.id ?? null);
   const [name, setName] = useState(actuator?.name ?? '');
   const [kind, setKind] = useState<IotActuatorKind>(actuator?.kind ?? 'pump');
   const [channel, setChannel] = useState(String(actuator?.channel ?? 1));
   const [maxMinutes, setMaxMinutes] = useState(String(actuator?.max_minutes ?? 60));
+  const [blockDeviceId, setBlockDeviceId] = useState<number | null>(actuator?.block?.device_id ?? null);
+  const [blockMetric, setBlockMetric] = useState(actuator?.block?.metric ?? 'salinity');
+  const [blockOperator, setBlockOperator] = useState<'above' | 'below'>(actuator?.block?.operator ?? 'above');
+  const [blockValue, setBlockValue] = useState(actuator?.block ? formatDecimal(actuator.block.value) : '0,3');
   const [errors, setErrors] = useState(NO_ERRORS);
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
     if (deviceId === null) return;
+    const value = parseDecimalInput(blockValue);
+    if (blockDeviceId !== null && (value === null || Number.isNaN(value))) return setErrors({ fields: {}, message: 'Nhập mức chặn là số, VD 0,3.' });
     setBusy(true);
     setErrors(NO_ERRORS);
     try {
-      const input = { name: name.trim(), kind, channel: Number(channel) || 0, plot_id: actuator?.plot_id ?? plotId, max_minutes: Number(maxMinutes) || 60 };
+      const input = {
+        name: name.trim(),
+        kind,
+        channel: Number(channel) || 0,
+        plot_id: actuator?.plot_id ?? plotId,
+        max_minutes: Number(maxMinutes) || 60,
+        block_device_id: blockDeviceId,
+        block_metric: blockDeviceId === null ? null : blockMetric,
+        block_operator: blockDeviceId === null ? null : blockOperator,
+        block_value: blockDeviceId === null ? null : value,
+      };
       if (actuator) await iotApi.updateActuator(actuator.id, input);
       else await iotApi.createActuator(deviceId, input);
       router.back();
@@ -97,6 +120,33 @@ function ActuatorForm({ actuator, controllers, plotId }: { actuator?: IotActuato
         keyboardType="number-pad"
         hint="Mạch tự tắt khi hết giờ, kể cả lúc mất mạng (an toàn cho máy bơm)."
       />
+      <Card>
+        <Text style={[styles.body, { fontWeight: '700', marginBottom: 4 }]}>🔒 Khóa an toàn (không bắt buộc)</Text>
+        <Text style={[styles.muted, { marginBottom: 8 }]}>
+          Theo một cảm biến đo nguồn nước: vượt mức thì không cho bơm (kể cả lịch tưới, luật tự động), đang chạy thì tự tắt. VD sầu riêng: nước tưới mặn trên 0,3‰ là không được tưới.
+        </Text>
+        <FormSection label="Cảm biến nguồn nước" error={errors.fields.block_device_id}>
+          <Chip small label="Không dùng" active={blockDeviceId === null} onPress={() => setBlockDeviceId(null)} />
+          {sensors.map((d) => (
+            <Chip key={d.id} small label={d.name} active={blockDeviceId === d.id} onPress={() => setBlockDeviceId(d.id)} />
+          ))}
+        </FormSection>
+        {blockDeviceId !== null && (
+          <>
+            <FormSection label="Chỉ số" error={errors.fields.block_metric}>
+              {BLOCK_METRICS.map((m) => (
+                <Chip key={m.code} small label={m.label} active={blockMetric === m.code} onPress={() => setBlockMetric(m.code)} />
+              ))}
+            </FormSection>
+            <FormSection label="Chặn khi">
+              <Chip small label="Cao hơn" active={blockOperator === 'above'} onPress={() => setBlockOperator('above')} />
+              <Chip small label="Thấp hơn" active={blockOperator === 'below'} onPress={() => setBlockOperator('below')} />
+            </FormSection>
+            <FormInput label="Mức chặn" value={blockValue} onChange={setBlockValue} error={errors.fields.block_value} keyboardType="decimal-pad" hint="Mực nước: chọn 'Thấp hơn' để bơm không chạy khô khi hết nước." />
+          </>
+        )}
+      </Card>
+
       <FormMessage errors={errors} />
       <Button label={busy ? 'Đang lưu…' : 'Lưu'} onPress={save} disabled={busy || name.trim() === '' || deviceId === null} />
       {actuator && (

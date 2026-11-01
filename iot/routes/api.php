@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\ActuatorController;
 use App\Http\Controllers\Api\V1\AlertController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\CropPresetController;
 use App\Http\Controllers\Api\V1\DeviceCommandController;
 use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\FarmController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Api\V1\PlotController;
 use App\Http\Controllers\Api\V1\PushTokenController;
 use App\Http\Controllers\Api\V1\ReadingController;
 use App\Http\Controllers\Api\V1\RuleController;
+use App\Http\Controllers\Api\V1\ScheduleController;
 use App\Http\Controllers\Api\V1\ThresholdController;
 use App\Http\Middleware\AuthenticateDevice;
 use Illuminate\Support\Facades\Route;
@@ -82,6 +84,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::delete('/actuators/{actuator}', [ActuatorController::class, 'destroy'])->name('actuators.destroy');
         Route::post('/actuators/{actuator}/command', [ActuatorController::class, 'command'])->middleware('throttle:30,1')->name('actuators.command');
         Route::get('/actuators/{actuator}/commands', [ActuatorController::class, 'history'])->name('actuators.history');
+
+        Route::get('/plots/{plot}/schedules', [ScheduleController::class, 'index'])->name('schedules.index');
+        Route::post('/actuators/{actuator}/schedules', [ScheduleController::class, 'store'])->name('schedules.store');
+        Route::put('/schedules/{schedule}', [ScheduleController::class, 'update'])->name('schedules.update');
+        Route::delete('/schedules/{schedule}', [ScheduleController::class, 'destroy'])->name('schedules.destroy');
+
+        Route::get('/crop-presets', [CropPresetController::class, 'index'])->name('crop-presets.index');
+        Route::post('/plots/{plot}/apply-preset', [CropPresetController::class, 'apply'])->name('crop-presets.apply');
 
         Route::get('/plots/{plot}/rules', [RuleController::class, 'index'])->name('rules.index');
         Route::post('/plots/{plot}/rules', [RuleController::class, 'store'])->name('rules.store');

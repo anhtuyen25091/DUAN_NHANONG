@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ReadingSource;
 use App\Jobs\EvaluateThresholds;
 use App\Jobs\ObserveRainGauge;
+use App\Models\Actuator;
 use App\Models\Device;
 use App\Models\Metric;
 use Carbon\CarbonImmutable;
@@ -125,7 +126,8 @@ class ReadingIngestor
      */
     private function queueThresholdCheck(Device $device, array $records, CarbonImmutable $now): void
     {
-        if ($device->plot_id === null || $records === []) {
+        // Thiết bị không thuộc lô vẫn có thể là cảm biến khóa an toàn (VD đo độ mặn kênh cấp nước)
+        if ($records === [] || ($device->plot_id === null && ! Actuator::query()->where('block_device_id', $device->id)->exists())) {
             return;
         }
 

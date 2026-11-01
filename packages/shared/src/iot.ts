@@ -40,6 +40,10 @@ export interface IotFarm {
   rain_alerts: boolean;
   /** Đang mưa (dữ liệu thời tiết hoặc máy đo mưa): từ lúc nào, khoảng bao nhiêu mm */
   raining: { since: string; mm: number } | null;
+  /** Nhắc khi đã N ngày liên tiếp không mưa (0 / null = tắt) */
+  dry_alert_days: number | null;
+  /** Số ngày liên tiếp không mưa tới hôm qua (null: chưa có vị trí) */
+  dry_days: number | null;
   plots: IotPlot[];
 }
 
@@ -49,6 +53,7 @@ export interface IotFarmInput {
   lat: number | null;
   lng: number | null;
   rain_alerts?: boolean;
+  dry_alert_days?: number | null;
 }
 
 /** Gói dùng chung với tài khoản Nhà Nông đã nối */
@@ -209,6 +214,8 @@ export interface IotActuator {
   is_on: boolean;
   state_changed_at: string | null;
   auto_off_at: string | null;
+  /** Khóa an toàn: số đo cảm biến nguồn nước vượt mức thì không bơm */
+  block: { device_id: number; device_name: string | null; metric: string | null; metric_name: string | null; unit: string | null; operator: 'above' | 'below'; value: number } | null;
   /** Lệnh đang chờ mạch làm */
   pending: { id: number; action: 'on' | 'off'; minutes: number | null; status: IotCommandStatus; expires_at: string } | null;
 }
@@ -219,6 +226,46 @@ export interface IotActuatorInput {
   channel: number;
   plot_id: number | null;
   max_minutes: number;
+  block_device_id?: number | null;
+  block_metric?: string | null;
+  block_operator?: 'above' | 'below' | null;
+  block_value?: number | null;
+}
+
+/** Lịch tưới: "05:30, bơm 40 phút, mỗi 20 ngày, tháng 12 → 4, bỏ lượt nếu đã mưa ≥ 10 mm" */
+export interface IotSchedule {
+  id: number;
+  actuator: { id: number; name: string };
+  start_time: string;
+  minutes: number;
+  every_days: number;
+  months: number[] | null;
+  skip_rain_mm: number | null;
+  note: string | null;
+  enabled: boolean;
+  next_run_on: string;
+  last_run_at: string | null;
+}
+
+export interface IotScheduleInput {
+  start_time: string;
+  minutes: number;
+  every_days: number;
+  months: number[] | null;
+  skip_rain_mm: number | null;
+  note: string | null;
+  enabled: boolean;
+}
+
+/** Gợi ý theo cây trồng từ tài liệu kỹ thuật (có nguồn) */
+export interface IotCropPreset {
+  code: string;
+  name: string;
+  thresholds: { metric: string; min: number | null; max: number | null; note: string }[];
+  schedule: { every_days: number; months: number[]; note: string } | null;
+  interlock: { metric: string; max: number; note: string } | null;
+  notes: string[];
+  sources: { title: string; url: string }[];
 }
 
 export interface IotCommand {
@@ -351,6 +398,14 @@ export function createIotApi({ baseUrl, getToken, fetch: fetchFn = globalThis.fe
     command: (actuatorId: number, action: 'on' | 'off', minutes?: number) =>
       request<{ data: IotCommand }>('POST', `/actuators/${actuatorId}/command`, { body: { action, minutes } }).then((r) => r.data),
     commandHistory: (actuatorId: number) => request<{ data: IotCommand[] }>('GET', `/actuators/${actuatorId}/commands`).then((r) => r.data),
+    schedules: (plotId: number) => request<{ data: IotSchedule[] }>('GET', `/plots/${plotId}/schedules`).then((r) => r.data),
+    createSchedule: (actuatorId: number, input: IotScheduleInput) =>
+      request<{ data: IotSchedule }>('POST', `/actuators/${actuatorId}/schedules`, { body: input }).then((r) => r.data),
+    updateSchedule: (id: number, input: IotScheduleInput) => request<{ data: IotSchedule }>('PUT', `/schedules/${id}`, { body: input }).then((r) => r.data),
+    deleteSchedule: (id: number) => request<void>('DELETE', `/schedules/${id}`),
+    cropPresets: () => request<{ data: IotCropPreset[] }>('GET', '/crop-presets').then((r) => r.data),
+    /** Đặt các ngưỡng gợi ý của cây trồng cho lô */
+    applyPreset: (plotId: number, preset: string) => request<{ thresholds: IotThreshold[]; preset: IotCropPreset }>('POST', `/plots/${plotId}/apply-preset`, { body: { preset } }),
     rules: (plotId: number) => request<{ data: IotRule[] }>('GET', `/plots/${plotId}/rules`).then((r) => r.data),
     createRule: (plotId: number, input: IotRuleInput) => request<{ data: IotRule }>('POST', `/plots/${plotId}/rules`, { body: input }).then((r) => r.data),
     updateRule: (id: number, input: IotRuleInput) => request<{ data: IotRule }>('PUT', `/rules/${id}`, { body: input }).then((r) => r.data),
@@ -441,6 +496,34 @@ export function describeRule(rule: IotRule): string {
   const when = `Khi ${rule.metric.name} ${rule.operator === 'below' ? 'thấp hơn' : 'cao hơn'} ${formatDecimal(rule.value)}${unit}`;
   const off = rule.off_value === null ? '' : `, tắt khi ${rule.operator === 'below' ? '≥' : '≤'} ${formatDecimal(rule.off_value)}`;
   return `${when} → bật ${rule.actuator.name} ${rule.minutes} phút${off}`;
+}
+
+/** [12, 1, 2, 3, 4] -> "tháng 12 → 4"; [3, 5] -> "tháng 3, 5"; null -> "cả năm" */
+export function monthsLabel(months: number[] | null): string {
+  if (!months || months.length === 0 || months.length === 12) return 'cả năm';
+  // Chuỗi tháng liền nhau (kể cả vắt qua năm mới, VD 12 → 4)
+  const set = new Set(months);
+  const start = months.find((m) => !set.has(m === 1 ? 12 : m - 1));
+  if (start !== undefined) {
+    let end = start;
+    while (set.has(end === 12 ? 1 : end + 1) && (end === 12 ? 1 : end + 1) !== start) end = end === 12 ? 1 : end + 1;
+    let count = 1;
+    for (let m = start; m !== end; m = m === 12 ? 1 : m + 1) count++;
+    if (count === months.length && count > 1) return `tháng ${start} → ${end}`;
+  }
+  return `tháng ${[...months].sort((a, b) => a - b).join(', ')}`;
+}
+
+/** "05:30 · 40 phút · mỗi 20 ngày · tháng 12 → 4 · bỏ lượt nếu đã mưa ≥ 10 mm" */
+export function describeSchedule(schedule: Pick<IotSchedule, 'start_time' | 'minutes' | 'every_days' | 'months' | 'skip_rain_mm'>): string {
+  const parts = [
+    schedule.start_time,
+    `${schedule.minutes} phút`,
+    schedule.every_days === 1 ? 'mỗi ngày' : `mỗi ${schedule.every_days} ngày`,
+    monthsLabel(schedule.months),
+  ];
+  if (schedule.skip_rain_mm !== null) parts.push(`bỏ lượt nếu đã mưa ≥ ${formatDecimal(schedule.skip_rain_mm)} mm`);
+  return parts.join(' · ');
 }
 
 /** Lượng mưa 1 ngày: ưu tiên máy đo mưa của trang trại, không có thì dữ liệu thời tiết */

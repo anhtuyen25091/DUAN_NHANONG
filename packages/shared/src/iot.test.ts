@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from './api';
-import { createIotApi, describeRule, formatDecimal, formatIotValue, normalizeDevEui, parseDecimalInput, parseDeviceFile, pointValue, rainOfDay, thresholdLabel, timeAgo, weatherDayLabel } from './iot';
+import { createIotApi, describeRule, describeSchedule, monthsLabel, formatDecimal, formatIotValue, normalizeDevEui, parseDecimalInput, parseDeviceFile, pointValue, rainOfDay, thresholdLabel, timeAgo, weatherDayLabel } from './iot';
 
 function fakeFetch(status: number, body: unknown) {
   return vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(status === 204 ? null : JSON.stringify(body), { status }));
@@ -116,5 +116,22 @@ describe('luật tự động', () => {
     };
     expect(describeRule(rule)).toBe('Khi Oxy hòa tan (DO) thấp hơn 4 mg/L → bật Quạt oxy 1 90 phút, tắt khi ≥ 5');
     expect(describeRule({ ...rule, operator: 'above', value: 35.5, off_value: null, metric: { ...rule.metric, name: 'Nhiệt độ', unit: '°C' } })).toBe('Khi Nhiệt độ cao hơn 35,5 °C → bật Quạt oxy 1 90 phút');
+  });
+});
+
+describe('lịch tưới', () => {
+  it('tên các tháng', () => {
+    expect(monthsLabel([12, 1, 2, 3, 4])).toBe('tháng 12 → 4');
+    expect(monthsLabel([2, 3, 4])).toBe('tháng 2 → 4');
+    expect(monthsLabel([3, 5])).toBe('tháng 3, 5');
+    expect(monthsLabel(null)).toBe('cả năm');
+    expect(monthsLabel([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])).toBe('cả năm');
+  });
+
+  it('mô tả lịch', () => {
+    expect(describeSchedule({ start_time: '05:30', minutes: 40, every_days: 20, months: [12, 1, 2, 3, 4], skip_rain_mm: 10 })).toBe(
+      '05:30 · 40 phút · mỗi 20 ngày · tháng 12 → 4 · bỏ lượt nếu đã mưa ≥ 10 mm',
+    );
+    expect(describeSchedule({ start_time: '17:00', minutes: 15, every_days: 1, months: null, skip_rain_mm: null })).toBe('17:00 · 15 phút · mỗi ngày · cả năm');
   });
 });

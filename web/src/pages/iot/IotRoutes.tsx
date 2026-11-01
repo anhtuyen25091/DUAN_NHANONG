@@ -1,5 +1,6 @@
 import {
   ApiError,
+  describeSchedule,
   formatDecimal,
   formatIotValue,
   thresholdLabel,
@@ -194,6 +195,12 @@ function WeatherCard({ farm }: { farm: IotFarm }) {
             </b>
           </>
         )}
+        {farm.dry_days !== null && farm.dry_days >= 3 && !farm.raining && (
+          <>
+            <br />
+            <b style={{ color: '#7a4a00' }}>☀️ Đã {farm.dry_days} ngày không mưa</b>
+          </>
+        )}
         <Hints hints={weather.data.hints} />
       </span>
       <span aria-hidden>›</span>
@@ -316,6 +323,7 @@ function Controls({ plotId }: { plotId: number }) {
       {list.map((actuator) => (
         <ActuatorCard key={actuator.id} actuator={actuator} onChanged={() => reloadRef.current()} />
       ))}
+      <Schedules plotId={plotId} />
     </>
   )
 }
@@ -350,6 +358,12 @@ function ActuatorCard({ actuator, onChanged }: { actuator: IotActuator; onChange
             ? `🟢 Đang chạy${actuator.auto_off_at ? `, tự tắt lúc ${timeOf(actuator.auto_off_at)}` : ''}`
             : '⚪ Đang tắt'}
       </p>
+      {actuator.block && (
+        <p className="small muted">
+          🔒 Khóa an toàn: không bơm khi {actuator.block.metric_name} {actuator.block.operator === 'above' ? '>' : '<'} {formatDecimal(actuator.block.value)}
+          {actuator.block.unit ? ` ${actuator.block.unit}` : ''} ({actuator.block.device_name})
+        </p>
+      )}
       {!actuator.device_online && <p className="field-error">⚠️ Mạch điều khiển đang mất kết nối: lệnh sẽ hủy nếu 10 phút không nhận được.</p>}
       <div className="segmented">
         {[15, 30, 60]
@@ -370,6 +384,27 @@ function ActuatorCard({ actuator, onChanged }: { actuator: IotActuator; onChange
       </div>
       {error && <p className="field-error">{error}</p>}
     </div>
+  )
+}
+
+/** Lịch tưới của lô (chỉ xem; thêm / sửa trong app) */
+function Schedules({ plotId }: { plotId: number }) {
+  const [schedules] = useAsync(() => iotApi.schedules(plotId), [plotId])
+  if (schedules.status !== 'ok' || schedules.data.length === 0) return null
+  return (
+    <>
+      <h2 className="section-title">🗓️ Lịch tưới</h2>
+      {schedules.data.map((schedule) => (
+        <p key={schedule.id} className="card" style={schedule.enabled ? undefined : { opacity: 0.6 }}>
+          <b>{schedule.actuator.name}</b>: {describeSchedule(schedule)}
+          <br />
+          <span className="small muted">
+            {schedule.enabled ? `Lượt tới: ${schedule.next_run_on.split('-').reverse().slice(0, 2).join('/')}` : 'Đang tạm tắt'}
+            {schedule.note ? ` · ${schedule.note}` : ''}
+          </span>
+        </p>
+      ))}
+    </>
   )
 }
 
