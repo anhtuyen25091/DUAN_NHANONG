@@ -95,24 +95,8 @@ export async function registerPush(askPermission: boolean): Promise<PushResult> 
   const Notifications = notifications();
   if (!Notifications) return { ok: false, reason: notificationsUnsupported! };
 
-  if (Platform.OS === 'android') {
-    // Backend gửi với channelId "price-alerts"
-    await Notifications.setNotificationChannelAsync(ALERT_CHANNEL, {
-      name: 'Báo giá',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-    });
-    await Notifications.setNotificationChannelAsync(UPDATES_CHANNEL, {
-      name: 'Đơn mua bán, phiếu',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-    });
-    await Notifications.setNotificationChannelAsync(IOT_CHANNEL, {
-      name: 'Cảnh báo cảm biến ruộng / ao',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 400, 200, 400],
-    });
-  }
+  // Expo Go trên Android: tạo kênh có thể lỗi ở phía máy (NullPointerException) → bỏ qua, máy dùng kênh mặc định
+  if (Platform.OS === 'android') await createChannels(Notifications).catch(() => {});
 
   if (!Device.isDevice) return { ok: false, reason: 'Cần chạy trên điện thoại thật để nhận thông báo.' };
 
@@ -136,4 +120,24 @@ export async function registerPush(askPermission: boolean): Promise<PushResult> 
   } catch (e) {
     return { ok: false, reason: e instanceof Error ? e.message : 'Không lấy được mã thông báo.' };
   }
+}
+
+/** Kênh thông báo Android (đặt mức ưu tiên / rung cho từng loại) */
+async function createChannels(N: NotificationsModule) {
+  // Backend gửi với channelId "price-alerts"
+  await N.setNotificationChannelAsync(ALERT_CHANNEL, {
+    name: 'Báo giá',
+    importance: N.AndroidImportance.HIGH,
+    vibrationPattern: [0, 250, 250, 250],
+  });
+  await N.setNotificationChannelAsync(UPDATES_CHANNEL, {
+    name: 'Đơn mua bán, phiếu',
+    importance: N.AndroidImportance.HIGH,
+    vibrationPattern: [0, 250, 250, 250],
+  });
+  await N.setNotificationChannelAsync(IOT_CHANNEL, {
+    name: 'Cảnh báo cảm biến ruộng / ao',
+    importance: N.AndroidImportance.HIGH,
+    vibrationPattern: [0, 400, 200, 400],
+  });
 }

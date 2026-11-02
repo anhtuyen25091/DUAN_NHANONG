@@ -23,8 +23,17 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
   - thiếu phụ thuộc hook ở tab Cảnh báo, import thừa, kiểu `Array<T>`
   - tắt quy tắc `react/no-unescaped-entities` (của HTML, không áp dụng cho chữ React Native)
 
+- **Sửa lỗi app báo đỏ trên điện thoại** (bản dev, Expo Go) khi mở tab Tài khoản và các form có ô nhập: style tạo bằng `themed()` (getter không sửa được) được đưa thẳng xuống React Native, bản dev "đóng băng" style thì báo `property is not configurable`. `Text` / `TextInput` (`components/AppText.tsx`) giờ luôn chép style ra object thường. Bản web không bị nên các lần thử trước không thấy.
+- **Sửa lỗi đăng nhập xong sang tab khác bị đòi đăng nhập lại** (app + web): máy còn giữ token cảm biến cũ không còn trên máy chủ → mục Cảm biến bị 401 → khung "Phiên đăng nhập đã hết hạn", bấm "Đăng nhập lại" thì đăng xuất luôn tài khoản Nhà Nông. Giờ:
+  - `createIotApi` có `onUnauthorized`: máy chủ cảm biến từ chối token thì bỏ token đó, tự vào lại Cảm biến bằng tài khoản Nhà Nông; lúc đồng bộ gặp 401 cũng vậy
+  - `ApiError.service` (`nhanong` / `iot`): 401 của cảm biến hiện "Đang kết nối lại mục Cảm biến…" + "Thử lại", không đăng xuất Nhà Nông
+  - kiểm tra bằng Chrome tự động trên web và bản web của app với token cảm biến giả: tự lấy token mới, vẫn đăng nhập Nhà Nông
+- Mở thẳng trang lô khi chưa vào Cảm biến (VD bấm thông báo): tự vào bằng tài khoản Nhà Nông rồi tải lại, không cần bấm "Thử lại".
+- **Dữ liệu demo cảm biến:** lệnh `php artisan iot:demo <SĐT>` (`iot/README.md`) gồm 5 lô (sầu riêng, ao cá, ruộng lúa), 6 thiết bị, 14 ngày số đo, máy bơm, lịch, luật, ngưỡng, cảnh báo, việc làm vườn. Đã tạo cho `0900000001`; test `SeedDemoTest`.
+- Expo Go trên Android lỗi khi tạo kênh thông báo (`setNotificationChannelAsync`): bỏ qua lỗi, dùng kênh mặc định; tab Cảnh báo không còn báo lỗi "Uncaught (in promise)".
+
 **Kiểm tra**
-- `expo lint` 0 lỗi 0 cảnh báo, typecheck sạch, Metro build bản Android được.
+- `expo lint` 0 lỗi 0 cảnh báo, typecheck sạch, Metro build bản Android được; cảm biến 106/106, thư viện chung 150/150, web build được.
 - Bản web của app bằng Chrome tự động: nền tối → ô đánh dấu và nút khóa rõ ràng; gõ SĐT rồi đổi máy sang sáng → giữ nền tối, chữ còn nguyên; xóa chữ → chuyển sang sáng.
 
 **Còn tồn**

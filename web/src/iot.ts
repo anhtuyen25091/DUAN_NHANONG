@@ -21,7 +21,15 @@ function read(): IotAuth | null {
   }
 }
 
-export const iotApi = createIotApi({ baseUrl: import.meta.env.VITE_IOT_URL ?? '/iot', getToken: () => current?.token ?? null })
+export const iotApi = createIotApi({ baseUrl: import.meta.env.VITE_IOT_URL ?? '/iot', getToken: () => current?.token ?? null, onUnauthorized: dropStaleToken })
+
+/** Token cảm biến trong trình duyệt bị máy chủ từ chối: bỏ đi, đang đăng nhập Nhà Nông thì vào lại Cảm biến bằng tài khoản đó */
+function dropStaleToken(token: string) {
+  if (current?.token !== token) return
+  setIotAuth(null)
+  syncedToken = null
+  if (getAuth()) void syncIotWithNhanong().catch(() => {})
+}
 
 export function setIotAuth(auth: IotAuth | null) {
   current = auth
@@ -79,20 +87,24 @@ async function run(): Promise<void> {
     return
   }
   if (nhanong.token === syncedToken && current) return
+  const signIn = async () => setIotAuth(await iotApi.loginNhanong(nhanong.token))
+  // 422: tài khoản Nhà Nông đã nối với tài khoản cảm biến khác → theo tài khoản Nhà Nông
+  // 401: token cảm biến trong trình duyệt không còn trên máy chủ → đăng nhập lại bằng tài khoản Nhà Nông
+  const signInInstead = (err: unknown) => {
+    if (!(err instanceof ApiError) || (err.status !== 422 && err.status !== 401)) throw err
+    return signIn()
+  }
   if (current && current.user.nhanong_user_id == null) {
-    try {
-      await iotApi.linkNhanong(nhanong.token)
-      setIotAuth({ ...current, user: { ...current.user, nhanong_user_id: nhanong.user.id } })
-    } catch (err) {
-      // Tài khoản Nhà Nông đã nối với tài khoản cảm biến khác: theo tài khoản Nhà Nông
-      if (!(err instanceof ApiError) || err.status !== 422) throw err
-      setIotAuth(await iotApi.loginNhanong(nhanong.token))
-    }
+    const before = current
+    await iotApi.linkNhanong(nhanong.token).then(
+      () => setIotAuth({ ...before, user: { ...before.user, nhanong_user_id: nhanong.user.id } }),
+      signInInstead,
+    )
   } else if (current && current.user.nhanong_user_id === nhanong.user.id) {
     // Cùng người: gửi token mới để máy chủ cảm biến biết gói đang dùng
-    await iotApi.linkNhanong(nhanong.token)
+    await iotApi.linkNhanong(nhanong.token).catch(signInInstead)
   } else {
-    setIotAuth(await iotApi.loginNhanong(nhanong.token))
+    await signIn()
   }
   syncedToken = nhanong.token
 }

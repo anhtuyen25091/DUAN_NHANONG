@@ -1,11 +1,12 @@
 import { ApiError, formatChange, trendOf } from '@nhanong/shared';
 import { router } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from './AppText';
 import { colors, font, primaryShadow, radius, shadow, themed } from '../lib/theme';
 import { BrandGradient } from './Gradient';
 import { setAuth } from '../lib/auth';
+import { syncIotWithNhanong } from '../lib/iot';
 import type { AsyncState } from '../lib/useAsync';
 
 const ARROWS = { up: '▲', down: '▼', flat: '–', none: '' };
@@ -74,9 +75,35 @@ export function Button({ label, onPress, disabled, variant = 'primary' }: { labe
   );
 }
 
+let lastIotReconnect = 0;
+
+/** Vào lại Cảm biến bằng tài khoản Nhà Nông (lib/iot.ts) rồi tải lại; tự làm tối đa 1 lần / 30 giây để không lặp mãi */
+function IotReconnect({ retry }: { retry: () => void }) {
+  useEffect(() => {
+    if (Date.now() - lastIotReconnect < 30_000) return;
+    lastIotReconnect = Date.now();
+    let active = true;
+    syncIotWithNhanong().then(
+      () => active && retry(),
+      () => {},
+    );
+    return () => {
+      active = false;
+    };
+  }, [retry]);
+  return (
+    <Card>
+      <Text style={[styles.body, { marginBottom: 8 }]}>Đang kết nối mục Cảm biến với tài khoản của bạn…</Text>
+      <Button label="Thử lại" onPress={() => syncIotWithNhanong().then(retry, retry)} variant="outline" />
+    </Card>
+  );
+}
+
 /** Đang tải / lỗi; trả null khi đã có dữ liệu */
 export function Status({ state, retry }: { state: AsyncState<unknown>; retry: () => void }) {
   if (state.status === 'loading') return <ActivityIndicator style={{ margin: 24 }} color={colors.primary} />;
+  // Máy chủ cảm biến từ chối token / chưa vào Cảm biến: vào lại bằng tài khoản Nhà Nông rồi tự tải lại
+  if (state.status === 'error' && state.error instanceof ApiError && state.error.status === 401 && state.error.service === 'iot') return <IotReconnect retry={retry} />;
   // Phiên đăng nhập hết hạn: mời đăng nhập lại, không hiện chữ lỗi khó hiểu ("Unauthenticated.")
   if (state.status === 'error' && state.error instanceof ApiError && state.error.status === 401)
     return (

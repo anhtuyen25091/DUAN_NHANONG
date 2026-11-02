@@ -99,7 +99,8 @@ export function syncDueNotifications(data: Pick<LedgerSnapshot, 'debts' | 'debt_
     if (signature === lastSignature) return;
 
     if (Platform.OS === 'android') {
-      await N.setNotificationChannelAsync(CHANNEL, { name: 'Nhắc hạn trả nợ', importance: N.AndroidImportance.HIGH, vibrationPattern: [0, 250, 250, 250] });
+      // Expo Go trên Android có thể lỗi khi tạo kênh → dùng kênh mặc định
+      await N.setNotificationChannelAsync(CHANNEL, { name: 'Nhắc hạn trả nợ', importance: N.AndroidImportance.HIGH, vibrationPattern: [0, 250, 250, 250] }).catch(() => null);
     }
     await cancelOurs(N);
     for (const p of planned) {

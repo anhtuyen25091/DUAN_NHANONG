@@ -449,10 +449,12 @@ export interface IotApiOptions {
   /** Ví dụ http://localhost:8001 (không có /api/v1) */
   baseUrl: string;
   getToken: () => string | null;
+  /** Máy chủ từ chối token đã gửi (401: token bị xóa, DB làm lại…): bỏ token đó, đăng nhập lại bằng tài khoản Nhà Nông */
+  onUnauthorized?: (token: string) => void;
   fetch?: typeof fetch;
 }
 
-export function createIotApi({ baseUrl, getToken, fetch: fetchFn = globalThis.fetch.bind(globalThis) }: IotApiOptions) {
+export function createIotApi({ baseUrl, getToken, onUnauthorized, fetch: fetchFn = globalThis.fetch.bind(globalThis) }: IotApiOptions) {
   const root = `${baseUrl.replace(/\/+$/, '')}/api/v1`;
 
   async function request<T>(method: string, path: string, options: { query?: object; body?: unknown } = {}): Promise<T> {
@@ -475,13 +477,14 @@ export function createIotApi({ baseUrl, getToken, fetch: fetchFn = globalThis.fe
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
       });
     } catch {
-      throw new ApiError('Không kết nối được máy chủ cảm biến. Kiểm tra mạng rồi thử lại.', 0);
+      throw new ApiError('Không kết nối được máy chủ cảm biến. Kiểm tra mạng rồi thử lại.', 0, {}, 'iot');
     }
 
     if (response.status === 204) return undefined as T;
     const json = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new ApiError(json?.message ?? `Lỗi máy chủ (${response.status})`, response.status, json?.errors ?? {});
+      if (response.status === 401 && token) onUnauthorized?.(token);
+      throw new ApiError(json?.message ?? `Lỗi máy chủ (${response.status})`, response.status, json?.errors ?? {}, 'iot');
     }
     return json as T;
   }

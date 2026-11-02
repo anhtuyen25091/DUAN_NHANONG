@@ -38,6 +38,23 @@ describe('createIotApi', () => {
     const error = await forbidden.uploadDeviceFile('x').catch((e) => e);
     expect(error).toBeInstanceOf(ApiError);
     expect(error.message).toBe('Chữ ký file không hợp lệ');
+    expect(error.service).toBe('iot');
+  });
+
+  it('401 với token đã gửi: báo onUnauthorized kèm token đó (để bỏ token cũ, vào lại bằng tài khoản Nhà Nông)', async () => {
+    const onUnauthorized = vi.fn();
+    const api = createIotApi({ baseUrl: 'http://iot', getToken: () => 'old', onUnauthorized, fetch: fakeFetch(401, { message: 'Unauthenticated.' }) });
+    const error = await api.farms().catch((e) => e);
+    expect(error.status).toBe(401);
+    expect(error.service).toBe('iot');
+    expect(onUnauthorized).toHaveBeenCalledWith('old');
+
+    // Không gửi token (chưa đăng nhập): không có token nào để bỏ
+    const guest = vi.fn();
+    await createIotApi({ baseUrl: 'http://iot', getToken: () => null, onUnauthorized: guest, fetch: fakeFetch(401, {}) }).farms().catch(() => null);
+    // Lỗi khác 401: giữ token
+    await createIotApi({ baseUrl: 'http://iot', getToken: () => 'tok', onUnauthorized: guest, fetch: fakeFetch(403, {}) }).farms().catch(() => null);
+    expect(guest).not.toHaveBeenCalled();
   });
 });
 

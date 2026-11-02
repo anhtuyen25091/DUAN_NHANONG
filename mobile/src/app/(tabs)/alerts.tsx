@@ -18,7 +18,7 @@ export default function AlertsScreen() {
   useFocusEffect(
     useCallback(() => {
       refetch();
-      registerPush(false).then(setPush);
+      registerPush(false).then(setPush, () => {});
     }, [refetch]),
   );
 

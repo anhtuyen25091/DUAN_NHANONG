@@ -389,12 +389,15 @@ export class ApiError extends Error {
   readonly status: number;
   /** Lỗi validate theo từng trường (422) */
   readonly errors: Record<string, string[]>;
+  /** Máy chủ trả lỗi: Nhà Nông hay cảm biến (401 của cảm biến không có nghĩa là phải đăng nhập lại Nhà Nông) */
+  readonly service: 'nhanong' | 'iot';
 
-  constructor(message: string, status: number, errors: Record<string, string[]> = {}) {
+  constructor(message: string, status: number, errors: Record<string, string[]> = {}, service: 'nhanong' | 'iot' = 'nhanong') {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.errors = errors;
+    this.service = service;
   }
 }
 

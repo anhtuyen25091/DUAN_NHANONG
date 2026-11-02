@@ -58,6 +58,24 @@ php artisan iot:simulate ND7K3M9QXA --hours=24 --interval=15 --offline=6
 php artisan iot:simulate ND7K3M9QXA --lorawan    # thiết bị LoRaWAN: đi qua webhook ChirpStack
 ```
 
+Dữ liệu demo đầy đủ cho 1 tài khoản (tài khoản phải đã mở mục Cảm biến 1 lần):
+
+```bash
+php artisan iot:demo 0900000001            # chạy lại thì xóa demo cũ rồi tạo mới
+php artisan iot:demo 0900000001 --remove   # chỉ xóa phần demo
+```
+
+- Thêm 2 lô sầu riêng vào trang trại đầu tiên của tài khoản:
+  - Lô 1: cảm biến đất 7 trong 1, trạm thời tiết, bơm tưới gốc và béc phun trên tán, lịch tưới (bỏ lượt sau mưa), luật tự động. Vừa bón phân nên EC vượt ngưỡng, kèm ghi chú. Phun thuốc còn cách ly. Có việc lên kế hoạch cho ngày mai.
+  - Lô 2: cảm biến mất kết nối 9 giờ, pin 18%, tưới bằng luật tự động khi đất khô.
+- Thêm 1 lô vào trang trại thứ 2: vừa phun thuốc 3 giờ trước, nên đang cấm vào lô, đang cách ly, và máy tưới trên tán tạm dừng.
+- Tạo trang trại "Ao cá & ruộng lúa (demo)":
+  - ao cá: oxy thấp lúc rạng sáng, quạt oxy bật theo luật
+  - ruộng lúa: mực nước ruộng
+- 14 ngày số đo, 30 phút / lần.
+- Tài khoản `0900000002` được xem trang trại đầu tiên.
+- Thiết bị demo có mã bắt đầu bằng `NDDEMO`. Số đo ghi thẳng vào DB nên không gửi thông báo đẩy.
+
 ## API
 
 **Thiết bị gửi số đo** (header `Authorization: Bearer <khóa thiết bị>`, giới hạn 120 lần/phút/thiết bị):
@@ -174,6 +192,7 @@ Số đo gửi bù cũ hơn 24 giờ chỉ được lưu lại, không bắn c�
 | `weather:sync-rain --days=2` | Mỗi giờ: lưu lượng mưa từng ngày (bảng `farm_rain_daily`). Trang trại vừa có / đổi vị trí thì tự lấy 1 năm. Ngày đã qua lấy từ API lưu trữ, hôm nay cộng các giờ đã qua; ngày không có số liệu để trống (không ghi 0). |
 | `iot:mqtt-listen` | Nghe MQTT (`nhanong/+/up` số đo, `nhanong/+/ack` kết quả lệnh). Chạy liên tục bằng supervisor. |
 | `iot:simulate` | Giả lập thiết bị |
+| `iot:demo <SĐT> [--remove]` | Tạo / xóa dữ liệu demo đầy đủ cho 1 tài khoản (xem "Thử khi chưa có phần cứng") |
 | `iot:simulate-controller <uid>` | Giả lập mạch điều khiển relay: nhận lệnh bật / tắt, tự tắt khi hết giờ (để thử app khi chưa có phần cứng) |
 | `farmwork:remind` | 6:00 hằng ngày: nhắc việc làm vườn đã lên kế hoạch cho hôm nay (kèm lưu ý thời tiết nếu chưa phù hợp) |
 | `commands:expire` | Mỗi phút: hủy lệnh bật / tắt quá 10 phút mà mạch chưa nhận, báo chủ trang trại; gửi lệnh tắt cho máy LoRaWAN hết giờ chạy |

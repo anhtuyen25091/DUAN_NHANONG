@@ -12,14 +12,15 @@ import { forgetInput, markInput } from '../lib/unsavedInput';
  */
 const InsideText = createContext(false);
 
-function textStyle(style: StyleProp<TextStyle>, nested: boolean): StyleProp<TextStyle> {
-  const flat = (StyleSheet.flatten(style) ?? {}) as TextStyle;
+function textStyle(style: StyleProp<TextStyle>, nested: boolean): TextStyle {
+  // Luôn chép ra object thường: style tạo bằng themed() (lib/theme) là getter không sửa được, bản dev của
+  // React Native "đóng băng" style truyền xuống máy thì báo lỗi "property is not configurable"
+  const flat: TextStyle = { ...StyleSheet.flatten(style) };
   const color = !nested && flat.color == null ? colors.text : null;
   const family = flat.fontFamily == null && (!nested || flat.fontWeight != null) ? fontFamilyFor(flat.fontWeight) : null;
-  if (!color && !family) return style;
   // Màu mặc định đặt trước để style của chỗ gọi vẫn thắng; phông đặt sau để thay fontWeight
   // (mỗi độ đậm là một họ phông riêng; để nguyên fontWeight thì web / iOS tô đậm thêm lần nữa)
-  return [color ? { color } : null, style, family ? { fontFamily: family, fontWeight: 'normal' } : null];
+  return { ...(color ? { color } : null), ...flat, ...(family ? { fontFamily: family, fontWeight: 'normal' } : null) };
 }
 
 export function Text(props: ComponentProps<typeof RNText>) {
