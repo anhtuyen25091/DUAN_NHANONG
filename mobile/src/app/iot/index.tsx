@@ -1,33 +1,50 @@
 import { ApiError, canControl, canManage, planLabel, ROLE_LABELS } from '@nhanong/shared';
 import { router, Stack, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Text, TextInput } from '../../components/AppText';
 import { inputStyle } from '../../components/fields';
+import { WorkBadges } from '../../components/farmWork';
 import { AlertCard, SectionTitle } from '../../components/iot';
 import { WeatherCard } from '../../components/iotWeather';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
-import { flushDeviceFiles, iotApi, linkNhanongIfPossible, setIotAuth, signOutIot, syncIotPush, useIotAuth, usePendingDeviceFiles } from '../../lib/iot';
-import { confirmAsync } from '../../lib/confirm';
+import { useAuth } from '../../lib/auth';
+import { flushDeviceFiles, iotApi, setIotAuth, signOutIot, syncIotPush, syncIotWithNhanong, useIotAuth, usePendingDeviceFiles } from '../../lib/iot';
+import { useFarmWorkSyncOnFocus } from '../../lib/farmwork';
 import { registerPush } from '../../lib/push';
 import { colors, font } from '../../lib/theme';
 import { showToast } from '../../lib/toast';
 import { useAsync } from '../../lib/useAsync';
 
-/** Cảm biến ruộng / ao: đăng nhập tài khoản cảm biến, danh sách lô, cảnh báo đang mở */
+/** Cảm biến ruộng / ao: tự vào bằng tài khoản Nhà Nông, danh sách lô, cảnh báo đang mở */
 export default function IotHomeScreen() {
   const auth = useIotAuth();
+  const nhanongToken = useAuth()?.token ?? null;
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    syncIotWithNhanong()
+      .then((signedIn) => {
+        setSyncError(null);
+        // Vừa vào Cảm biến: hỏi quyền thông báo để báo khi số đo vượt ngưỡng (cả khi app đóng)
+        if (signedIn) registerPush(true).then(syncIotPush).catch(() => {});
+      })
+      .catch((error: Error) => setSyncError(error instanceof ApiError ? (Object.values(error.errors)[0]?.[0] ?? error.message) : error.message));
+  }, [nhanongToken, attempt]);
   return (
     <>
       <Stack.Screen options={{ title: '📡 Cảm biến ruộng · ao' }} />
-      {auth ? <Farms /> : <SignIn />}
+      {auth ? <Farms /> : <SignIn signedIn={nhanongToken !== null} error={syncError} retry={() => {
+            setSyncError(null);
+            setAttempt((n) => n + 1);
+          }} />}
     </>
   );
 }
 
-function SignIn() {
-  const [tab, setTab] = useState<'login' | 'register'>('login');
-  const [name, setName] = useState('');
+/** Đăng nhập Nhà Nông là vào được Cảm biến; tài khoản cảm biến cũ (email) đăng nhập riêng khi chưa có tài khoản Nhà Nông */
+function SignIn({ signedIn, error: syncError, retry }: { signedIn: boolean; error: string | null; retry: () => void }) {
+  const [showEmail, setShowEmail] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string[]>>({});
@@ -39,9 +56,7 @@ function SignIn() {
     setErrors({});
     setMessage(null);
     try {
-      const result = tab === 'login' ? await iotApi.login(email.trim(), password) : await iotApi.register(name.trim(), email.trim(), password);
-      setIotAuth(result);
-      // Hỏi quyền thông báo để báo khi số đo vượt ngưỡng (cả khi app đóng)
+      setIotAuth(await iotApi.login(email.trim(), password));
       registerPush(true)
         .then(syncIotPush)
         .catch(() => {});
@@ -54,35 +69,48 @@ function SignIn() {
   };
 
   const error = (key: string) => (errors[key] ? <Text style={{ color: colors.error, fontSize: font.small, marginTop: -6, marginBottom: 6 }}>{errors[key][0]}</Text> : null);
-  const canSubmit = !sending && email.trim() !== '' && password !== '' && (tab === 'login' || name.trim() !== '');
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 8 }} keyboardShouldPersistTaps="handled">
       <Card>
         <Text style={[styles.body, { fontWeight: '700', marginBottom: 4 }]}>Theo dõi ruộng, ao bằng cảm biến</Text>
-        <Text style={styles.muted}>
-          Xem độ ẩm, pH, độ mặn, mực nước, oxy trong ao… do thiết bị gửi về, và nhận thông báo khi vượt ngưỡng. Tài khoản cảm biến dùng email, riêng với tài khoản Nhà Nông.
-        </Text>
+        <Text style={styles.muted}>Xem độ ẩm, pH, độ mặn, mực nước, oxy trong ao… do thiết bị gửi về, và nhận thông báo khi vượt ngưỡng.</Text>
       </Card>
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
-        <Chip label="Đăng nhập" active={tab === 'login'} onPress={() => setTab('login')} />
-        <Chip label="Tạo tài khoản" active={tab === 'register'} onPress={() => setTab('register')} />
-      </View>
-      {tab === 'register' && (
+      {signedIn ? (
+        <Card>
+          {syncError ? (
+            <>
+              <Text style={[styles.body, { color: colors.error, marginBottom: 8 }]}>{syncError}</Text>
+              <Button label="Thử lại" onPress={retry} />
+            </>
+          ) : (
+            <Text style={styles.muted}>Đang vào mục Cảm biến bằng tài khoản Nhà Nông…</Text>
+          )}
+        </Card>
+      ) : (
         <>
-          <Text style={styles.body}>Tên</Text>
-          <TextInput value={name} onChangeText={setName} style={[inputStyle, { marginBottom: 6 }]} placeholderTextColor={colors.muted} />
-          {error('name')}
+          <Card>
+            <Text style={[styles.body, { marginBottom: 8 }]}>Dùng chung tài khoản Nhà Nông: đăng nhập là vào được mục Cảm biến.</Text>
+            <Button label="Đăng nhập / đăng ký Nhà Nông" onPress={() => router.push('/account')} />
+          </Card>
+          <Text onPress={() => setShowEmail((v) => !v)} accessibilityRole="button" style={{ color: colors.primary, textAlign: 'center', padding: 12, fontSize: font.body }}>
+            {showEmail ? 'Ẩn' : 'Đã có tài khoản cảm biến cũ (email)?'}
+          </Text>
+          {showEmail && (
+            <>
+              <Text style={styles.body}>Email</Text>
+              <TextInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" style={[inputStyle, { marginBottom: 6 }]} />
+              {error('email')}
+              <Text style={styles.body}>Mật khẩu</Text>
+              <TextInput value={password} onChangeText={setPassword} secureTextEntry style={[inputStyle, { marginBottom: 6 }]} />
+              {error('password')}
+              <Button label={sending ? 'Đang gửi…' : 'Đăng nhập'} onPress={submit} disabled={sending || email.trim() === '' || password === ''} />
+              {message && Object.keys(errors).length === 0 && <Text style={[styles.body, { color: colors.error }]}>{message}</Text>}
+              <Text style={styles.muted}>Lần sau đăng nhập Nhà Nông thì tài khoản này tự nối vào, giữ nguyên trang trại.</Text>
+            </>
+          )}
         </>
       )}
-      <Text style={styles.body}>Email</Text>
-      <TextInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" style={[inputStyle, { marginBottom: 6 }]} />
-      {error('email')}
-      <Text style={styles.body}>Mật khẩu</Text>
-      <TextInput value={password} onChangeText={setPassword} secureTextEntry style={[inputStyle, { marginBottom: 6 }]} />
-      {error('password')}
-      <Button label={sending ? 'Đang gửi…' : tab === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'} onPress={submit} disabled={!canSubmit} />
-      {message && Object.keys(errors).length === 0 && <Text style={[styles.body, { color: colors.error }]}>{message}</Text>}
     </ScrollView>
   );
 }
@@ -106,13 +134,14 @@ function Farms() {
   useFocusEffect(
     useCallback(() => {
       if (pending.length > 0) void sendPending(true);
-      // Đã đăng nhập Nhà Nông trên máy: dùng chung gói (xem lượng mưa 1 năm)
-      void linkNhanongIfPossible();
       farms.refetch();
       alerts.refetch();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
+
+  // Đồng bộ việc làm vườn với Sổ thu chi; có gì mới thì tải lại (cảnh báo cách ly, không vào lô)
+  useFarmWorkSyncOnFocus(farms.refetch);
 
   const reload = () => {
     farms.reload();
@@ -190,7 +219,9 @@ function Farms() {
                     <Text style={styles.muted}>
                       {plot.type_label}
                       {plot.crop ? ` · ${plot.crop}` : ''}
+                      {plot.work?.planned ? ` · 📅 ${plot.work.planned} việc kế hoạch` : ''}
                     </Text>
+                    <WorkBadges work={plot.work} />
                   </View>
                   <Text style={{ fontSize: 22, color: colors.primary }}>›</Text>
                 </Card>
@@ -217,43 +248,33 @@ function Farms() {
       </Card>
 
       <PlanCard />
-      <Text style={[styles.muted, { textAlign: 'center', marginTop: 8 }]}>Đăng nhập: {auth?.user.email}</Text>
-      <Text onPress={() => void signOutIot()} accessibilityRole="button" style={{ color: colors.error, textAlign: 'center', padding: 12, fontSize: font.body }}>
-        Đăng xuất tài khoản cảm biến
-      </Text>
+      {auth?.user.nhanong_user_id ? (
+        <Text style={[styles.muted, { textAlign: 'center', marginTop: 8, marginBottom: 12 }]}>Dùng tài khoản Nhà Nông {auth.user.phone ?? auth.user.email}</Text>
+      ) : (
+        <>
+          <Text style={[styles.muted, { textAlign: 'center', marginTop: 8 }]}>Đăng nhập: {auth?.user.email}</Text>
+          <Text onPress={() => void signOutIot()} accessibilityRole="button" style={{ color: colors.error, textAlign: 'center', padding: 12, fontSize: font.body }}>
+            Đăng xuất tài khoản cảm biến
+          </Text>
+        </>
+      )}
     </ScrollView>
   );
 }
 
-/** Gói đang dùng (dùng chung với tài khoản Nhà Nông đã nối) */
+/** Gói đang dùng (dùng chung với tài khoản Nhà Nông) */
 function PlanCard() {
   const me = useAsync(() => iotApi.me(), []);
-  const [busy, setBusy] = useState(false);
   if (me.state.status !== 'ok') return null;
   const plan = me.state.data.plan;
   return (
     <Card>
       <Text style={[styles.body, { fontWeight: '700' }]}>⭐ {planLabel(plan)}</Text>
-      <Text style={[styles.muted, { marginBottom: plan.linked ? 6 : 0 }]}>
+      <Text style={styles.muted}>
         {plan.linked
-          ? `Đã nối tài khoản Nhà Nông ${plan.phone ?? ''}: dùng chung gói trả phí.`
+          ? 'Dùng chung gói trả phí với tài khoản Nhà Nông.'
           : 'Đăng nhập tài khoản Nhà Nông (mục 👤 Tài khoản) trên máy này để dùng chung gói (xem lượng mưa 1 năm).'}
       </Text>
-      {plan.linked && (
-        <Text
-          onPress={async () => {
-            if (!(await confirmAsync('Bỏ nối tài khoản Nhà Nông?', 'Tài khoản cảm biến sẽ về gói miễn phí.', 'Bỏ nối'))) return;
-            setBusy(true);
-            await iotApi.unlinkNhanong().catch(() => {});
-            setBusy(false);
-            me.refetch();
-          }}
-          accessibilityRole="button"
-          style={{ color: colors.error, opacity: busy ? 0.5 : 1 }}
-        >
-          Bỏ nối tài khoản
-        </Text>
-      )}
     </Card>
   );
 }

@@ -22,6 +22,8 @@ class ActuatorResource extends JsonResource
             'name' => $this->name,
             'kind' => $this->kind,
             'kind_label' => $this->kind->getLabel(),
+            'irrigation_mode' => $this->irrigation_mode,
+            'wets_canopy' => $this->wetsCanopy(),
             'channel' => $this->channel,
             'max_minutes' => $this->max_minutes,
             'is_on' => $this->is_on,

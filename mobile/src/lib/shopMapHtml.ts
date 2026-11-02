@@ -19,8 +19,12 @@ export interface MapRender {
  * Kéo / phóng xong thì báo khung đang xem về app ({action: 'view', bbox, zoom}); app tải rồi gọi window.render(MapRender):
  * nhiều điểm thì vẽ cụm ghi số (bấm để phóng to), ít điểm thì vẽ từng chấm, bấm nút trong ô thông tin thì báo về app.
  */
-/** dark: app đang ở chế độ tối → đảo màu nền bản đồ, ô thông tin nền tối (giống bảng màu tối của app) */
-export function mapHtml(view: { center: [number, number]; zoom: number | null; dark?: boolean }): string {
+/**
+ * dark: app đang ở chế độ tối → đảo màu nền bản đồ, ô thông tin nền tối (giống bảng màu tối của app).
+ * pin: chế độ chọn vị trí (form trang trại): có ghim kéo được, bấm / kéo thì báo {action: 'pick', lat, lng};
+ * app dời ghim bằng window.setPin(lat, lng). null = chưa có vị trí, chưa hiện ghim.
+ */
+export function mapHtml(view: { center: [number, number]; zoom: number | null; dark?: boolean; pin?: { lat: number; lng: number } | null }): string {
   // Dữ liệu nhúng vào <script>: chặn "</script>"
   const data = JSON.stringify({
     tiles: TILES,
@@ -32,6 +36,8 @@ export function mapHtml(view: { center: [number, number]; zoom: number | null; d
     labels: MAP_LABELS,
     provinces: provinceLabels(),
     provinceZoom: [PROVINCE_LABEL_MIN_ZOOM, PROVINCE_LABEL_MAX_ZOOM],
+    picker: view.pin !== undefined,
+    pin: view.pin ?? null,
   }).replace(/</g, '\\u003c');
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <link rel="stylesheet" href="${LEAFLET}/leaflet.css">
@@ -47,6 +53,7 @@ export function mapHtml(view: { center: [number, number]; zoom: number | null; d
 .dark .leaflet-popup-content-wrapper,.dark .leaflet-popup-tip{background:#141d18;color:#ebf2ed}.dark .muted{color:#9fb2a6}.dark .leaflet-container a.leaflet-popup-close-button{color:#9fb2a6}
 .dark .acts button{background:#141d18;color:#3ddc97;border-color:#3ddc97}.dark .acts button.primary{background:#3ddc97;color:#06281a}
 .dark .vn-label span{text-shadow:0 0 3px #000,0 0 3px #000,0 0 3px #000}.dark .vn-label.province span{color:#c8d3cc}.dark .vn-label.sea span{color:#8ec1e6}.dark .vn-label.sovereignty span{color:#ff8a80}
+.pin span{display:block;font-size:32px;line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
 .dark .leaflet-bar a,.dark .leaflet-control-attribution{background:#141d18;color:#ebf2ed}.dark .leaflet-control-attribution a{color:#3ddc97}</style></head><body${view.dark ? ' class="dark"' : ''}><div id="map"></div>
 <script src="${LEAFLET}/leaflet.js"></script><script>
 const D=${data};
@@ -87,6 +94,15 @@ window.render=R=>{
     L.circleMarker([R.position.lat,R.position.lng],{radius:8,color:'#fff',weight:3,fillColor:'#1a73e8',fillOpacity:1}).addTo(layer);
   }
 };
-report();
+if(D.picker){
+  const pin=L.marker([0,0],{draggable:true,keyboard:false,icon:L.divIcon({className:'pin',html:'<span>📍</span>',iconSize:[36,36],iconAnchor:[18,34]})});
+  const put=(lat,lng,fly)=>{pin.setLatLng([lat,lng]).addTo(map);if(fly)map.setView([lat,lng],Math.min(14,D.maxZoom))};
+  const pick=ll=>post({action:'pick',lat:Math.round(ll.lat*1e5)/1e5,lng:Math.round(ll.lng*1e5)/1e5});
+  map.on('click',e=>{put(e.latlng.lat,e.latlng.lng,false);pick(e.latlng)});
+  pin.on('dragend',()=>pick(pin.getLatLng()));
+  // Vị trí mới ở xa (tìm xã, dán tọa độ) thì bay tới; chỉnh gần đó thì giữ khung
+  window.setPin=(lat,lng)=>put(lat,lng,map.getZoom()<12||!map.getBounds().contains([lat,lng]));
+  if(D.pin)put(D.pin.lat,D.pin.lng,true);
+}else report();
 </script></body></html>`;
 }

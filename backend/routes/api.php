@@ -36,27 +36,27 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/provinces', [ShopController::class, 'provinces'])->name('provinces');
     Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
     // Giá quanh 1 vị trí do các điểm mua đã duyệt đăng (không cần đăng nhập)
-    Route::get('/local-prices', [LocalPriceController::class, 'index'])->middleware('throttle:60,1')->name('local-prices.index');
+    Route::get('/local-prices', [LocalPriceController::class, 'index'])->middleware('throttle:60,1,local-prices.index')->name('local-prices.index');
     Route::get('/places', [LocalPriceController::class, 'places'])->middleware('throttle:places')->name('places.index');
 
     // Không cần đăng nhập: nhận diện máy qua header X-Device-Id
-    Route::middleware([ResolveDevice::class, 'throttle:60,1'])->group(function () {
+    Route::middleware([ResolveDevice::class, 'throttle:60,1,device'])->group(function () {
         Route::put('/device', [DeviceController::class, 'update'])->name('device.update');
         Route::get('/alerts', [PriceAlertController::class, 'index'])->name('alerts.index');
         Route::post('/alerts', [PriceAlertController::class, 'store'])->name('alerts.store');
         Route::delete('/alerts/{alert}', [PriceAlertController::class, 'destroy'])->name('alerts.destroy');
     });
 
-    Route::middleware([ResolveDevice::class, 'throttle:10,60'])
+    Route::middleware([ResolveDevice::class, 'throttle:10,60,shops.submit'])
         ->post('/shop-submissions', [ShopController::class, 'submit'])
         ->name('shops.submit');
 
-    Route::middleware([ResolveDevice::class, 'throttle:20,60'])
+    Route::middleware([ResolveDevice::class, 'throttle:20,60,local-prices.flag'])
         ->post('/local-prices/{report}/flag', [LocalPriceController::class, 'flag'])
         ->name('local-prices.flag');
 
     // Tài khoản (chỉ cần khi bật "lưu cả trên mạng" cho sổ thu chi)
-    Route::middleware('throttle:10,1')->group(function () {
+    Route::middleware('throttle:10,1,auth-guest')->group(function () {
         Route::post('/auth/register', [AuthController::class, 'register'])->name('auth.register');
         Route::post('/auth/login', [AuthController::class, 'login'])->name('auth.login');
         // Quên mật khẩu: xác minh số bằng SMS ngược (người dùng nhắn mã tới số của hệ thống)
@@ -64,11 +64,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/auth/password/reset', [PasswordResetController::class, 'reset'])->name('auth.password.reset');
     });
     // App hỏi 3 giây 1 lần trong lúc chờ người dùng nhắn tin
-    Route::get('/auth/password/forgot/{verification}', [PasswordResetController::class, 'status'])->middleware('throttle:60,1')->name('auth.password.status');
+    Route::get('/auth/password/forgot/{verification}', [PasswordResetController::class, 'status'])->middleware('throttle:60,1,auth.password.status')->name('auth.password.status');
     // Webhook nhận SMS (thiết bị chuyển tiếp / dịch vụ SMS 2 chiều), khóa bằng header X-Sms-Secret
-    Route::post('/sms/inbound', SmsInboundController::class)->middleware('throttle:120,1')->name('sms.inbound');
+    Route::post('/sms/inbound', SmsInboundController::class)->middleware('throttle:120,1,sms.inbound')->name('sms.inbound');
 
-    Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
+    Route::middleware(['auth:sanctum', 'throttle:120,1,user'])->group(function () {
         Route::get('/user', [AuthController::class, 'me'])->name('user');
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
 
@@ -88,7 +88,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/sync/pull', [LedgerSyncController::class, 'pull'])->name('sync.pull');
         Route::delete('/ledger', [LedgerSyncController::class, 'destroy'])->name('ledger.destroy');
         // Ảnh hóa đơn của sổ (id = uuid do máy tạo)
-        Route::put('/sync/photos/{photo}', [ReceiptPhotoController::class, 'store'])->whereUuid('photo')->middleware('throttle:60,1')->name('sync.photos.store');
+        Route::put('/sync/photos/{photo}', [ReceiptPhotoController::class, 'store'])->whereUuid('photo')->middleware('throttle:60,1,sync.photos.store')->name('sync.photos.store');
         Route::get('/sync/photos/{photo}', [ReceiptPhotoController::class, 'show'])->whereUuid('photo')->name('sync.photos.show');
 
         // Đơn mua bán chung 2 bên (thương lái / chi nhánh / nông dân)
@@ -106,14 +106,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/deal-entries/{entry}/dispute', [DealEntryController::class, 'dispute'])->name('deal-entries.dispute');
 
         // Chào bán: nông dân đăng lô hàng, điểm mua / lái quanh đó trả giá, nông dân chọn 1 giá
-        Route::get('/offers', [OfferController::class, 'index'])->middleware('throttle:60,1')->name('offers.index');
+        Route::get('/offers', [OfferController::class, 'index'])->middleware('throttle:60,1,offers.index')->name('offers.index');
         Route::get('/me/offers', [OfferController::class, 'mine'])->name('offers.mine');
         Route::get('/me/offer-bids', [OfferController::class, 'myBids'])->name('offers.my-bids');
-        Route::post('/offers', [OfferController::class, 'store'])->middleware('throttle:20,60')->name('offers.store');
+        Route::post('/offers', [OfferController::class, 'store'])->middleware('throttle:20,60,offers.store')->name('offers.store');
         Route::get('/offers/{offer}', [OfferController::class, 'show'])->name('offers.show');
         Route::patch('/offers/{offer}', [OfferController::class, 'update'])->name('offers.update');
         Route::delete('/offers/{offer}', [OfferController::class, 'destroy'])->name('offers.destroy');
-        Route::put('/offers/{offer}/bid', [OfferController::class, 'bid'])->middleware('throttle:30,1')->name('offers.bid');
+        Route::put('/offers/{offer}/bid', [OfferController::class, 'bid'])->middleware('throttle:30,1,offers.bid')->name('offers.bid');
         Route::delete('/offers/{offer}/bid', [OfferController::class, 'withdraw'])->name('offers.withdraw');
         Route::post('/offers/{offer}/bids/{bid}/accept', [OfferController::class, 'accept'])->name('offers.accept');
 

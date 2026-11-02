@@ -11,6 +11,7 @@ use App\Models\Alert;
 use App\Models\Farm;
 use App\Models\Plot;
 use App\Models\Reading;
+use App\Services\FarmWork\PlotWork;
 use App\Support\LatestReadings;
 use App\Support\Ownership;
 use Illuminate\Http\JsonResponse;
@@ -44,10 +45,11 @@ class PlotController extends Controller
     /**
      * Màn hình chính của 1 lô: số đo mới nhất của mọi chỉ số (từ mọi thiết bị trong lô), so với ngưỡng.
      */
-    public function summary(Request $request, Plot $plot): JsonResponse
+    public function summary(Request $request, Plot $plot, PlotWork $work): JsonResponse
     {
         Ownership::plot($request, $plot, Ownership::VIEW);
 
+        $plot->work_status = $work->status($plot);
         $devices = $plot->devices()->orderBy('name')->get();
         $thresholds = $plot->thresholds()->get()->keyBy('metric_id');
 
@@ -88,6 +90,8 @@ class PlotController extends Controller
             'type' => ['required', Rule::enum(PlotType::class)],
             'crop' => ['nullable', 'string', 'max:100'],
             'area_m2' => ['nullable', 'integer', 'min:1'],
+            'ledger_garden_id' => ['nullable', 'uuid'],
+            'ledger_garden_name' => ['nullable', 'required_with:ledger_garden_id', 'string', 'max:191'],
         ]);
     }
 }

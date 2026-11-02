@@ -11,8 +11,33 @@ function timeLabel(iso: string, withDate = false): string {
   return withDate ? `${time} ${d.getDate()}/${d.getMonth() + 1}` : time
 }
 
-/** Đường số đo (trung bình nếu đã gộp) + dải thấp–cao + vạch ngưỡng; di chuột / chạm để xem từng điểm */
-export function IotLineChart({ points, unit, min, max, daily }: { points: IotPoint[]; unit: string | null; min: number | null; max: number | null; daily: boolean }) {
+/** Việc làm vườn đánh dấu trên biểu đồ (phun thuốc, bón phân…); faint: tưới (nhiều, vẽ nhỏ và mờ) */
+export interface ChartMarker {
+  t: string
+  icon: string
+  /** Chữ khi di chuột: "🧴 Phun thuốc: Regent" */
+  label: string
+  /** Tên việc (dòng chú thích dưới biểu đồ) */
+  title: string
+  faint?: boolean
+}
+
+/** Đường số đo (trung bình nếu đã gộp) + dải thấp–cao + vạch ngưỡng + việc làm vườn; di chuột / chạm để xem từng điểm */
+export function IotLineChart({
+  points,
+  unit,
+  min,
+  max,
+  daily,
+  markers = [],
+}: {
+  points: IotPoint[]
+  unit: string | null
+  min: number | null
+  max: number | null
+  daily: boolean
+  markers?: ChartMarker[]
+}) {
   const [active, setActive] = useState<number | null>(null)
   if (points.length === 0) return <p className="muted">Chưa có số đo trong khoảng này.</p>
 
@@ -34,6 +59,21 @@ export function IotLineChart({ points, unit, min, max, daily }: { points: IotPoi
       'Z'
     : null
   const current = active === null ? null : points[active]
+  // Trục ngang theo thứ tự điểm: đặt vạch việc làm vườn theo thời gian, nội suy giữa 2 điểm kề nhau
+  const times = points.map((p) => new Date(p.t).getTime())
+  const xAt = (iso: string): number | null => {
+    const t = new Date(iso).getTime()
+    if (points.length < 2 || t < times[0] || t > times[times.length - 1]) return null
+    let i = 0
+    while (i < times.length - 2 && times[i + 1] < t) i++
+    const span = times[i + 1] - times[i]
+    return x(i) + (span > 0 ? (t - times[i]) / span : 0) * (x(i + 1) - x(i))
+  }
+  const placed = markers
+    .map((m) => ({ ...m, x: xAt(m.t) }))
+    .filter((m): m is ChartMarker & { x: number } => m.x !== null)
+    // Tưới vẽ trước (nằm dưới)
+    .sort((a, b) => Number(b.faint ?? false) - Number(a.faint ?? false))
   const outside = (v: number) => (min !== null && v < min) || (max !== null && v > max)
   const label = (iso: string, withDate = false) => (daily ? `${new Date(iso).getDate()}/${new Date(iso).getMonth() + 1}` : timeLabel(iso, withDate))
 
@@ -83,9 +123,28 @@ export function IotLineChart({ points, unit, min, max, daily }: { points: IotPoi
         <text x={W - PAD.right} y={H - 6} fontSize="11" fill="#56675c" textAnchor="end">
           {label(points[points.length - 1].t)}
         </text>
+        {placed.map((m) => (
+          <g key={`${m.t}-${m.label}`} opacity={m.faint ? 0.45 : 1}>
+            <title>{`${m.label} · ${label(m.t, true)}`}</title>
+            <line x1={m.x} x2={m.x} y1={PAD.top + 4} y2={H - PAD.bottom} stroke={m.faint ? '#2b7bb9' : '#a16207'} strokeWidth={m.faint ? 1 : 1.5} strokeDasharray={m.faint ? '2 3' : undefined} />
+            <text x={m.x} y={PAD.top + (m.faint ? 8 : 10)} fontSize={m.faint ? 9 : 14} textAnchor="middle">
+              {m.icon}
+            </text>
+          </g>
+        ))}
         {current && active !== null && <circle cx={x(active)} cy={y(pointValue(current))} r={5} fill={outside(pointValue(current)) ? '#c0262d' : '#0b7a4b'} />}
       </svg>
       {limits.length > 0 && <p className="small muted">Vạch đỏ đứt: ngưỡng an toàn</p>}
+      {placed.some((m) => !m.faint) && (
+        <p className="small muted">
+          Việc làm vườn:{' '}
+          {placed
+            .filter((m) => !m.faint)
+            .map((m) => `${m.icon} ${m.title} (${label(m.t, true)})`)
+            .join(' · ')}
+        </p>
+      )}
+      {placed.some((m) => m.faint) && <p className="small muted">💧 Vạch xanh mờ: lần tưới</p>}
     </div>
   )
 }

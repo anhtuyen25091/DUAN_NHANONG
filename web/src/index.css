@@ -2793,3 +2793,72 @@ a.card:hover {
   font-size: 1.6rem;
   font-weight: 800;
 }
+
+/* Chọn vị trí trang trại (pages/iot/FarmLocation) */
+.farm-location {
+  display: grid;
+  gap: 10px;
+}
+.shop-map.farm-map {
+  height: min(45vh, 360px);
+  min-height: 260px;
+}
+.farm-pin {
+  background: none;
+  border: 0;
+}
+.farm-pin span {
+  display: block;
+  font-size: 32px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+}
+
+/* Việc làm vườn trên lô (pages/iot/IotWork) */
+.notice.warn {
+  color: #92400e;
+  border-color: #d97706;
+  background: #fff7e6;
+}
+.work-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.work-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.work-badge.danger {
+  color: var(--error);
+  background: #fdecec;
+}
+.work-badge.warn {
+  color: #92400e;
+  background: #fff1d6;
+}
+.advice.avoid {
+  border: 2px solid var(--error);
+}
+.advice.caution {
+  border: 2px solid #d97706;
+}
+@media (prefers-color-scheme: dark) {
+  .notice.warn {
+    color: #fbbf24;
+    border-color: #d97706;
+    background: #2a2210;
+  }
+  .work-badge.danger {
+    background: #3b1717;
+  }
+  .work-badge.warn {
+    color: #fbbf24;
+    background: #2a2210;
+  }
+}

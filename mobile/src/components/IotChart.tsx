@@ -1,10 +1,11 @@
-import { formatDecimal, pointValue, type IotInterval, type IotPoint } from '@nhanong/shared';
+import { formatDecimal, pointValue, type IotInterval, type IotPlotEvent, type IotPoint } from '@nhanong/shared';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Text } from './AppText';
-import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Line, Path, Text as SvgText } from 'react-native-svg';
 import { colors, fontFamilyFor } from '../lib/theme';
 import { styles } from './ui';
+import { WORK_ICONS } from './farmWork';
 
 const H = 200;
 const PAD = { top: 10, right: 10, bottom: 22, left: 46 };
@@ -19,7 +20,22 @@ function timeLabel(iso: string, interval: IotInterval, withDate = false): string
 }
 
 /** Đường số đo (trung bình nếu đã gộp) + dải thấp–cao + vạch ngưỡng. Chạm / kéo để xem từng điểm. */
-export function IotChart({ points, interval, unit, min, max }: { points: IotPoint[]; interval: IotInterval; unit: string | null; min: number | null; max: number | null }) {
+export function IotChart({
+  points,
+  interval,
+  unit,
+  min,
+  max,
+  events = [],
+}: {
+  points: IotPoint[];
+  interval: IotInterval;
+  unit: string | null;
+  min: number | null;
+  max: number | null;
+  /** Việc làm vườn của lô: vạch dọc + biểu tượng tại lúc làm */
+  events?: IotPlotEvent[];
+}) {
   const [width, setWidth] = useState(0);
   const [active, setActive] = useState<number | null>(null);
 
@@ -54,6 +70,29 @@ export function IotChart({ points, interval, unit, min, max }: { points: IotPoin
   const labelEvery = Math.max(1, Math.ceil(points.length / 4));
   const current = active === null ? null : points[active];
   const outside = (v: number) => (min !== null && v < min) || (max !== null && v > max);
+
+  // Vị trí việc làm vườn trên trục ngang (trục theo thứ tự điểm đo: nội suy giữa 2 điểm kề nhau)
+  const times = points.map((p) => new Date(p.t).getTime());
+  const markers = events
+    .filter((e) => !e.planned)
+    .map((e) => {
+      const t = new Date(e.done_at).getTime();
+      if (points.length < 2 || t < times[0] || t > times[times.length - 1]) return null;
+      let i = 0;
+      while (i < times.length - 2 && times[i + 1] < t) i++;
+      const span = times[i + 1] - times[i];
+      return { event: e, x: x(i + (span > 0 ? (t - times[i]) / span : 0)) };
+    })
+    .filter((m): m is { event: IotPlotEvent; x: number } => m !== null)
+    .sort((a, b) => a.x - b.x)
+    // Biểu tượng sát nhau thì xếp hàng dưới (row) để không đè lên nhau
+    .map((m, i, all) => {
+      let row = 0;
+      for (let j = i - 1; j >= 0 && m.x - all[j].x < 16; j--) row = Math.max(row, (all[j] as { row?: number }).row ?? 0) + 1;
+      return Object.assign(m, { row: Math.min(row, 3) });
+    })
+    // Việc tưới vẽ trước (nằm dưới)
+    .sort((a, b) => Number(b.event.kind === 'water') - Number(a.event.kind === 'water'));
 
   const pick = (locationX: number) => {
     const i = Math.round(((locationX - PAD.left) / innerW) * (points.length - 1));
@@ -110,6 +149,18 @@ export function IotChart({ points, interval, unit, min, max }: { points: IotPoin
                   </SvgText>
                 ),
             )}
+            {markers.map(({ event, x: mx, row }) => {
+              const water = event.kind === 'water';
+              const iconY = PAD.top + 12 + row * 16;
+              return (
+                <G key={`e${event.id}`} opacity={water ? 0.45 : 0.9}>
+                  <Line x1={mx} x2={mx} y1={iconY + 2} y2={H - PAD.bottom} stroke={water ? colors.info : colors.accentText} strokeWidth={water ? 1 : 1.5} strokeDasharray={water ? '2 3' : undefined} />
+                  <SvgText x={Math.min(Math.max(mx, PAD.left + 7), width - 8)} y={iconY} fontSize={water ? 10 : 14} textAnchor="middle">
+                    {WORK_ICONS[event.kind]}
+                  </SvgText>
+                </G>
+              );
+            })}
             {band && <Path d={band} fill={colors.band} />}
             <Path d={line} fill="none" stroke={colors.primary} strokeWidth={2} strokeLinejoin="round" />
             {current && active !== null && (
@@ -122,6 +173,7 @@ export function IotChart({ points, interval, unit, min, max }: { points: IotPoin
         )}
       </View>
       {limits.length > 0 && <Text style={[styles.muted, { marginTop: 4 }]}>Vạch đỏ đứt: ngưỡng an toàn</Text>}
+      {markers.length > 0 && <Text style={[styles.muted, { marginTop: 4 }]}>🧴 phun thuốc · 🌱 bón phân · 💧 tưới · ✂️ tỉa cành · 📝 việc khác</Text>}
     </View>
   );
 }

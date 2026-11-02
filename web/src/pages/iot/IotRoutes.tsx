@@ -17,12 +17,16 @@ import {
   type IotPlotType,
   type IotReading,
   type IotWeather,
+  type IotWorkKind,
 } from '@nhanong/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Status } from '../../components/Status'
 import { href, useAsync } from '../../hooks'
-import { iotApi, linkNhanongIfPossible, setIotAuth, signOutIot, useIotAuth } from '../../iot'
+import { useAuth } from '../../auth'
+import { syncFarmWork, useFarmWorkVersion, WORK_ICONS } from '../../farmwork'
+import { iotApi, sendIotCommand, setIotAuth, signOutIot, syncIotWithNhanong, useIotAuth } from '../../iot'
 import { IotLineChart, RainBars } from './IotCharts'
+import { PlotWork, WorkBadges, WorkBanners, WorkEventForm } from './IotWork'
 import { ActuatorForm, DeviceForm, ExportButton, FarmForm, HistoryPage, MembersPage, PlanCard, PlotForm, RulesPage, SchedulesPage, ThresholdsPage, UploadPage } from './IotManage'
 
 /**
@@ -32,10 +36,18 @@ import { ActuatorForm, DeviceForm, ExportButton, FarmForm, HistoryPage, MembersP
  */
 export default function IotRoutes({ path, query }: { path: string[]; query: URLSearchParams }) {
   const auth = useIotAuth()
+  const nhanongToken = useAuth()?.token ?? null
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
-    void linkNhanongIfPossible()
-  }, [auth])
-  if (!auth) return <SignIn />
+    syncIotWithNhanong()
+      .then(() => setSyncError(null))
+      .catch((err: Error) => setSyncError(err instanceof ApiError ? (Object.values(err.errors)[0]?.[0] ?? err.message) : err.message))
+  }, [nhanongToken, attempt])
+  if (!auth) return <SignIn signedIn={nhanongToken !== null} error={syncError} retry={() => {
+          setSyncError(null)
+          setAttempt((n) => n + 1)
+        }} />
   if (path[1] === 'lo' && path[2]) return <PlotPage id={Number(path[2])} />
   if (path[1] === 'thoi-tiet' && path[2]) return <WeatherPage farmId={Number(path[2])} name={query.get('ten') ?? ''} />
   if (path[1] === 'bieu-do') return <ChartPage query={query} />
@@ -54,6 +66,7 @@ export default function IotRoutes({ path, query }: { path: string[]; query: URLS
   if (path[1] === 'lich' && id) return <SchedulesPage plotId={id} plotName={query.get('ten') ?? ''} editable={editable} />
   if (path[1] === 'lich-su' && id) return <HistoryPage actuatorId={id} name={query.get('ten') ?? ''} plotId={query.get('plot')} />
   if (path[1] === 'gui-file') return <UploadPage />
+  if (path[1] === 'viec' && num('plot')) return <WorkEventForm key={path[2]} id={id} plotId={num('plot') ?? 0} kind={(query.get('kind') ?? 'spray') as IotWorkKind} />
   if (path[1] === 'chia-se' && id) return <MembersPage farmId={id} farmName={query.get('ten') ?? ''} />
   return <Home />
 }
@@ -66,22 +79,21 @@ function Back({ to = 'cam-bien', label = 'Cảm biến' }: { to?: string; label?
   )
 }
 
-function SignIn() {
-  const [tab, setTab] = useState<'login' | 'register'>('login')
-  const [name, setName] = useState('')
+/** Đăng nhập Nhà Nông là vào được Cảm biến; tài khoản cảm biến cũ (email) đăng nhập riêng khi chưa có tài khoản Nhà Nông */
+function SignIn({ signedIn, error, retry }: { signedIn: boolean; error: string | null; retry: () => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setBusy(true)
-    setError(null)
+    setFormError(null)
     try {
-      setIotAuth(tab === 'login' ? await iotApi.login(email.trim(), password) : await iotApi.register(name.trim(), email.trim(), password))
+      setIotAuth(await iotApi.login(email.trim(), password))
     } catch (err) {
-      setError(err instanceof ApiError ? (Object.values(err.errors)[0]?.[0] ?? err.message) : (err as Error).message)
+      setFormError(err instanceof ApiError ? (Object.values(err.errors)[0]?.[0] ?? err.message) : (err as Error).message)
     } finally {
       setBusy(false)
     }
@@ -90,42 +102,59 @@ function SignIn() {
   return (
     <section>
       <h1>📡 Cảm biến ruộng · ao</h1>
-      <p className="muted">Xem độ ẩm, pH, độ mặn, mực nước, oxy trong ao… do thiết bị gửi về; bật / tắt máy bơm, quạt oxy; dự báo thời tiết và lượng mưa tại vườn. Tài khoản cảm biến dùng email, riêng với tài khoản Nhà Nông.</p>
-      <div className="segmented tabs">
-        <button type="button" className={tab === 'login' ? 'active' : ''} onClick={() => setTab('login')}>
-          Đăng nhập
-        </button>
-        <button type="button" className={tab === 'register' ? 'active' : ''} onClick={() => setTab('register')}>
-          Tạo tài khoản
-        </button>
-      </div>
-      <form className="form card" onSubmit={submit}>
-        {tab === 'register' && (
-          <label className="field">
-            Tên
-            <input value={name} onChange={(e) => setName(e.target.value)} required />
-          </label>
-        )}
-        <label className="field">
-          Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
-        </label>
-        <label className="field">
-          Mật khẩu
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        </label>
-        {error && <p className="field-error">{error}</p>}
-        <button className="button primary" disabled={busy}>
-          {busy ? 'Đang gửi…' : tab === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
-        </button>
-      </form>
+      <p className="muted">Xem độ ẩm, pH, độ mặn, mực nước, oxy trong ao… do thiết bị gửi về; bật / tắt máy bơm, quạt oxy; dự báo thời tiết và lượng mưa tại vườn.</p>
+      {signedIn ? (
+        <div className="card">
+          {error ? (
+            <>
+              <p className="field-error">{error}</p>
+              <button type="button" className="button primary" onClick={retry}>
+                Thử lại
+              </button>
+            </>
+          ) : (
+            <p className="muted">Đang vào mục Cảm biến bằng tài khoản Nhà Nông…</p>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="card">
+            <p>Dùng chung tài khoản Nhà Nông: đăng nhập là vào được mục Cảm biến.</p>
+            <a className="button primary" href={href('tai-khoan')}>
+              Đăng nhập / đăng ký Nhà Nông
+            </a>
+          </div>
+          <details className="card">
+            <summary>Đã có tài khoản cảm biến cũ (đăng nhập bằng email)</summary>
+            <form className="form" onSubmit={submit}>
+              <label className="field">
+                Email
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+              </label>
+              <label className="field">
+                Mật khẩu
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              </label>
+              {formError && <p className="field-error">{formError}</p>}
+              <button className="button" disabled={busy}>
+                {busy ? 'Đang gửi…' : 'Đăng nhập'}
+              </button>
+              <p className="small muted">Lần sau đăng nhập Nhà Nông thì tài khoản này tự nối vào, giữ nguyên trang trại.</p>
+            </form>
+          </details>
+        </>
+      )}
     </section>
   )
 }
 
 function Home() {
   const auth = useIotAuth()
-  const [farms, reloadFarms] = useAsync(() => iotApi.farms(), [])
+  const version = useFarmWorkVersion()
+  const [farms, reloadFarms] = useAsync(() => iotApi.farms(), [version])
+  useEffect(() => {
+    void syncFarmWork()
+  }, [])
   const [alerts, reloadAlerts] = useAsync(() => iotApi.alerts(true), [])
 
   return (
@@ -178,6 +207,7 @@ function Home() {
                     {plot.type_label}
                     {plot.crop ? ` · ${plot.crop}` : ''}
                   </span>
+                  <WorkBadges plot={plot} />
                 </span>
                 <span aria-hidden>›</span>
               </a>
@@ -204,10 +234,16 @@ function Home() {
       </div>
       <PlanCard />
       <p className="small muted center">
-        Đăng nhập: {auth?.user.email} ·{' '}
-        <button type="button" className="linklike" onClick={() => void signOutIot()}>
-          Đăng xuất
-        </button>
+        {auth?.user.nhanong_user_id ? (
+          <>Dùng tài khoản Nhà Nông {auth.user.phone ?? auth.user.email}</>
+        ) : (
+          <>
+            Đăng nhập: {auth?.user.email} ·{' '}
+            <button type="button" className="linklike" onClick={() => void signOutIot()}>
+              Đăng xuất
+            </button>
+          </>
+        )}
       </p>
     </section>
   )
@@ -279,6 +315,7 @@ function AlertCard({ alert, canResolve = true, onResolved }: { alert: IotAlert; 
       <p className="small muted">
         {limit} · {timeAgo(alert.measured_at)} · {alert.device.name}
       </p>
+      {alert.note && <p className="small muted">🌱 {alert.note}</p>}
       {canResolve && (
         <button
           type="button"
@@ -305,7 +342,11 @@ function AlertCard({ alert, canResolve = true, onResolved }: { alert: IotAlert; 
 }
 
 function PlotPage({ id }: { id: number }) {
-  const [summary, reload] = useAsync(() => iotApi.plotSummary(id), [id])
+  const version = useFarmWorkVersion()
+  const [summary, reload] = useAsync(() => iotApi.plotSummary(id), [id, version])
+  useEffect(() => {
+    void syncFarmWork()
+  }, [id])
   const data = summary.status === 'ok' ? summary.data : null
   return (
     <section>
@@ -314,6 +355,7 @@ function PlotPage({ id }: { id: number }) {
       <Status state={summary} retry={reload} />
       {data && (
         <>
+          <WorkBanners work={data.plot.work} />
           {data.open_alerts.map((alert) => (
             <AlertCard key={alert.id} alert={alert} canResolve={canControl(data.role)} onResolved={reload} />
           ))}
@@ -321,7 +363,7 @@ function PlotPage({ id }: { id: number }) {
           {data.readings.length === 0 && <p className="muted">Chưa có số đo.</p>}
           <div className="iot-tiles">
             {data.readings.map((reading) => (
-              <ReadingTile key={`${reading.device_id}-${reading.metric.code}`} reading={reading} showDevice={data.devices.length > 1} />
+              <ReadingTile key={`${reading.device_id}-${reading.metric.code}`} reading={reading} plotId={id} showDevice={data.devices.length > 1} />
             ))}
           </div>
           <div className="btn-row">
@@ -336,6 +378,7 @@ function PlotPage({ id }: { id: number }) {
             <ExportButton plotId={id} />
           </div>
           <Controls plotId={id} plotName={data.plot.name} type={data.plot.type} role={data.role} />
+          <PlotWork plot={data.plot} role={data.role} onChanged={reload} />
           <h2 className="section-title">Thiết bị đo</h2>
           {data.devices.map((device) => (
             <a key={device.id} className="card" style={{ display: 'block' }} href={canManage(data.role) ? href(`cam-bien/thiet-bi/${device.id}`) : undefined}>
@@ -357,7 +400,7 @@ function PlotPage({ id }: { id: number }) {
   )
 }
 
-function ReadingTile({ reading, showDevice }: { reading: IotReading; showDevice: boolean }) {
+function ReadingTile({ reading, plotId, showDevice }: { reading: IotReading; plotId: number; showDevice: boolean }) {
   const bad = reading.status === 'below' || reading.status === 'above'
   const limit = thresholdLabel(reading.min, reading.max)
   return (
@@ -365,6 +408,7 @@ function ReadingTile({ reading, showDevice }: { reading: IotReading; showDevice:
       className={`card iot-tile${bad ? ' bad' : ''}`}
       href={href('cam-bien/bieu-do', {
         device: String(reading.device_id),
+        plot: String(plotId),
         metric: reading.metric.code,
         ten: reading.metric.name,
         unit: reading.metric.unit ?? '',
@@ -432,7 +476,8 @@ function ActuatorCard({ actuator, plotId, role, onChanged }: { actuator: IotActu
   const send = async (action: 'on' | 'off') => {
     setError(null)
     try {
-      await iotApi.command(actuator.id, action, action === 'on' ? minutes : undefined)
+      // Lô vừa phun thuốc: máy tưới trên tán đang tạm dừng thì hỏi "Vẫn bật?"
+      await sendIotCommand(actuator.id, action, action === 'on' ? minutes : undefined)
       onChanged()
     } catch (err) {
       setError((err as Error).message)
@@ -446,7 +491,8 @@ function ActuatorCard({ actuator, plotId, role, onChanged }: { actuator: IotActu
     <div className="card" style={actuator.is_on ? { border: '2px solid #0b7a4b' } : undefined}>
       <b>{actuator.name}</b>{' '}
       <span className="small muted">
-        · {actuator.kind_label} · {actuator.device_name}, kênh {actuator.channel}
+        · {actuator.kind_label}
+        {actuator.irrigation_mode === 'root' ? ' · tưới gốc' : actuator.wets_canopy ? ' · tưới trên tán' : ''} · {actuator.device_name}, kênh {actuator.channel}
       </span>
       <p>
         {pending
@@ -535,10 +581,22 @@ function ChartPage({ query }: { query: URLSearchParams }) {
   const [range, setRange] = useState(RANGES[0])
   const device = Number(query.get('device'))
   const metric = query.get('metric') ?? ''
+  const plotId = Number(query.get('plot')) || null
   const [history, reload] = useAsync(
     () => iotApi.readings(device, { metric, from: new Date(Date.now() - range.hours * 3600 * 1000).toISOString(), interval: range.interval }),
     [device, metric, range],
   )
+  // Việc làm vườn trong khoảng đang xem: vạch đánh dấu trên biểu đồ (không có cũng không sao)
+  const [events] = useAsync(() => {
+    if (!plotId) return Promise.resolve([])
+    const from = new Date(Date.now() - range.hours * 3600 * 1000)
+    const day = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`
+    return iotApi.plotEvents(plotId, { from: day }).catch(() => [])
+  }, [plotId, range])
+  const markers =
+    events.status === 'ok'
+      ? events.data.filter((e) => !e.planned).map((e) => ({ t: e.done_at, icon: WORK_ICONS[e.kind], label: `${e.kind_label}: ${e.title}`, title: e.title, faint: e.kind === 'water' }))
+      : []
   const toNumber = (v: string | null) => (v ? Number(v) : null)
   return (
     <section>
@@ -554,7 +612,7 @@ function ChartPage({ query }: { query: URLSearchParams }) {
       <Status state={history} retry={reload} />
       {history.status === 'ok' && (
         <div className="card">
-          <IotLineChart points={history.data.data} unit={query.get('unit') || null} min={toNumber(query.get('min'))} max={toNumber(query.get('max'))} daily={history.data.interval === 'day'} />
+          <IotLineChart points={history.data.data} unit={query.get('unit') || null} min={toNumber(query.get('min'))} max={toNumber(query.get('max'))} daily={history.data.interval === 'day'} markers={markers} />
         </div>
       )}
     </section>

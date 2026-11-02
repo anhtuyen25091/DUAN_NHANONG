@@ -20,6 +20,7 @@ export function AlertCard({ alert, canResolve = true, onResolved }: { alert: Iot
       <Text style={[styles.muted, { marginBottom: 8 }]}>
         {limit} · {timeAgo(alert.measured_at)} · {alert.device.name}
       </Text>
+      {alert.note ? <Text style={[styles.muted, { marginTop: -4, marginBottom: 8 }]}>🌱 {alert.note}</Text> : null}
       {canResolve && (
         <Button
           label={busy ? 'Đang lưu…' : '✓ Đã xử lý'}

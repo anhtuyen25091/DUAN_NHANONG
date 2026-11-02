@@ -17,3 +17,4 @@ export * from './farmlog';
 export * from './receipts';
 export * from './realtime';
 export * from './iot';
+export * from './farmwork';

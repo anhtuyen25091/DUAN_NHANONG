@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Đăng nhập bằng email + mật khẩu, trả token Sanctum (gửi lại qua Authorization: Bearer).
+ * Đăng nhập bằng tài khoản Nhà Nông (mặc định) hoặc email + mật khẩu (tài khoản cảm biến cũ, admin),
+ * trả token Sanctum (gửi lại qua Authorization: Bearer).
  */
 class AuthController extends Controller
 {
@@ -51,6 +52,27 @@ class AuthController extends Controller
         return $this->tokenResponse($user, $data['device_name'] ?? null);
     }
 
+    /**
+     * Đăng nhập bằng tài khoản Nhà Nông (gửi token đăng nhập của web / app Nhà Nông): không cần tài khoản cảm biến riêng.
+     */
+    public function nhanong(Request $request, NhanongPlan $plan): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string', 'max:255'],
+            'device_name' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        try {
+            $user = $plan->signIn($data['token']);
+        } catch (ConnectionException|RequestException $e) {
+            report($e);
+
+            return response()->json(['message' => 'Chưa kết nối được máy chủ Nhà Nông, thử lại sau.'], 503);
+        }
+
+        return $this->tokenResponse($user, $data['device_name'] ?? null);
+    }
+
     public function logout(Request $request): Response
     {
         $request->user()->currentAccessToken()->delete();
@@ -63,7 +85,7 @@ class AuthController extends Controller
         $user = $request->user();
         $plan->refresh($user);
 
-        return response()->json(['data' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'plan' => $plan->summary($user)]]);
+        return response()->json(['data' => [...self::userData($user), 'plan' => $plan->summary($user)]]);
     }
 
     /**
@@ -95,6 +117,14 @@ class AuthController extends Controller
     {
         $token = $user->createToken($deviceName ?: 'app')->plainTextToken;
 
-        return response()->json(['token' => $token, 'user' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email]], $status);
+        return response()->json(['token' => $token, 'user' => self::userData($user)], $status);
+    }
+
+    /**
+     * @return array{id: int, name: string, email: ?string, phone: ?string, nhanong_user_id: ?int}
+     */
+    private static function userData(User $user): array
+    {
+        return ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->nhanong_phone, 'nhanong_user_id' => $user->nhanong_user_id];
     }
 }

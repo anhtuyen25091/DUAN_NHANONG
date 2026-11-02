@@ -16,3 +16,5 @@ Schedule::command('commands:expire')->everyMinute()->withoutOverlapping();
 // Lịch tưới (mỗi phút) và nhắc nhiều ngày không mưa (7:00 sáng)
 Schedule::command('schedules:run')->everyMinute()->withoutOverlapping();
 Schedule::command('weather:dry-spell')->dailyAt('07:00')->withoutOverlapping();
+// Nhắc việc làm vườn đã lên kế hoạch cho hôm nay (phun thuốc, bón phân...)
+Schedule::command('farmwork:remind')->dailyAt(config('iot.farm_work.remind_at'))->withoutOverlapping();

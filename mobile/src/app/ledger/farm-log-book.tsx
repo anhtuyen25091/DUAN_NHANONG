@@ -6,6 +6,7 @@ import { Text } from '../../components/AppText';
 import { WithholdingNotice } from '../../components/farmLogs';
 import { DateField } from '../../components/fields';
 import { Button, Card, styles } from '../../components/ui';
+import { useFarmWorkSyncOnFocus } from '../../lib/farmwork';
 import { useLedger } from '../../lib/ledger';
 import { colors } from '../../lib/theme';
 
@@ -21,6 +22,7 @@ function FarmLogBook({ data }: { data: LedgerSnapshot }) {
   const garden = data.gardens.find((g) => g.id === gardenId);
   const [from, setFrom] = useState(`${today().slice(0, 4)}-01-01`);
   const [to, setTo] = useState(today());
+  useFarmWorkSyncOnFocus();
   if (!garden) return <Text style={[styles.body, { padding: 16 }]}>Không tìm thấy vườn này.</Text>;
   const logs = data.farm_logs.filter((l) => l.garden_id === gardenId && l.date >= from && l.date <= to).sort((a, b) => a.date.localeCompare(b.date));
   const text = farmLogText(garden, data.farm_logs.filter((l) => l.garden_id === gardenId), { from, to });

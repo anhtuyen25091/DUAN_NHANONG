@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Farms;
 
 use App\Filament\Resources\Farms\Pages\ManageFarms;
 use App\Models\Farm;
+use App\Models\User;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -39,7 +40,8 @@ class FarmResource extends Resource
             ->components([
                 Select::make('user_id')
                     ->label('Chủ trang trại')
-                    ->relationship('user', 'email')
+                    ->relationship('user', 'name')
+                    ->getOptionLabelFromRecordUsing(fn (User $record): string => $record->name.' · '.$record->contactLabel())
                     ->searchable()
                     ->required(),
                 TextInput::make('name')
@@ -74,9 +76,10 @@ class FarmResource extends Resource
                 TextColumn::make('name')
                     ->label('Tên')
                     ->searchable(),
-                TextColumn::make('user.email')
+                TextColumn::make('user.name')
                     ->label('Chủ')
-                    ->searchable(),
+                    ->description(fn (Farm $record): string => $record->user->contactLabel())
+                    ->searchable(['name']),
                 TextColumn::make('province')
                     ->label('Tỉnh')
                     ->placeholder('—'),

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -31,6 +32,32 @@ class NhanongPlan
 
         $user->forceFill(['nhanong_user_id' => $account['id'], 'nhanong_token' => $token])->save();
         $this->store($user, $account);
+    }
+
+    /**
+     * Đăng nhập mục Cảm biến bằng tài khoản Nhà Nông: lấy tài khoản cảm biến đã nối với tài khoản Nhà Nông này
+     * (kể cả tài khoản email cũ đã nối), chưa có thì tạo mới (không email, không mật khẩu dùng được).
+     *
+     * @throws ValidationException token không dùng được
+     * @throws ConnectionException
+     */
+    public function signIn(string $token): User
+    {
+        $account = $this->fetch($token);
+        if ($account === null) {
+            throw ValidationException::withMessages(['token' => 'Phiên đăng nhập Nhà Nông đã hết hạn. Đăng nhập lại tài khoản Nhà Nông rồi thử lại.']);
+        }
+
+        $user = User::query()->where('nhanong_user_id', $account['id'])->first()
+            ?? (new User)->forceFill(['nhanong_user_id' => $account['id'], 'email' => null, 'password' => Str::random(40)]);
+        if ($user->email === null) {
+            // Tài khoản chỉ dùng Nhà Nông: tên đổi theo bên Nhà Nông
+            $user->name = $account['name'] ?? $user->name ?? 'Nhà Nông';
+        }
+        $user->forceFill(['nhanong_token' => $token])->save();
+        $this->store($user, $account);
+
+        return $user;
     }
 
     public function unlink(User $user): void
@@ -89,7 +116,7 @@ class NhanongPlan
     }
 
     /**
-     * @return array{id: int, phone: ?string, tier: string, premium_until: ?string}|null null = token không dùng được
+     * @return array{id: int, name: string, phone: ?string, tier: string, premium_until: ?string}|null null = token không dùng được
      *
      * @throws ConnectionException
      */

@@ -14,6 +14,7 @@ use App\Models\Metric;
 use App\Models\Plot;
 use App\Services\Control\BlockedCommandException;
 use App\Services\Control\CommandService;
+use App\Services\Control\SprayPauseException;
 use App\Services\LoRaWan\RelayCodec;
 use App\Support\Ownership;
 use Illuminate\Http\JsonResponse;
@@ -69,10 +70,15 @@ class ActuatorController extends Controller
         $data = $request->validate([
             'action' => ['required', Rule::in([ActuatorCommand::ON, ActuatorCommand::OFF])],
             'minutes' => ['nullable', 'integer', 'min:1', 'max:'.$actuator->max_minutes],
+            // Vẫn bật dù vừa phun thuốc (người dùng đã xác nhận); không vượt được khóa an toàn
+            'force' => ['nullable', 'boolean'],
         ], ['minutes.max' => "Thiết bị này chạy tối đa {$actuator->max_minutes} phút mỗi lần."]);
 
         try {
-            $command = $this->commands->issue($actuator, $data['action'], $data['minutes'] ?? null, ActuatorCommand::SOURCE_MANUAL, $request->user());
+            $command = $this->commands->issue($actuator, $data['action'], $data['minutes'] ?? null, ActuatorCommand::SOURCE_MANUAL, $request->user(), force: (bool) ($data['force'] ?? false));
+        } catch (SprayPauseException $e) {
+            // App hỏi lại "Vẫn bật?" rồi gửi force = true
+            return response()->json(['message' => $e->getMessage(), 'code' => 'spray_pause', 'until' => $e->until], 409);
         } catch (BlockedCommandException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -95,6 +101,8 @@ class ActuatorController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'kind' => ['required', Rule::enum(ActuatorKind::class)],
+            // Tưới gốc / nhỏ giọt hay phun mưa trên tán (để tạm dừng sau khi phun thuốc); null = chưa rõ
+            'irrigation_mode' => ['nullable', Rule::in([Actuator::ROOT, Actuator::CANOPY])],
             'channel' => ['required', 'integer', 'min:1', 'max:16', Rule::unique('actuators')->where('device_id', $device->id)->ignore($actuator)],
             'plot_id' => ['nullable', 'integer'],
             'max_minutes' => ['nullable', 'integer', 'min:1', 'max:720'],

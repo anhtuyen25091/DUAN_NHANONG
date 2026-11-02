@@ -2,6 +2,7 @@ import { FARM_LOG_KIND_LABELS, formatDate, formatQty, today, withholdingOn, with
 import { router } from 'expo-router';
 import { View } from 'react-native';
 import { Text } from './AppText';
+import { useFarmWorkSyncOnFocus } from '../lib/farmwork';
 import { colors, font } from '../lib/theme';
 import { RowCard } from './ledger';
 import { Button, Card, styles } from './ui';
@@ -19,6 +20,8 @@ export function WithholdingNotice({ data, gardenId, on = today() }: { data: Ledg
 
 /** Trang vườn: 5 việc gần nhất, lối vào ghi việc / xem cả nhật ký */
 export function FarmLogSection({ data, gardenId }: { data: LedgerSnapshot; gardenId: string }) {
+  // Lấy việc ghi trên lô cảm biến đã nối với vườn (sổ tự cập nhật khi có thay đổi)
+  useFarmWorkSyncOnFocus();
   const logs = data.farm_logs.filter((l) => l.garden_id === gardenId);
   return (
     <View>

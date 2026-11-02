@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Lần số đo vượt ngưỡng. Mỗi ngưỡng chỉ có 1 cảnh báo đang mở; tự đóng khi số đo về lại trong ngưỡng.
  */
-#[Fillable(['threshold_id', 'device_id', 'direction', 'value', 'measured_at', 'resolved_at'])]
+#[Fillable(['threshold_id', 'device_id', 'direction', 'value', 'measured_at', 'resolved_at', 'note'])]
 class Alert extends Model
 {
     /**

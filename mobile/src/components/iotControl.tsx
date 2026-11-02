@@ -3,6 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from './AppText';
+import { confirmAsync } from '../lib/confirm';
 import { iotApi } from '../lib/iot';
 import { colors, font } from '../lib/theme';
 import { showToast } from '../lib/toast';
@@ -79,7 +80,14 @@ function ActuatorCard({ actuator, role, onChanged }: { actuator: IotActuator; ro
   const send = async (action: 'on' | 'off') => {
     setBusy(true);
     try {
-      await iotApi.command(actuator.id, action, action === 'on' ? minutes : undefined);
+      try {
+        await iotApi.command(actuator.id, action, action === 'on' ? minutes : undefined);
+      } catch (error) {
+        // Lô vừa phun thuốc: máy tưới trên tán đang tạm dừng cho thuốc khô, hỏi lại rồi gửi kèm force
+        if (!(error instanceof ApiError) || error.status !== 409 || action !== 'on') throw error;
+        if (!(await confirmAsync('Vẫn bật?', error.message, 'Vẫn bật'))) return;
+        await iotApi.command(actuator.id, action, minutes, true);
+      }
       onChanged();
     } catch (error) {
       showToast({ message: error instanceof ApiError ? error.message : 'Chưa gửi được lệnh.' });

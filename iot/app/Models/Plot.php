@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Lô / ruộng / ao trong trang trại. Ngưỡng cảnh báo đặt theo lô.
  */
-#[Fillable(['farm_id', 'name', 'type', 'crop', 'area_m2'])]
+#[Fillable(['farm_id', 'name', 'type', 'crop', 'area_m2', 'ledger_garden_id', 'ledger_garden_name'])]
 class Plot extends Model
 {
     /** @use HasFactory<PlotFactory> */
@@ -52,6 +52,16 @@ class Plot extends Model
     public function thresholds(): HasMany
     {
         return $this->hasMany(Threshold::class);
+    }
+
+    /**
+     * Việc làm vườn (phun thuốc, bón phân, tưới...)
+     *
+     * @return HasMany<PlotEvent, $this>
+     */
+    public function events(): HasMany
+    {
+        return $this->hasMany(PlotEvent::class);
     }
 
     /**

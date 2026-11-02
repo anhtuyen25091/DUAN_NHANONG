@@ -12,7 +12,11 @@ export type IotInterval = 'raw' | 'hour' | 'day';
 export interface IotUser {
   id: number;
   name: string;
-  email: string;
+  /** null: tài khoản đăng nhập bằng Nhà Nông (SĐT) */
+  email: string | null;
+  phone?: string | null;
+  /** Tài khoản Nhà Nông đã nối / dùng để đăng nhập */
+  nhanong_user_id?: number | null;
 }
 
 export interface IotAuth {
@@ -28,6 +32,100 @@ export interface IotPlot {
   type_label: string;
   crop: string | null;
   area_m2: number | null;
+  /** Vườn trong Sổ thu chi của chủ trang trại (nhật ký canh tác dùng chung) */
+  ledger_garden_id?: string | null;
+  ledger_garden_name?: string | null;
+  /** Có trong danh sách trang trại và trang lô */
+  work?: IotWorkStatus;
+}
+
+/** Ảnh hưởng của các việc đã làm trên lô (null = không có) */
+export interface IotWorkStatus {
+  /** Phun thuốc: chưa được vào lô tới lúc này */
+  no_entry_until: string | null;
+  no_entry_event: IotEventBrief | null;
+  /** Ngày đầu tiên được thu hoạch (hết cách ly) */
+  harvest_from: string | null;
+  harvest_event: IotEventBrief | null;
+  /** Thuốc chưa khô: máy tưới trên tán tạm dừng tới lúc này */
+  canopy_paused_until: string | null;
+  spray_event: IotEventBrief | null;
+  /** Vừa bón phân (EC / đạm / lân / kali có thể tăng vài ngày) */
+  fertilized_at: string | null;
+  fertilize_event: IotEventBrief | null;
+  /** Số việc đã lên kế hoạch */
+  planned: number;
+}
+
+export interface IotEventBrief {
+  id: number;
+  uuid: string;
+  kind: IotWorkKind;
+  title: string;
+  done_at: string;
+}
+
+/** Giống FarmLogKind của Sổ thu chi */
+export type IotWorkKind = 'spray' | 'fertilize' | 'water' | 'prune' | 'other';
+
+/** 1 việc làm vườn trên lô (phun thuốc, bón phân, tưới...) */
+export interface IotPlotEvent {
+  id: number;
+  /** Trùng id nhật ký canh tác trong Sổ thu chi */
+  uuid: string;
+  plot_id: number;
+  kind: IotWorkKind;
+  kind_label: string;
+  title: string;
+  quantity: number | null;
+  unit: string | null;
+  target: string | null;
+  withholding_days: number | null;
+  reentry_hours: number | null;
+  rain_free_hours: number | null;
+  worker: string | null;
+  note: string | null;
+  /** Kế hoạch, chưa làm (chưa có hiệu lực) */
+  planned: boolean;
+  done_at: string;
+  /** manual: ghi trên trang lô; ledger: từ Sổ thu chi; actuator: máy bơm tự ghi */
+  source: 'manual' | 'ledger' | 'actuator';
+  actuator_id: number | null;
+  minutes: number | null;
+  user: { id: number; name: string } | null;
+  no_entry_until: string | null;
+  harvest_from: string | null;
+  canopy_paused_until: string | null;
+  /** Chỉ có khi hỏi ?since= (đồng bộ) */
+  deleted: boolean;
+  updated_at: string | null;
+}
+
+export interface IotPlotEventInput {
+  uuid?: string;
+  kind: IotWorkKind;
+  title: string;
+  quantity?: number | null;
+  unit?: string | null;
+  target?: string | null;
+  withholding_days?: number | null;
+  reentry_hours?: number | null;
+  rain_free_hours?: number | null;
+  worker?: string | null;
+  note?: string | null;
+  planned?: boolean;
+  /** ISO; trống = bây giờ */
+  done_at?: string | null;
+  source?: 'manual' | 'ledger';
+}
+
+/** Kiểm tra trước khi phun thuốc / bón phân */
+export interface IotWorkAdvice {
+  kind: 'spray' | 'fertilize';
+  level: 'ok' | 'caution' | 'avoid';
+  items: { level: 'ok' | 'info' | 'caution' | 'avoid'; text: string }[];
+  /** Giờ phù hợp gần nhất trong 24 giờ tới (khi lúc này chưa nên) */
+  best_time: string | null;
 }
 
 export interface IotFarm {
@@ -57,7 +155,8 @@ export interface IotMember {
   id: number | null;
   user_id: number;
   name: string;
-  email: string;
+  email: string | null;
+  phone?: string | null;
   role: IotRole;
 }
 
@@ -97,6 +196,9 @@ export interface IotPlotInput {
   type: IotPlotType;
   crop: string | null;
   area_m2: number | null;
+  /** Chỉ chủ trang trại: nối lô với vườn trong Sổ thu chi */
+  ledger_garden_id?: string | null;
+  ledger_garden_name?: string | null;
 }
 
 export interface IotDeviceInput {
@@ -194,6 +296,8 @@ export interface IotAlert {
   max: number | null;
   measured_at: string;
   resolved_at: string | null;
+  /** VD "Có thể do vừa bón NPK ngày 01/11" (không báo đẩy) */
+  note?: string | null;
 }
 
 export interface IotPlotSummary {
@@ -227,6 +331,10 @@ export interface IotActuator {
   name: string;
   kind: IotActuatorKind;
   kind_label: string;
+  /** root: tưới gốc / nhỏ giọt; canopy: phun mưa trên tán; null: chưa rõ */
+  irrigation_mode: IotIrrigationMode | null;
+  /** Tưới lên lá (tạm dừng sau khi phun thuốc) */
+  wets_canopy: boolean;
   channel: number;
   max_minutes: number;
   /** Trạng thái mạch báo về gần nhất */
@@ -239,9 +347,12 @@ export interface IotActuator {
   pending: { id: number; action: 'on' | 'off'; minutes: number | null; status: IotCommandStatus; expires_at: string } | null;
 }
 
+export type IotIrrigationMode = 'root' | 'canopy';
+
 export interface IotActuatorInput {
   name: string;
   kind: IotActuatorKind;
+  irrigation_mode?: IotIrrigationMode | null;
   channel: number;
   plot_id: number | null;
   max_minutes: number;
@@ -377,6 +488,8 @@ export function createIotApi({ baseUrl, getToken, fetch: fetchFn = globalThis.fe
 
   return {
     login: (email: string, password: string) => request<IotAuth>('POST', '/auth/login', { body: { email, password, device_name: 'app' } }),
+    /** Đăng nhập bằng tài khoản Nhà Nông (token đăng nhập của web / app Nhà Nông), không cần tài khoản cảm biến riêng */
+    loginNhanong: (token: string) => request<IotAuth>('POST', '/auth/nhanong', { body: { token, device_name: 'app' } }),
     register: (name: string, email: string, password: string) =>
       request<IotAuth>('POST', '/auth/register', { body: { name, email, password, device_name: 'app' } }),
     logout: () => request<void>('POST', '/auth/logout'),
@@ -406,8 +519,11 @@ export function createIotApi({ baseUrl, getToken, fetch: fetchFn = globalThis.fe
       request<{ data: IotThreshold }>('POST', `/plots/${plotId}/thresholds`, { body: input }).then((r) => r.data),
     deleteThreshold: (id: number) => request<void>('DELETE', `/thresholds/${id}`),
     members: (farmId: number) => request<{ data: IotMember[] }>('GET', `/farms/${farmId}/members`).then((r) => r.data),
-    addMember: (farmId: number, email: string, role: Exclude<IotRole, 'owner'>) =>
-      request<{ data: IotMember }>('POST', `/farms/${farmId}/members`, { body: { email, role } }).then((r) => r.data),
+    /** Mời bằng SĐT tài khoản Nhà Nông, hoặc email tài khoản cảm biến cũ (có "@") */
+    addMember: (farmId: number, contact: string, role: Exclude<IotRole, 'owner'>) =>
+      request<{ data: IotMember }>('POST', `/farms/${farmId}/members`, {
+        body: contact.includes('@') ? { email: contact.trim(), role } : { phone: contact.trim(), role },
+      }).then((r) => r.data),
     updateMember: (memberId: number, role: Exclude<IotRole, 'owner'>) =>
       request<{ data: IotMember }>('PUT', `/farm-members/${memberId}`, { body: { role } }).then((r) => r.data),
     /** Chủ bỏ chia sẻ, hoặc người được chia sẻ tự rời */
@@ -429,8 +545,19 @@ export function createIotApi({ baseUrl, getToken, fetch: fetchFn = globalThis.fe
     updateActuator: (id: number, input: IotActuatorInput) => request<{ data: IotActuator }>('PUT', `/actuators/${id}`, { body: input }).then((r) => r.data),
     deleteActuator: (id: number) => request<void>('DELETE', `/actuators/${id}`),
     /** Bật (kèm số phút) / tắt; mạch nhận trong vài giây, quá 10 phút chưa nhận thì lệnh hủy */
-    command: (actuatorId: number, action: 'on' | 'off', minutes?: number) =>
-      request<{ data: IotCommand }>('POST', `/actuators/${actuatorId}/command`, { body: { action, minutes } }).then((r) => r.data),
+    /** force: vẫn bật dù lô vừa phun thuốc (lỗi 409 = máy tưới trên tán đang tạm dừng, hỏi người dùng rồi gửi lại) */
+    command: (actuatorId: number, action: 'on' | 'off', minutes?: number, force?: boolean) =>
+      request<{ data: IotCommand }>('POST', `/actuators/${actuatorId}/command`, { body: { action, minutes, force: force || undefined } }).then((r) => r.data),
+    /** Việc làm vườn của lô: mặc định 60 ngày qua + kế hoạch; since = đồng bộ (kể cả đã xóa) */
+    plotEvents: (plotId: number, query: { from?: string; to?: string; since?: string } = {}) =>
+      request<{ data: IotPlotEvent[] }>('GET', `/plots/${plotId}/events`, { query }).then((r) => r.data),
+    savePlotEvent: (plotId: number, input: IotPlotEventInput) => request<{ data: IotPlotEvent }>('POST', `/plots/${plotId}/events`, { body: input }).then((r) => r.data),
+    updatePlotEvent: (id: number, input: IotPlotEventInput) => request<{ data: IotPlotEvent }>('PUT', `/plot-events/${id}`, { body: input }).then((r) => r.data),
+    deletePlotEvent: (id: number) => request<void>('DELETE', `/plot-events/${id}`),
+    /** Sổ thu chi xóa nhật ký (chỉ biết uuid) */
+    deletePlotEventByUuid: (plotId: number, uuid: string) => request<void>('POST', `/plots/${plotId}/events`, { body: { uuid, deleted: true } }),
+    workAdvice: (plotId: number, kind: 'spray' | 'fertilize', rainFreeHours?: number | null) =>
+      request<{ data: IotWorkAdvice }>('GET', `/plots/${plotId}/work-advice`, { query: { kind, rain_free_hours: rainFreeHours ?? undefined } }).then((r) => r.data),
     commandHistory: (actuatorId: number) => request<{ data: IotCommand[] }>('GET', `/actuators/${actuatorId}/commands`).then((r) => r.data),
     schedules: (plotId: number) => request<{ data: IotSchedule[] }>('GET', `/plots/${plotId}/schedules`).then((r) => r.data),
     createSchedule: (actuatorId: number, input: IotScheduleInput) =>

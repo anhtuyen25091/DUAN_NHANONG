@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 import Storage from 'expo-sqlite/kv-store';
 import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
-import { getAuth } from './auth';
+import { getAuth, subscribeAuth } from './auth';
 import { getLastPushToken } from './push';
 
 /**
@@ -22,7 +22,8 @@ export const DEVICE_FILE_URL = 'http://192.168.4.1/data.csv';
 const AUTH_KEY = 'iot_auth';
 const PENDING_KEY = 'iot_pending_files';
 
-const store =
+/** kv-store trên máy (web: localStorage) */
+export const iotStore =
   Platform.OS === 'web'
     ? {
         get: (key: string) => localStorage.getItem(key),
@@ -37,7 +38,7 @@ const store =
 
 function readJson<T>(key: string, fallback: T): T {
   try {
-    const raw = store.get(key);
+    const raw = iotStore.get(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
   } catch {
     return fallback;
@@ -53,9 +54,13 @@ export const iotApi = createIotApi({ baseUrl: iotUrl(), getToken: () => auth?.to
 
 export function setIotAuth(next: IotAuth | null) {
   auth = next;
-  if (next) store.set(AUTH_KEY, JSON.stringify(next));
-  else store.remove(AUTH_KEY);
+  if (next) iotStore.set(AUTH_KEY, JSON.stringify(next));
+  else iotStore.remove(AUTH_KEY);
   authListeners.forEach((l) => l());
+}
+
+export function getIotAuth(): IotAuth | null {
+  return auth;
 }
 
 export function useIotAuth(): IotAuth | null {
@@ -82,23 +87,56 @@ export async function syncIotPush() {
   await iotApi.savePushToken(token, Platform.OS === 'ios' ? 'ios' : 'android').catch(() => {});
 }
 
-let linkedToken: string | null = null;
+let syncedToken: string | null = null;
+let syncing: Promise<boolean> | null = null;
 
 /**
- * Đã đăng nhập cả tài khoản Nhà Nông lẫn tài khoản cảm biến: nối 2 tài khoản để dùng chung gói trả phí
- * (có gói Nhà Nông thì xem lượng mưa 1 năm). Mỗi token Nhà Nông chỉ gửi 1 lần mỗi lần mở app.
+ * Cho mục Cảm biến theo tài khoản Nhà Nông đang đăng nhập (dùng chung tài khoản, gói trả phí):
+ * - chưa vào Cảm biến, hoặc đang vào bằng tài khoản Nhà Nông khác: đăng nhập lại bằng token Nhà Nông
+ * - đang dùng tài khoản email cũ chưa nối: nối với tài khoản Nhà Nông (giữ trang trại cũ)
+ * - đăng xuất Nhà Nông: thoát luôn Cảm biến (trừ tài khoản email chưa nối)
+ * Trả true khi vừa đăng nhập mới (để hỏi quyền thông báo). Lỗi thì ném ra để màn hình hiện nút thử lại.
  */
-export async function linkNhanongIfPossible(): Promise<void> {
-  const nhanong = getAuth()?.token ?? null;
-  if (!auth || !nhanong || nhanong === linkedToken) return;
-  linkedToken = nhanong;
-  await iotApi.linkNhanong(nhanong).catch(() => {
-    // Tài khoản Nhà Nông đã nối với tài khoản cảm biến khác / mất mạng: thử lại lần mở app sau
-    linkedToken = null;
+export function syncIotWithNhanong(): Promise<boolean> {
+  syncing ??= run().finally(() => {
+    syncing = null;
   });
+  return syncing;
 }
 
-// ---------- File dữ liệu tải từ thiết bị (ruộng không có mạng) ----------
+async function run(): Promise<boolean> {
+  const nhanong = getAuth();
+  if (!nhanong) {
+    syncedToken = null;
+    if (auth?.user.nhanong_user_id) await signOutIot();
+    return false;
+  }
+  if (nhanong.token === syncedToken && auth) return false;
+  let signedIn = false;
+  if (auth && auth.user.nhanong_user_id == null) {
+    try {
+      await iotApi.linkNhanong(nhanong.token);
+      setIotAuth({ ...auth, user: { ...auth.user, nhanong_user_id: nhanong.user.id } });
+    } catch (error) {
+      // Tài khoản Nhà Nông đã nối với tài khoản cảm biến khác: theo tài khoản Nhà Nông
+      if (!(error instanceof ApiError) || error.status !== 422) throw error;
+      setIotAuth(await iotApi.loginNhanong(nhanong.token));
+      signedIn = true;
+    }
+  } else if (auth && auth.user.nhanong_user_id === nhanong.user.id) {
+    // Cùng người: gửi token mới để máy chủ cảm biến biết gói đang dùng
+    await iotApi.linkNhanong(nhanong.token);
+  } else {
+    setIotAuth(await iotApi.loginNhanong(nhanong.token));
+    signedIn = true;
+  }
+  syncedToken = nhanong.token;
+  return signedIn;
+}
+
+subscribeAuth(() => {
+  void syncIotWithNhanong().catch(() => {});
+});
 
 export interface PendingDeviceFile {
   uid: string;
@@ -112,7 +150,7 @@ const pendingListeners = new Set<() => void>();
 
 function savePending(next: PendingDeviceFile[]) {
   pending = next;
-  store.set(PENDING_KEY, JSON.stringify(next));
+  iotStore.set(PENDING_KEY, JSON.stringify(next));
   pendingListeners.forEach((l) => l());
 }
 

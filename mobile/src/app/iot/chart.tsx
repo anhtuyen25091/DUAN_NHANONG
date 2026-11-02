@@ -1,4 +1,4 @@
-import { type IotInterval } from '@nhanong/shared';
+import { today, type IotInterval } from '@nhanong/shared';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
@@ -15,7 +15,7 @@ const RANGES: { label: string; hours: number; interval: IotInterval }[] = [
 
 /** Lịch sử 1 chỉ số của 1 thiết bị */
 export default function IotChartScreen() {
-  const params = useLocalSearchParams<{ device: string; metric: string; title?: string; unit?: string; min?: string; max?: string }>();
+  const params = useLocalSearchParams<{ device: string; plot?: string; metric: string; title?: string; unit?: string; min?: string; max?: string }>();
   const [range, setRange] = useState(RANGES[0]);
   const history = useAsync(
     () =>
@@ -25,6 +25,11 @@ export default function IotChartScreen() {
         interval: range.interval,
       }),
     [params.device, params.metric, range],
+  );
+  // Việc làm vườn của lô trong khoảng đang xem (vẽ mốc trên biểu đồ)
+  const events = useAsync(
+    () => (params.plot ? iotApi.plotEvents(Number(params.plot), { from: today(new Date(Date.now() - range.hours * 3600 * 1000)) }) : Promise.resolve([])),
+    [params.plot, range],
   );
   const toNumber = (v?: string) => (v ? Number(v) : null);
 
@@ -39,7 +44,7 @@ export default function IotChartScreen() {
       <Status state={history.state} retry={history.reload} />
       {history.state.status === 'ok' && (
         <Card>
-          <IotChart points={history.state.data.data} interval={history.state.data.interval} unit={params.unit || null} min={toNumber(params.min)} max={toNumber(params.max)} />
+          <IotChart points={history.state.data.data} interval={history.state.data.interval} unit={params.unit || null} min={toNumber(params.min)} max={toNumber(params.max)} events={events.state.status === 'ok' ? events.state.data : []} />
         </Card>
       )}
     </ScrollView>

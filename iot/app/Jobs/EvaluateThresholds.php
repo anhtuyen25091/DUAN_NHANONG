@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\AlertDirection;
 use App\Models\Alert;
 use App\Models\Device;
 use App\Models\Reading;
@@ -9,6 +10,7 @@ use App\Models\Threshold;
 use App\Notifications\AlertNotifier;
 use App\Services\Control\InterlockWatcher;
 use App\Services\Control\RuleEngine;
+use App\Services\FarmWork\PlotWork;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -25,7 +27,7 @@ class EvaluateThresholds implements ShouldQueue
      */
     public function __construct(public int $deviceId, public array $latest) {}
 
-    public function handle(AlertNotifier $notifier, RuleEngine $rules, InterlockWatcher $interlocks): void
+    public function handle(AlertNotifier $notifier, RuleEngine $rules, InterlockWatcher $interlocks, PlotWork $work): void
     {
         $device = Device::query()->find($this->deviceId);
         if ($device === null) {
@@ -42,9 +44,12 @@ class EvaluateThresholds implements ShouldQueue
         $rules->evaluate($device, $this->latest);
 
         $thresholds = Threshold::query()
+            ->with('metric')
             ->where('plot_id', $device->plot_id)
             ->whereIn('metric_id', array_keys($this->latest))
             ->get();
+        // Vừa bón phân: EC / đạm / lân / kali tăng là bình thường
+        $fertilize = $work->recentFertilize($device->plot_id);
 
         foreach ($thresholds as $threshold) {
             ['value' => $value, 'measured_at' => $measuredAt] = $this->latest[$threshold->metric_id];
@@ -63,13 +68,19 @@ class EvaluateThresholds implements ShouldQueue
             $open = $threshold->alerts()->open()->latest('id')->first();
 
             if ($direction !== null && $open === null) {
+                $afterFertilize = $fertilize !== null && $direction === AlertDirection::Above
+                    && in_array($threshold->metric->code, config('iot.farm_work.fertilize_metrics'), true);
                 $alert = $threshold->alerts()->create([
                     'device_id' => $device->id,
                     'direction' => $direction,
                     'value' => $value,
                     'measured_at' => $measuredAt,
+                    'note' => $afterFertilize ? "Có thể do vừa bón {$fertilize->title} ngày {$fertilize->done_at->setTimezone('Asia/Ho_Chi_Minh')->format('d/m')}" : null,
                 ]);
-                $notifier->opened($alert);
+                // Đã báo "vừa bón phân, EC có thể tăng" lúc ghi việc: không báo đẩy lại
+                if (! $afterFertilize) {
+                    $notifier->opened($alert);
+                }
             } elseif ($direction !== null) {
                 // Vẫn vượt ngưỡng: cập nhật số đo gần nhất
                 $open->update(['direction' => $direction, 'value' => $value, 'measured_at' => $measuredAt]);

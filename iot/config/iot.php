@@ -87,4 +87,25 @@ return [
         // Mạch điều khiển hỏi lệnh mới mỗi N giây (firmware đọc từ phản hồi)
         'poll_seconds' => 10,
     ],
+
+    // Việc làm vườn (phun thuốc, bón phân, tưới). Các con số dưới đây chỉ là mặc định để gợi ý:
+    // người dùng nhập theo nhãn thuốc / khuyến cáo của cán bộ kỹ thuật địa phương.
+    'farm_work' => [
+        // Phun thuốc xong chưa nhập "số giờ không mưa / không tưới trên tán" thì dùng mức này
+        'spray_rain_free_hours' => 6,
+        // Kiểm tra trước khi phun: gió (m/s) trên mức "cân nhắc" thì nhắc, trên mức "không nên" thì khuyên hoãn
+        'spray_wind_caution_ms' => 3,
+        'spray_wind_avoid_ms' => 5,
+        // Nắng gắt dễ làm thuốc bay hơi, cháy lá: khuyên phun sáng sớm / chiều mát
+        'spray_hot_celsius' => 32,
+        // Kiểm tra trước khi bón phân: mưa trong 48 giờ tới từ mức này thì phân dễ bị rửa trôi
+        'fertilize_rain_mm' => 20,
+        // Sau khi bón phân: EC / đạm / lân / kali tăng trong ngần này ngày thì ghi "có thể do vừa bón phân", không báo đẩy
+        'fertilize_alert_quiet_days' => 3,
+        'fertilize_metrics' => ['soil_ec', 'soil_n', 'soil_p', 'soil_k', 'water_ec'],
+        // Máy bơm / van / phun sương chạy xong thì tự ghi nhật ký tưới
+        'log_water_kinds' => ['pump', 'valve', 'mister'],
+        // Nhắc việc đã lên kế hoạch vào sáng hôm đó
+        'remind_at' => '06:00',
+    ],
 ];

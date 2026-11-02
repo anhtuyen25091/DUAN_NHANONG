@@ -75,6 +75,12 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasPremium() ? config('iot.rain_history.premium_days') : config('iot.rain_history.free_days');
     }
 
+    /** Email, hoặc SĐT Nhà Nông khi đăng nhập bằng tài khoản Nhà Nông */
+    public function contactLabel(): string
+    {
+        return $this->email ?? $this->nhanong_phone ?? '';
+    }
+
     public function canAccessPanel(Panel $panel): bool
     {
         return (bool) $this->is_admin;

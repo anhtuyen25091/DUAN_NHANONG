@@ -12,8 +12,6 @@ import {
   parseDeviceFile,
   planLabel,
   ROLE_LABELS,
-  PROVINCE_CENTERS,
-  PROVINCE_NAMES,
   thresholdLabel,
   timeAgo,
   type IotActuator,
@@ -21,6 +19,7 @@ import {
   type IotCropPreset,
   type IotDevice,
   type IotFarm,
+  type IotIrrigationMode,
   type IotIngestResult,
   type IotMetric,
   type IotPlot,
@@ -33,7 +32,10 @@ import {
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Status } from '../../components/Status'
 import { go, href, useAsync } from '../../hooks'
+import { syncFarmWork } from '../../farmwork'
 import { iotApi, useIotAuth } from '../../iot'
+import { useLedger } from '../../ledger/useLedger'
+import { FarmLocation, type FarmPlace } from './FarmLocation'
 
 /**
  * Thêm / sửa trên web (giống app): trang trại, lô, thiết bị đo, ngưỡng (+ gợi ý theo cây), máy bơm / quạt (+ khóa an toàn),
@@ -111,36 +113,18 @@ export function FarmForm({ id }: { id: number | null }) {
 
 function FarmFormInner({ farm }: { farm?: IotFarm }) {
   const [name, setName] = useState(farm?.name ?? '')
-  const [province, setProvince] = useState(farm?.province ?? '')
-  const [point, setPoint] = useState<{ lat: number; lng: number } | null>(farm?.lat != null && farm?.lng != null ? { lat: farm.lat, lng: farm.lng } : null)
+  const [location, setLocation] = useState<FarmPlace>({ province: farm?.province ?? '', point: farm?.lat != null && farm?.lng != null ? { lat: farm.lat, lng: farm.lng } : null })
   const [rainAlerts, setRainAlerts] = useState(farm?.rain_alerts ?? true)
   const [dryDays, setDryDays] = useState<number>(farm?.dry_alert_days ?? 7)
-  const [gps, setGps] = useState<string | null>(null)
   const [errors, setErrors] = useState(NO_ERRORS)
   const [busy, setBusy] = useState(false)
-
-  const pickProvince = (code: string) => {
-    setProvince(PROVINCE_NAMES[code] ?? '')
-    if (PROVINCE_CENTERS[code]) setPoint({ lat: PROVINCE_CENTERS[code][0], lng: PROVINCE_CENTERS[code][1] })
-  }
-
-  const locate = () => {
-    if (!navigator.geolocation) return setGps('Trình duyệt không lấy được vị trí. Hãy chọn tỉnh.')
-    setGps('Đang lấy vị trí…')
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        setPoint({ lat: Math.round(p.coords.latitude * 1e4) / 1e4, lng: Math.round(p.coords.longitude * 1e4) / 1e4 })
-        setGps('Đã lấy vị trí hiện tại (nên đứng tại trang trại khi bấm).')
-      },
-      () => setGps('Không lấy được vị trí. Hãy chọn tỉnh.'),
-    )
-  }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setBusy(true)
     setErrors(NO_ERRORS)
     try {
+      const { province, point } = location
       const input = { name: name.trim(), province: province || null, lat: point?.lat ?? null, lng: point?.lng ?? null, rain_alerts: rainAlerts, dry_alert_days: dryDays }
       if (farm) await iotApi.updateFarm(farm.id, input)
       else await iotApi.createFarm(input)
@@ -152,8 +136,6 @@ function FarmFormInner({ farm }: { farm?: IotFarm }) {
     }
   }
 
-  const provinceCode = Object.entries(PROVINCE_NAMES).find(([, n]) => n === province)?.[0] ?? ''
-
   return (
     <section>
       <Back to="cam-bien" label="Cảm biến" />
@@ -162,23 +144,7 @@ function FarmFormInner({ farm }: { farm?: IotFarm }) {
         <Field label="Tên trang trại" error={errors.fields.name}>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Vườn sầu riêng nhà ông Ba" required />
         </Field>
-        <Field label="Tỉnh (để xem dự báo thời tiết)">
-          <select value={provinceCode} onChange={(e) => pickProvince(e.target.value)}>
-            <option value="">— Chọn tỉnh —</option>
-            {Object.entries(PROVINCE_NAMES)
-              .sort((a, b) => a[1].localeCompare(b[1], 'vi'))
-              .map(([code, n]) => (
-                <option key={code} value={code}>
-                  {n}
-                </option>
-              ))}
-          </select>
-        </Field>
-        <p className="small muted">{point ? `Tọa độ: ${point.lat}, ${point.lng}` : 'Chưa có tọa độ'}</p>
-        <button type="button" onClick={locate}>
-          📡 Dùng vị trí hiện tại
-        </button>
-        {gps && <p className="small muted">{gps}</p>}
+        <FarmLocation value={location} onChange={setLocation} />
         <fieldset>
           <legend>🌧️ Báo khi trời bắt đầu mưa tại vườn</legend>
           <Choices value={rainAlerts} options={[{ value: true, label: 'Có' }, { value: false, label: 'Không' }]} onChange={setRainAlerts} />
@@ -225,6 +191,10 @@ function PlotFormInner({ plot, farmId }: { plot?: IotPlot; farmId: number }) {
   const [type, setType] = useState<IotPlotType>(plot?.type ?? 'garden')
   const [crop, setCrop] = useState(plot?.crop ?? '')
   const [area, setArea] = useState(plot?.area_m2 ? String(plot.area_m2) : '')
+  const [gardenId, setGardenId] = useState<string | null>(plot?.ledger_garden_id ?? null)
+  const ledger = useLedger()
+  // Sổ thu chi trên máy này (chỉ chủ trang trại mới vào được trang này)
+  const gardens = ledger.ledger && ledger.data.meta.storage_mode ? ledger.data.gardens : null
   const [errors, setErrors] = useState(NO_ERRORS)
   const [busy, setBusy] = useState(false)
 
@@ -233,8 +203,17 @@ function PlotFormInner({ plot, farmId }: { plot?: IotPlot; farmId: number }) {
     setBusy(true)
     setErrors(NO_ERRORS)
     try {
-      const input = { name: name.trim(), type, crop: crop.trim() || null, area_m2: Number(area.replace(/\D/g, '')) || null }
+      const garden = gardens?.find((g) => g.id === gardenId)
+      const input = {
+        name: name.trim(),
+        type,
+        crop: crop.trim() || null,
+        area_m2: Number(area.replace(/\D/g, '')) || null,
+        // Sổ chưa mở được thì giữ nguyên vườn đã nối
+        ...(gardens ? { ledger_garden_id: gardenId, ledger_garden_name: gardenId ? (garden?.name ?? plot?.ledger_garden_name ?? null) : null } : {}),
+      }
       const saved = plot ? await iotApi.updatePlot(plot.id, input) : await iotApi.createPlot(farmId, input)
+      if (gardens && gardenId !== (plot?.ledger_garden_id ?? null)) void syncFarmWork(true)
       go(`cam-bien/lo/${saved.id}`)
     } catch (err) {
       setErrors(toErrors(err))
@@ -261,6 +240,29 @@ function PlotFormInner({ plot, farmId }: { plot?: IotPlot; farmId: number }) {
         <Field label="Diện tích (m²)" error={errors.fields.area_m2}>
           <input inputMode="numeric" value={area} onChange={(e) => setArea(e.target.value)} />
         </Field>
+        {gardens ? (
+          <Field
+            label="📒 Vườn trong Sổ thu chi"
+            error={errors.fields.ledger_garden_id}
+            hint="Nối thì nhật ký phun thuốc, bón phân, tưới ghi ở lô và trong sổ dùng chung (tự chép qua lại)."
+          >
+            <select value={gardenId ?? ''} onChange={(e) => setGardenId(e.target.value || null)}>
+              <option value="">— Không nối —</option>
+              {gardens.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                  {g.crop ? ` · ${g.crop}` : ''}
+                </option>
+              ))}
+              {gardenId && !gardens.some((g) => g.id === gardenId) && <option value={gardenId}>{plot?.ledger_garden_name ?? 'Vườn'} (không có trong sổ trên máy này)</option>}
+            </select>
+          </Field>
+        ) : (
+          <p className="small muted">
+            📒 {plot?.ledger_garden_name ? `Đang nối với vườn “${plot.ledger_garden_name}” trong Sổ thu chi. ` : ''}Muốn nối lô với vườn trong Sổ thu chi (nhật ký dùng chung): mở{' '}
+            <a href={href('so')}>Sổ thu chi</a> trên trình duyệt này trước.
+          </p>
+        )}
         <Message errors={errors} />
         <button className="button primary" disabled={busy}>
           {busy ? 'Đang lưu…' : 'Lưu'}
@@ -586,6 +588,12 @@ const ACTUATOR_KINDS: { value: IotActuatorKind; label: string }[] = [
   { value: 'other', label: '🔌 Khác' },
 ]
 
+const IRRIGATION_MODES: { value: IotIrrigationMode | null; label: string }[] = [
+  { value: 'root', label: '💧 Tưới gốc / nhỏ giọt' },
+  { value: 'canopy', label: '🌧️ Phun mưa trên tán' },
+  { value: null, label: 'Chưa rõ' },
+]
+
 const BLOCK_METRICS = [
   { value: 'salinity', label: 'Độ mặn (‰)' },
   { value: 'water_ec', label: 'EC nước (µS/cm)' },
@@ -606,6 +614,8 @@ function ActuatorFormInner({ actuator, plotId, controllers, sensors }: { actuato
   const [deviceId, setDeviceId] = useState<number | null>(actuator?.device_id ?? controllers.find((d) => d.plot_id === plotId)?.id ?? controllers[0]?.id ?? null)
   const [name, setName] = useState(actuator?.name ?? '')
   const [kind, setKind] = useState<IotActuatorKind>(actuator?.kind ?? 'pump')
+  const [irrigation, setIrrigation] = useState<IotIrrigationMode | null>(actuator?.irrigation_mode ?? null)
+  const waters = kind === 'pump' || kind === 'valve' || kind === 'mister'
   const [channel, setChannel] = useState(String(actuator?.channel ?? 1))
   const [maxMinutes, setMaxMinutes] = useState(String(actuator?.max_minutes ?? 60))
   const [blockDeviceId, setBlockDeviceId] = useState<number | null>(actuator?.block?.device_id ?? null)
@@ -626,6 +636,7 @@ function ActuatorFormInner({ actuator, plotId, controllers, sensors }: { actuato
       const input = {
         name: name.trim(),
         kind,
+        irrigation_mode: waters ? irrigation : null,
         channel: Number(channel) || 0,
         plot_id: actuator?.plot_id ?? plotId,
         max_minutes: Number(maxMinutes) || 60,
@@ -665,6 +676,17 @@ function ActuatorFormInner({ actuator, plotId, controllers, sensors }: { actuato
           <legend>Loại</legend>
           <Choices value={kind} options={ACTUATOR_KINDS} onChange={setKind} />
         </fieldset>
+        {waters && (
+          <fieldset>
+            <legend>Kiểu tưới</legend>
+            <Choices value={irrigation} options={IRRIGATION_MODES} onChange={setIrrigation} />
+            <span className="small muted">
+              {kind === 'mister'
+                ? 'Phun sương được tính là tưới trên tán.'
+                : 'Tưới trên tán (ướt lá) thì app tự tạm dừng sau khi phun thuốc, cho thuốc kịp khô.'}
+            </span>
+          </fieldset>
+        )}
         {!actuator && (
           <fieldset>
             <legend>Mạch điều khiển (relay)</legend>
@@ -1078,7 +1100,7 @@ export function UploadPage() {
 // ---------- Gói đang dùng ----------
 
 export function PlanCard() {
-  const [me, reload] = useAsync(() => iotApi.me(), [])
+  const [me] = useAsync(() => iotApi.me(), [])
   if (me.status !== 'ok') return null
   const plan = me.data.plan
   return (
@@ -1086,23 +1108,9 @@ export function PlanCard() {
       <b>⭐ {planLabel(plan)}</b>
       <p className="small muted">
         {plan.linked
-          ? `Đã nối tài khoản Nhà Nông ${plan.phone ?? ''}: dùng chung gói trả phí.`
+          ? 'Dùng chung gói trả phí với tài khoản Nhà Nông.'
           : 'Đăng nhập tài khoản Nhà Nông (mục 👤 Tài khoản) trên trình duyệt này để dùng chung gói (xem lượng mưa 1 năm).'}
       </p>
-      {plan.linked && (
-        <button
-          type="button"
-          className="linklike"
-          style={{ color: 'var(--error)' }}
-          onClick={async () => {
-            if (!window.confirm('Bỏ nối tài khoản Nhà Nông? Tài khoản cảm biến sẽ về gói miễn phí.')) return
-            await iotApi.unlinkNhanong().catch(() => {})
-            reload()
-          }}
-        >
-          Bỏ nối tài khoản
-        </button>
-      )}
     </div>
   )
 }
@@ -1147,7 +1155,7 @@ export function MembersPage({ farmId, farmName }: { farmId: number; farmName: st
       <p className="muted">Người được chia sẻ xem được số đo, thời tiết, lượng mưa và cũng nhận thông báo của trang trại. Chỉ chủ trang trại được thêm / sửa / xóa.</p>
       {members.data.map((m) => (
         <div key={m.user_id} className="card">
-          <b>{m.name}</b> <span className="small muted">· {m.email}</span>
+          <b>{m.name}</b> <span className="small muted">· {m.phone ?? m.email}</span>
           <br />
           {isOwner && m.id !== null ? (
             <>
@@ -1171,8 +1179,12 @@ export function MembersPage({ farmId, farmName }: { farmId: number; farmName: st
       {isOwner && (
         <form className="form card" onSubmit={invite}>
           <b>＋ Chia sẻ cho người khác</b>
-          <Field label="Email tài khoản cảm biến của người đó" error={errors.fields.email} hint="Người đó cần đăng ký tài khoản cảm biến trước (app Nhà Nông › 📡 Cảm biến).">
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Field
+            label="Số điện thoại tài khoản Nhà Nông của người đó"
+            error={errors.fields.phone ?? errors.fields.email}
+            hint="Người đó cần đăng nhập Nhà Nông và mở mục 📡 Cảm biến 1 lần. Tài khoản cảm biến cũ thì nhập email."
+          >
+            <input inputMode="tel" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="VD 0912 345 678" required />
           </Field>
           <fieldset>
             <legend>Quyền</legend>

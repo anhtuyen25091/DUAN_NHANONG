@@ -1,4 +1,4 @@
-import { formatDecimal, isController, parseDecimalInput, type IotActuator, type IotActuatorKind, type IotDevice } from '@nhanong/shared';
+import { formatDecimal, isController, parseDecimalInput, type IotActuator, type IotActuatorKind, type IotDevice, type IotIrrigationMode } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView } from 'react-native';
@@ -32,6 +32,9 @@ export default function IotActuatorFormScreen() {
   return <ActuatorForm actuator={actuator} controllers={controllers} sensors={devices.filter((d) => d.farm_id === farmId)} plotId={plot ? Number(plot) : null} />;
 }
 
+/** Máy tưới: hỏi kiểu tưới (gốc / trên tán) */
+const WATERING: IotActuatorKind[] = ['pump', 'valve', 'mister'];
+
 /** Chỉ số hay dùng làm khóa an toàn của máy bơm */
 const BLOCK_METRICS = [
   { code: 'salinity', label: 'Độ mặn (‰)' },
@@ -43,6 +46,7 @@ function ActuatorForm({ actuator, controllers, sensors, plotId }: { actuator?: I
   const [deviceId, setDeviceId] = useState<number | null>(actuator?.device_id ?? controllers[0]?.id ?? null);
   const [name, setName] = useState(actuator?.name ?? '');
   const [kind, setKind] = useState<IotActuatorKind>(actuator?.kind ?? 'pump');
+  const [irrigation, setIrrigation] = useState<IotIrrigationMode | null>(actuator?.irrigation_mode ?? null);
   const [channel, setChannel] = useState(String(actuator?.channel ?? 1));
   const [maxMinutes, setMaxMinutes] = useState(String(actuator?.max_minutes ?? 60));
   const [blockDeviceId, setBlockDeviceId] = useState<number | null>(actuator?.block?.device_id ?? null);
@@ -62,6 +66,7 @@ function ActuatorForm({ actuator, controllers, sensors, plotId }: { actuator?: I
       const input = {
         name: name.trim(),
         kind,
+        irrigation_mode: WATERING.includes(kind) ? irrigation : null,
         channel: Number(channel) || 0,
         plot_id: actuator?.plot_id ?? plotId,
         max_minutes: Number(maxMinutes) || 60,
@@ -105,6 +110,18 @@ function ActuatorForm({ actuator, controllers, sensors, plotId }: { actuator?: I
           <Chip key={k.value} small label={k.label} active={kind === k.value} onPress={() => setKind(k.value)} />
         ))}
       </FormSection>
+      {WATERING.includes(kind) && (
+        <>
+          <FormSection label="Kiểu tưới" error={errors.fields.irrigation_mode}>
+            <Chip small label="💧 Tưới gốc / nhỏ giọt" active={irrigation === 'root'} onPress={() => setIrrigation('root')} />
+            <Chip small label="🌧️ Phun mưa trên tán" active={irrigation === 'canopy'} onPress={() => setIrrigation('canopy')} />
+            <Chip small label="Chưa rõ" active={irrigation === null} onPress={() => setIrrigation(null)} />
+          </FormSection>
+          <Text style={[styles.muted, { marginTop: -6, marginBottom: 12 }]}>
+            {kind === 'mister' ? 'Phun sương được tính là tưới trên tán. ' : ''}Tưới trên tán tự tạm dừng sau khi phun thuốc (chờ thuốc khô), bật tay thì app hỏi lại.
+          </Text>
+        </>
+      )}
       {!actuator && (
         <FormSection label="Mạch điều khiển (relay)">
           {controllers.map((d) => (

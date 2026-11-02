@@ -50,7 +50,7 @@ export default function IotMembersScreen() {
       {list.map((m) => (
         <Card key={m.user_id}>
           <Text style={[styles.body, { fontWeight: '700' }]}>{m.name}</Text>
-          <Text style={[styles.muted, { marginBottom: 6 }]}>{m.email}</Text>
+          <Text style={[styles.muted, { marginBottom: 6 }]}>{m.phone ?? m.email}</Text>
           {isOwner && m.id !== null ? (
             <>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
@@ -80,12 +80,12 @@ export default function IotMembersScreen() {
         <Card>
           <Text style={[styles.body, { fontWeight: '700', marginBottom: 8 }]}>＋ Chia sẻ cho người khác</Text>
           <FormInput
-            label="Email tài khoản cảm biến của người đó"
+            label="Số điện thoại tài khoản Nhà Nông của người đó"
             value={email}
             onChange={setEmail}
-            error={errors.fields.email}
-            hint="Người đó cần tạo tài khoản cảm biến trước (app Nhà Nông › 📡 Cảm biến)."
-            keyboardType="email-address"
+            error={errors.fields.phone ?? errors.fields.email}
+            hint="Người đó cần đăng nhập Nhà Nông và mở mục 📡 Cảm biến 1 lần. Tài khoản cảm biến cũ thì nhập email."
+            keyboardType="default"
             autoCapitalize="none"
           />
           <FormSection label="Quyền">

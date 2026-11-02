@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\IngestController;
 use App\Http\Controllers\Api\V1\LoRaWanController;
 use App\Http\Controllers\Api\V1\MetricController;
 use App\Http\Controllers\Api\V1\PlotController;
+use App\Http\Controllers\Api\V1\PlotEventController;
 use App\Http\Controllers\Api\V1\PushTokenController;
 use App\Http\Controllers\Api\V1\ReadingController;
 use App\Http\Controllers\Api\V1\RuleController;
@@ -38,20 +39,22 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     });
 
     // Không có Internet ở ruộng: điện thoại / SMS / LoRaWAN chuyển dữ liệu lên (xác thực bằng chữ ký hoặc mã bí mật)
-    Route::post('/ingest/upload', [IngestController::class, 'upload'])->middleware('throttle:30,1')->name('ingest.upload');
-    Route::post('/sms/inbound', [IngestController::class, 'sms'])->middleware('throttle:120,1')->name('sms.inbound');
-    Route::post('/lorawan/chirpstack', [LoRaWanController::class, 'chirpstack'])->middleware('throttle:600,1')->name('lorawan.chirpstack');
-    Route::post('/lorawan/ttn', [LoRaWanController::class, 'ttn'])->middleware('throttle:600,1')->name('lorawan.ttn');
+    Route::post('/ingest/upload', [IngestController::class, 'upload'])->middleware('throttle:30,1,ingest.upload')->name('ingest.upload');
+    Route::post('/sms/inbound', [IngestController::class, 'sms'])->middleware('throttle:120,1,sms.inbound')->name('sms.inbound');
+    Route::post('/lorawan/chirpstack', [LoRaWanController::class, 'chirpstack'])->middleware('throttle:600,1,lorawan.chirpstack')->name('lorawan.chirpstack');
+    Route::post('/lorawan/ttn', [LoRaWanController::class, 'ttn'])->middleware('throttle:600,1,lorawan.ttn')->name('lorawan.ttn');
 
-    Route::middleware('throttle:10,1')->group(function () {
+    Route::middleware('throttle:10,1,auth-guest')->group(function () {
         Route::post('/auth/register', [AuthController::class, 'register'])->name('auth.register');
         Route::post('/auth/login', [AuthController::class, 'login'])->name('auth.login');
     });
+    // Web / app tự gọi khi mở mục Cảm biến (đã đăng nhập Nhà Nông)
+    Route::post('/auth/nhanong', [AuthController::class, 'nhanong'])->middleware('throttle:30,1,auth.nhanong')->name('auth.nhanong');
 
-    Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
+    Route::middleware(['auth:sanctum', 'throttle:120,1,user'])->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
         Route::get('/me', [AuthController::class, 'me'])->name('me');
-        Route::put('/me/nhanong', [AuthController::class, 'linkNhanong'])->middleware('throttle:20,1')->name('nhanong.link');
+        Route::put('/me/nhanong', [AuthController::class, 'linkNhanong'])->middleware('throttle:20,1,nhanong.link')->name('nhanong.link');
         Route::delete('/me/nhanong', [AuthController::class, 'unlinkNhanong'])->name('nhanong.unlink');
         Route::put('/me/push-token', [PushTokenController::class, 'store'])->name('push-token.store');
         Route::delete('/me/push-token', [PushTokenController::class, 'destroy'])->name('push-token.destroy');
@@ -60,10 +63,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/farms', [FarmController::class, 'store'])->name('farms.store');
         Route::put('/farms/{farm}', [FarmController::class, 'update'])->name('farms.update');
         Route::delete('/farms/{farm}', [FarmController::class, 'destroy'])->name('farms.destroy');
-        Route::get('/farms/{farm}/weather', [FarmController::class, 'weather'])->middleware('throttle:30,1')->name('farms.weather');
+        Route::get('/farms/{farm}/weather', [FarmController::class, 'weather'])->middleware('throttle:30,1,farms.weather')->name('farms.weather');
         Route::get('/farms/{farm}/rainfall', [FarmController::class, 'rainfall'])->name('farms.rainfall');
         Route::get('/farms/{farm}/members', [FarmMemberController::class, 'index'])->name('farm-members.index');
-        Route::post('/farms/{farm}/members', [FarmMemberController::class, 'store'])->middleware('throttle:20,1')->name('farm-members.store');
+        Route::post('/farms/{farm}/members', [FarmMemberController::class, 'store'])->middleware('throttle:20,1,farm-members.store')->name('farm-members.store');
         Route::put('/farm-members/{member}', [FarmMemberController::class, 'update'])->name('farm-members.update');
         Route::delete('/farm-members/{member}', [FarmMemberController::class, 'destroy'])->name('farm-members.destroy');
 
@@ -71,7 +74,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::put('/plots/{plot}', [PlotController::class, 'update'])->name('plots.update');
         Route::delete('/plots/{plot}', [PlotController::class, 'destroy'])->name('plots.destroy');
         Route::get('/plots/{plot}/summary', [PlotController::class, 'summary'])->name('plots.summary');
-        Route::get('/plots/{plot}/export', [ExportController::class, 'plot'])->middleware('throttle:10,1')->name('plots.export');
+        Route::get('/plots/{plot}/export', [ExportController::class, 'plot'])->middleware('throttle:10,1,plots.export')->name('plots.export');
+
+        // Việc làm vườn: phun thuốc, bón phân, tưới... (đồng bộ với Nhật ký canh tác của Sổ thu chi)
+        Route::get('/plots/{plot}/events', [PlotEventController::class, 'index'])->name('plot-events.index');
+        Route::post('/plots/{plot}/events', [PlotEventController::class, 'store'])->name('plot-events.store');
+        Route::put('/plot-events/{event}', [PlotEventController::class, 'update'])->name('plot-events.update');
+        Route::delete('/plot-events/{event}', [PlotEventController::class, 'destroy'])->name('plot-events.destroy');
+        Route::get('/plots/{plot}/work-advice', [PlotEventController::class, 'advice'])->middleware('throttle:30,1,plot-events.advice')->name('plot-events.advice');
 
         Route::get('/plots/{plot}/thresholds', [ThresholdController::class, 'index'])->name('thresholds.index');
         Route::post('/plots/{plot}/thresholds', [ThresholdController::class, 'store'])->name('thresholds.store');
@@ -91,7 +101,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/devices/{device}/actuators', [ActuatorController::class, 'store'])->name('actuators.store');
         Route::put('/actuators/{actuator}', [ActuatorController::class, 'update'])->name('actuators.update');
         Route::delete('/actuators/{actuator}', [ActuatorController::class, 'destroy'])->name('actuators.destroy');
-        Route::post('/actuators/{actuator}/command', [ActuatorController::class, 'command'])->middleware('throttle:30,1')->name('actuators.command');
+        Route::post('/actuators/{actuator}/command', [ActuatorController::class, 'command'])->middleware('throttle:30,1,actuators.command')->name('actuators.command');
         Route::get('/actuators/{actuator}/commands', [ActuatorController::class, 'history'])->name('actuators.history');
 
         Route::get('/plots/{plot}/schedules', [ScheduleController::class, 'index'])->name('schedules.index');

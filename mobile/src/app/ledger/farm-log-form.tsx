@@ -5,6 +5,7 @@ import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { Text } from '../../components/AppText';
 import { DateField, ErrorNote, Field, GardenPicker, QtyField, TextField } from '../../components/fields';
 import { Button, Chip, styles } from '../../components/ui';
+import { syncFarmWork } from '../../lib/farmwork';
 import { useLedger } from '../../lib/ledger';
 import { parseQty, qtyText } from '../../lib/qty';
 import { colors } from '../../lib/theme';
@@ -57,6 +58,8 @@ function FarmLogForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot })
     try {
       if (log) await ledger.updateFarmLog(log.id, input);
       else await ledger.addFarmLog(input);
+      // Vườn nối với lô cảm biến: gửi lên lô (cấm vào lô, tạm dừng tưới trên tán…)
+      void syncFarmWork(true);
       showToast({ message: log ? 'Đã lưu' : `Đã ghi vào nhật ký${chosen && parseQty(qty) ? ` · trừ kho ${qty} ${chosen.supply.unit}` : ''}` });
       router.back();
     } catch (err) {
@@ -67,6 +70,7 @@ function FarmLogForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot })
   const remove = async () => {
     if (!log) return;
     const undo = await ledger.removeFarmLog(log.id);
+    void syncFarmWork(true);
     showToast({ message: log.supply_usage_id ? 'Đã xóa, vật tư đã trả về kho' : 'Đã xóa', undo });
     router.back();
   };

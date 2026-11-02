@@ -11,6 +11,79 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 02/11/2026 (tiếp 3): Việc làm vườn (phun thuốc, bón phân, tưới) dùng chung giữa Sổ thu chi và cảm biến; sửa giới hạn số lần gọi API
+
+**Đã làm**
+- **Máy chủ cảm biến** (bảng `plot_events`, `App\Services\FarmWork`):
+  - ghi việc trên lô: phun thuốc (cách ly thu hoạch, không vào lô, chờ thuốc khô), bón phân, tưới, tỉa cành, việc khác; chủ + người được bật / tắt máy ghi được; kế hoạch (`planned`) nhắc 6:00 hôm đó
+  - phun thuốc: báo mọi người của trang trại "không vào lô tới…, thu hoạch từ…"; **tạm dừng máy tưới trên tán** tới khi thuốc khô (luật / lịch tưới bỏ lượt, bật tay phải xác nhận)
+  - máy bơm có "kiểu tưới": tưới gốc / phun trên tán / chưa rõ (phun sương tính là trên tán); chưa rõ thì không tự dừng, app nhắc khai báo
+  - bón phân: 3 ngày sau đó cảnh báo EC / đạm / lân / kali ghi "có thể do vừa bón…", không báo đẩy
+  - máy bơm / van / phun sương chạy xong **tự ghi nhật ký tưới**
+  - **kiểm tra trước khi phun / bón**: mưa trong số giờ thuốc cần khô (48 giờ với phân), gió (trạm đo ở vườn hoặc dự báo), nắng nóng, đất khô; gợi ý giờ phù hợp gần nhất (ban ngày). Mức gió / nhiệt / mưa ở `config/iot.php` › `farm_work`, chỉ là gợi ý chung, nhãn thuốc được ưu tiên
+  - danh sách trang trại + trang lô có `work` (đang cấm vào / cách ly / tạm dừng tưới / vừa bón)
+- **Đồng bộ với Sổ thu chi** (`packages/shared/src/farmwork.ts`): chủ nối lô với 1 vườn trong sổ (1 vườn nhiều lô được); việc trên lô (kể cả người làm công ghi, máy bơm tự ghi) ↔ Nhật ký canh tác cùng id, 2 chiều, cả sửa / xóa. Kế hoạch chỉ vào sổ khi đã làm.
+- **Web + app**: banner trên trang lô, huy hiệu trên danh sách trang trại, mục "🧑‍🌾 Việc làm vườn" (ghi / sửa / xóa / "Đã làm"), form ghi việc có ô "Kiểm tra trước khi làm", mốc việc trên biểu đồ số đo, chọn vườn trong sổ ở "Sửa lô", "Kiểu tưới" ở form máy bơm, hỏi "Vẫn bật?" khi bật máy tưới trên tán lúc thuốc chưa khô, ghi chú trên cảnh báo, cảnh báo cách ly ở form đợt cắt (web).
+- **Sửa lỗi "Too Many Attempts."** (backend + cảm biến): các giới hạn số lần gọi dạng số dùng chung 1 bộ đếm theo tài khoản (VD đã gọi 30 lần bất kỳ thì nút bật máy / kiểm tra thời tiết bị chặn). Đặt tên riêng cho từng giới hạn; có test tái hiện lỗi cũ.
+- Sửa lỗi giờ gửi dạng UTC bị lưu lệch 7 tiếng.
+
+**Kiểm tra**
+- backend 229/229, cảm biến 104/104 (thêm `FarmWorkTest`), thư viện chung 149/149 (thêm `farmwork.test.ts`), web build + lint sạch, app typecheck sạch, Metro build bản Android được.
+- Chạy thật bằng Chrome tự động trên web và bản web của app (tài khoản 0900000001): tạo trang trại + lô, nối vườn, phun thuốc → banner + huy hiệu, nhật ký vào sổ; ghi bón phân trong sổ → hiện trên lô; kế hoạch → "Đã làm"; bật máy tưới trên tán → hỏi "Vẫn bật?". Dữ liệu thử đã xóa.
+
+**Còn tồn**
+- Chưa thử trên điện thoại thật (hộp thoại Alert, emoji trên biểu đồ Android, thông báo nhắc 6:00).
+- Xóa nhật ký rồi bấm "Hoàn tác" sau khi việc đã bị xóa trên lô thì lần đồng bộ sau xóa lại.
+- Chờ trả lời 2 câu hỏi: 1 lô ↔ 1 vườn hay nhiều lô chung vườn (đã hỗ trợ cả 2); máy bơm của khách hay tưới gốc hay trên tán (cần khai báo từng máy).
+
+---
+
+## 02/11/2026 (tiếp 2): Chọn vị trí trang trại khi không đứng tại vườn
+
+Lý do: tài khoản hay do con cái quản lý giúp cha mẹ, không ở vườn để bấm "Dùng vị trí hiện tại".
+
+**Đã làm** (form thêm / sửa trang trại, web `pages/iot/FarmLocation.tsx` + app `components/FarmLocation.tsx`)
+- Tìm xã / phường / thôn (API `/places` có sẵn của backend, Photon), chọn xong tự điền tỉnh và bay bản đồ tới đó.
+- Dán vị trí cha mẹ gửi qua Zalo: link Google Maps (`@lat,lng`, `?q=`, `!3d…!4d…`), link Apple Maps, hoặc tọa độ (cả dấu phẩy thập phân). Hàm chung `parseCoordinates` (`packages/shared/src/map.ts`, có test), chỉ nhận điểm trong Việt Nam. Link rút gọn `maps.app.goo.gl` không có tọa độ: hiện hướng dẫn mở link rồi chép lại.
+- Bản đồ nhỏ: bấm hoặc kéo 📍 để chỉnh đúng chỗ vườn. Web dùng Leaflet (tách `createVietnamMap` sang `web/src/vietnamMap.ts`, dùng chung với bản đồ điểm bán, vẫn có nhãn Hoàng Sa / Trường Sa); app dùng trang bản đồ WebView có sẵn thêm chế độ chọn vị trí (`mapHtml({ pin })`, báo `{action: 'pick'}`).
+- Tỉnh tự đổi theo vị trí khi dời sang vùng khác; chọn tỉnh khác thì về trung tâm tỉnh đó.
+- Vẫn giữ "Dùng vị trí hiện tại (khi đang ở vườn)".
+
+**Kiểm tra**
+- Thư viện chung 145/145 (thêm 3 test đọc tọa độ), web build + lint sạch, app typecheck sạch, Metro build bản Android được.
+- Chrome tự động trên web: tìm "Cư Bao" → ra Phường Cư Bao, Đắk Lắk, tự điền tỉnh; bấm bản đồ dời ghim; dán link Google Maps ở Cần Thơ → tỉnh đổi sang Cần Thơ; link rút gọn hiện hướng dẫn; lưu được (đã xóa trang trại thử).
+- Trang bản đồ của app thử trên Chrome (giả lập WebView): có ghim lúc mở, bấm gửi tọa độ về app, dời ghim từ app thì bay tới.
+
+**Còn tồn**
+- Chưa thử trên điện thoại thật (bản đồ trong WebView nằm trong trang cuộn).
+- Tìm địa danh chỉ tới mức xã / thôn (Photon không có số nhà ở nông thôn); nền bản đồ không có ảnh vệ tinh nên khó nhận ra đúng mảnh vườn. Có thể thêm lớp ảnh vệ tinh (Esri World Imagery, cùng điều kiện giấy phép như nền hiện tại).
+
+---
+
+## 02/11/2026 (tiếp): Mục Cảm biến dùng chung tài khoản Nhà Nông
+
+**Đã làm**
+- Đăng nhập Nhà Nông (web / app) là vào được mục 📡 Cảm biến, không cần tài khoản email riêng:
+  - API mới `POST /auth/nhanong`: gửi token Nhà Nông, máy chủ cảm biến hỏi backend rồi trả token cảm biến; lần đầu tự tạo tài khoản cảm biến (không email, tên + SĐT theo Nhà Nông)
+  - tài khoản email cũ đã nối với Nhà Nông thì vào đúng tài khoản đó, giữ trang trại
+  - đang dùng tài khoản email chưa nối mà đăng nhập Nhà Nông: tự nối (tài khoản Nhà Nông đã nối chỗ khác thì theo tài khoản Nhà Nông)
+  - đăng xuất / đổi tài khoản Nhà Nông thì mục Cảm biến đổi theo; bỏ nút "Đăng xuất tài khoản cảm biến" và "Bỏ nối tài khoản"
+  - chưa đăng nhập Nhà Nông: màn Cảm biến có nút "Đăng nhập / đăng ký Nhà Nông"; tài khoản email cũ (admin…) vẫn đăng nhập được ở mục thu gọn bên dưới
+- Chia sẻ trang trại: mời bằng SĐT tài khoản Nhà Nông (vẫn nhận email cho tài khoản cũ). Người được mời phải mở mục Cảm biến 1 lần.
+- `users.email` cho phép trống (migration mới); trang quản trị IoT hiện SĐT khi không có email.
+
+**Kiểm tra**
+- iot 94/94 (thêm `NhanongSignInTest`: tạo / dùng lại tài khoản, tài khoản email cũ giữ trang trại + gói, token hết hạn / backend tắt, mời bằng SĐT); thư viện chung 142/142; web build + app typecheck sạch.
+- Chạy thật trên máy dev qua Chrome tự động:
+  - web: chưa đăng nhập thì thấy nút đăng nhập Nhà Nông; đăng nhập `0900000002` thì vào thẳng Cảm biến, thẻ gói đúng (có gói tới 15/10/2027); đăng xuất Nhà Nông thì thoát luôn
+  - app (bản web của Expo): đăng nhập `0900000001` thì vào thẳng Cảm biến
+
+**Còn tồn**
+- Chưa thử trên điện thoại thật.
+- Người chưa từng mở mục Cảm biến thì chưa mời được (máy chủ cảm biến chưa biết SĐT); muốn mời trước cần backend cho tra SĐT.
+
+---
+
 ## 02/11/2026: Gửi lệnh qua MQTT, người dùng chung xem lịch tưới / luật / ngưỡng, app màu tối + phông Be Vietnam Pro, OCR PDF bản scan, Android cho HTTP tới thiết bị
 
 **Đã làm**

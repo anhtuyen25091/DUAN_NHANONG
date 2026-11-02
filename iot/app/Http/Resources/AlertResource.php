@@ -26,6 +26,7 @@ class AlertResource extends JsonResource
             'max' => $threshold->max,
             'measured_at' => $this->measured_at->toIso8601String(),
             'resolved_at' => $this->resolved_at?->toIso8601String(),
+            'note' => $this->note,
         ];
     }
 }

@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * Khóa an toàn (block_*): số đo `block_metric` của cảm biến `block_device` (VD độ mặn nguồn nước) vượt `block_value`
  * thì không cho bật, đang chạy thì tự tắt (App\Services\Control\InterlockGuard).
  */
-#[Fillable(['device_id', 'plot_id', 'name', 'kind', 'channel', 'max_minutes', 'block_device_id', 'block_metric_id', 'block_operator', 'block_value'])]
+#[Fillable(['device_id', 'plot_id', 'name', 'kind', 'irrigation_mode', 'channel', 'max_minutes', 'block_device_id', 'block_metric_id', 'block_operator', 'block_value'])]
 class Actuator extends Model
 {
     /**
@@ -49,6 +49,18 @@ class Actuator extends Model
     public function plot(): BelongsTo
     {
         return $this->belongsTo(Plot::class);
+    }
+
+    /** Tưới gốc / nhỏ giọt */
+    public const ROOT = 'root';
+
+    /** Phun mưa trên tán: rửa trôi thuốc vừa phun */
+    public const CANOPY = 'canopy';
+
+    /** Tưới lên lá / tán (phun sương mặc định là có): sau khi phun thuốc thì tạm dừng */
+    public function wetsCanopy(): bool
+    {
+        return $this->irrigation_mode === self::CANOPY || ($this->irrigation_mode === null && $this->kind === ActuatorKind::Mister);
     }
 
     public function hasInterlock(): bool

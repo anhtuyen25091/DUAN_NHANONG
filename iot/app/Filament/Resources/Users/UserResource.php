@@ -32,14 +32,15 @@ class UserResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Chủ trang trại';
 
-    protected static ?string $recordTitleAttribute = 'email';
+    protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
                 TextInput::make('name')->label('Tên')->required(),
-                TextInput::make('email')->label('Email')->email()->unique(ignoreRecord: true)->required(),
+                // Tài khoản đăng nhập bằng Nhà Nông (SĐT) không có email
+                TextInput::make('email')->label('Email')->email()->unique(ignoreRecord: true)->required(fn (?User $record): bool => $record?->nhanong_user_id === null),
                 TextInput::make('password')
                     ->label('Mật khẩu')
                     ->password()
@@ -56,7 +57,7 @@ class UserResource extends Resource
         return $table
             ->defaultSort('id', 'desc')
             ->columns([
-                TextColumn::make('name')->label('Tên')->description(fn (User $record): string => $record->email)->searchable(['name', 'email']),
+                TextColumn::make('name')->label('Tên')->description(fn (User $record): string => $record->contactLabel())->searchable(['name', 'email', 'nhanong_phone']),
                 TextColumn::make('farms_count')->label('Trang trại')->counts('farms'),
                 TextColumn::make('nhanong_phone')->label('Tài khoản Nhà Nông')->placeholder('Chưa nối'),
                 IconColumn::make('premium')->label('Có gói')->state(fn (User $record): bool => $record->hasPremium())->boolean(),

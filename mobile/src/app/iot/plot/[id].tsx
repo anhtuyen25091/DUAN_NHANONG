@@ -1,11 +1,13 @@
 import { canControl, canManage, formatIotValue, thresholdLabel, timeAgo, type IotReading } from '@nhanong/shared';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Text } from '../../../components/AppText';
 import { AlertCard, ExportButton, SectionTitle } from '../../../components/iot';
+import { FarmWorkSection, WorkBanners } from '../../../components/farmWork';
 import { ControlSection } from '../../../components/iotControl';
 import { Button, Card, Status, styles } from '../../../components/ui';
+import { useFarmWorkSyncOnFocus } from '../../../lib/farmwork';
 import { iotApi } from '../../../lib/iot';
 import { colors, font } from '../../../lib/theme';
 import { useAsync } from '../../../lib/useAsync';
@@ -14,21 +16,42 @@ import { useAsync } from '../../../lib/useAsync';
 export default function IotPlotScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const summary = useAsync(() => iotApi.plotSummary(Number(id)), [id]);
-  // Quay về từ màn sửa lô / thiết bị / ngưỡng: tải lại
+  const events = useAsync(() => iotApi.plotEvents(Number(id)), [id]);
+  const actuators = useAsync(() => iotApi.actuators(Number(id)), [id]);
+  const refetchWork = useCallback(() => {
+    summary.refetch();
+    events.refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Quay về từ màn sửa lô / thiết bị / ngưỡng / ghi việc: tải lại
+  const focused = useRef(false);
   useFocusEffect(
     useCallback(() => {
+      // Lần đầu đã tải ở trên
+      if (!focused.current) {
+        focused.current = true;
+        return;
+      }
       summary.refetch();
+      events.refetch();
+      actuators.refetch();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
+  // Đồng bộ với Nhật ký canh tác trong Sổ thu chi; có gì mới thì tải lại
+  useFarmWorkSyncOnFocus(refetchWork);
   const data = summary.state.status === 'ok' ? summary.state.data : null;
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16 }} refreshControl={<RefreshControl refreshing={summary.refreshing} onRefresh={summary.reload} />}>
+    <ScrollView contentContainerStyle={{ padding: 16 }} refreshControl={<RefreshControl refreshing={summary.refreshing} onRefresh={() => {
+        summary.reload();
+        events.refetch();
+      }} />}>
       <Stack.Screen options={{ title: data?.plot.name ?? name ?? 'Lô' }} />
       <Status state={summary.state} retry={summary.reload} />
       {data && (
         <>
+          <WorkBanners work={data.plot.work} />
           {data.open_alerts.map((alert) => (
             <AlertCard key={alert.id} alert={alert} canResolve={canControl(data.role)} onResolved={summary.refetch} />
           ))}
@@ -50,6 +73,7 @@ export default function IotPlotScreen() {
                     pathname: '/iot/chart',
                     params: {
                       device: String(reading.device_id),
+                      plot: String(data.plot.id),
                       metric: reading.metric.code,
                       title: reading.metric.name,
                       unit: reading.metric.unit ?? '',
@@ -79,6 +103,14 @@ export default function IotPlotScreen() {
           </View>
           <View style={{ height: 12 }} />
           <ExportButton plotId={data.plot.id} plotName={data.plot.name} />
+
+          <FarmWorkSection
+            plot={data.plot}
+            role={data.role}
+            events={events.state.status === 'ok' ? events.state.data : null}
+            actuators={actuators.state.status === 'ok' ? actuators.state.data : []}
+            onChanged={refetchWork}
+          />
 
           <ControlSection plotId={data.plot.id} plotName={data.plot.name} plotType={data.plot.type} farmId={data.plot.farm_id} role={data.role} />
 

@@ -21,6 +21,7 @@ import { parseQty, qtyText } from '../../ledger/qty'
 import { showToast } from '../../ledger/toast'
 import { CategoryPicker, GardenPicker, MoneyField } from './fields'
 import { DateField } from '../../components/DateField'
+import { WithholdingNotice } from './FarmLogs'
 
 /** #/so/ban: các hợp đồng bán cho lái (đang cắt trước) */
 export function ContractList({ data }: { data: LedgerSnapshot }) {
@@ -488,6 +489,7 @@ export function CutForm({ ledger, data, contractId, id }: { ledger: Ledger; data
       </a>
       <h1>{cut ? 'Sửa đợt cắt' : '✂️ Ghi đợt cắt'}</h1>
       <DateField label="Ngày cắt" value={date} onChange={setDate} max={today()} />
+      <WithholdingNotice data={data} gardenId={summary.contract.garden_id} on={date} />
 
       <fieldset>
         <legend>Hàng cắt đợt này</legend>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\FarmResource;
 use App\Models\Farm;
 use App\Models\Metric;
+use App\Services\FarmWork\PlotWork;
 use App\Services\NhanongPlan;
 use App\Services\Weather\WeatherService;
 use App\Support\Ownership;
@@ -21,11 +22,15 @@ use Throwable;
 
 class FarmController extends Controller
 {
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(Request $request, PlotWork $work): AnonymousResourceCollection
     {
         // Trang trại của mình trước, rồi tới trang trại được chia sẻ
         $farms = Farm::query()->accessibleBy($request->user())->with(['plots', 'user'])->get()
             ->sortBy(fn (Farm $farm) => [$farm->user_id !== $request->user()->id, $farm->name])->values();
+        // Lô đang cấm vào / cách ly thu hoạch: hiện ngay trên danh sách
+        $plots = $farms->flatMap->plots;
+        $statuses = $work->statuses($plots);
+        $plots->each(fn ($plot) => $plot->work_status = $statuses[$plot->id]);
 
         return FarmResource::collection($farms);
     }

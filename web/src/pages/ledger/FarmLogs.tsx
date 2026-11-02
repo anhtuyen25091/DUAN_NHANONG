@@ -14,8 +14,9 @@ import {
   type Ledger,
   type LedgerSnapshot,
 } from '@nhanong/shared'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { DateField } from '../../components/DateField'
+import { syncFarmWork } from '../../farmwork'
 import { go, href } from '../../hooks'
 import { parseQty, qtyText } from '../../ledger/qty'
 import { showToast } from '../../ledger/toast'
@@ -29,6 +30,10 @@ export function WithholdingNotice({ data, gardenId, on = today() }: { data: Ledg
 
 /** Trang vườn: 5 việc gần nhất, lối vào ghi việc / xem cả nhật ký */
 export function FarmLogSection({ data, gardenId }: { data: LedgerSnapshot; gardenId: string }) {
+  // Lấy việc mới ghi trên lô cảm biến đã nối với vườn này
+  useEffect(() => {
+    void syncFarmWork()
+  }, [gardenId])
   const logs = data.farm_logs.filter((l) => l.garden_id === gardenId)
   return (
     <>
@@ -73,6 +78,9 @@ export function FarmLogBook({ data, gardenId }: { data: LedgerSnapshot; gardenId
   const garden = data.gardens.find((g) => g.id === gardenId)
   const [from, setFrom] = useState(`${today().slice(0, 4)}-01-01`)
   const [to, setTo] = useState(today())
+  useEffect(() => {
+    void syncFarmWork()
+  }, [gardenId])
   if (!garden) return <div className="notice">Không tìm thấy vườn này.</div>
   const logs = data.farm_logs.filter((l) => l.garden_id === gardenId && l.date >= from && l.date <= to).sort((a, b) => a.date.localeCompare(b.date))
   const text = farmLogText(garden, data.farm_logs.filter((l) => l.garden_id === gardenId), { from, to })
@@ -171,6 +179,8 @@ export function FarmLogForm({ ledger, data, gardenId, id }: { ledger: Ledger; da
     try {
       if (log) await ledger.updateFarmLog(log.id, input)
       else await ledger.addFarmLog(input)
+      // Vườn nối với lô cảm biến: gửi lên lô (cấm vào lô, tạm dừng tưới trên tán, báo người làm)
+      void syncFarmWork(true)
       showToast({ message: log ? 'Đã lưu' : `Đã ghi vào nhật ký${chosen && parseQty(qty) ? ` · trừ kho ${qty} ${chosen.supply.unit}` : ''}` })
       go(`so/vuon/${garden}`)
     } catch (err) {
@@ -181,6 +191,7 @@ export function FarmLogForm({ ledger, data, gardenId, id }: { ledger: Ledger; da
   const remove = async () => {
     if (!log) return
     const undo = await ledger.removeFarmLog(log.id)
+    void syncFarmWork(true)
     showToast({ message: log.supply_usage_id ? 'Đã xóa, vật tư đã trả về kho' : 'Đã xóa', undo })
     go(back)
   }

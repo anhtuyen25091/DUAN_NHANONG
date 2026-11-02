@@ -105,3 +105,32 @@ export function spreadPoint(lat: number, lng: number, id: number, precision: 'ex
   const dLng = (meters * Math.sin(angle)) / (111_320 * Math.cos((lat * Math.PI) / 180));
   return [lat + dLat, lng + dLng];
 }
+
+/**
+ * Đọc tọa độ từ chữ người dùng dán vào: "12.8395, 108.2572", "12,8395 108,2572",
+ * link Google Maps (…/@12.83,108.25,15z · ?q=12.83,108.25 · ll= · !3d12.83!4d108.25) hay link vị trí Zalo / Apple Maps.
+ * Chỉ nhận điểm trong Việt Nam (kể cả biển đảo); link rút gọn (maps.app.goo.gl) không có tọa độ thì trả null.
+ */
+export function parseCoordinates(text: string): { lat: number; lng: number } | null {
+  const s = text.trim();
+  if (!s) return null;
+  const patterns = [
+    /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/,
+    /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+    /[?&](?:q|query|ll|sll|daddr|destination|center)=(?:loc:)?(-?\d+(?:\.\d+)?)(?:,|%2C)\s*(-?\d+(?:\.\d+)?)/i,
+    // Số trần: dấu chấm thập phân, ngăn bằng phẩy / chấm phẩy / khoảng trắng
+    /^(-?\d{1,2}\.\d+)\s*[,;\s]\s*(-?\d{2,3}\.\d+)$/,
+    // Máy tiếng Việt dùng dấu phẩy thập phân: "12,8395 108,2572" hoặc "12,8395; 108,2572"
+    /^(-?\d{1,2},\d+)\s*[;\s]\s*(-?\d{2,3},\d+)$/,
+  ];
+  for (const pattern of patterns) {
+    const m = pattern.exec(s);
+    if (!m) continue;
+    const lat = Number(m[1].replace(',', '.'));
+    const lng = Number(m[2].replace(',', '.'));
+    const [[south, west], [north, east]] = VIETNAM_BOUNDS;
+    if (lat >= south && lat <= north && lng >= west && lng <= east) return { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5 };
+    return null;
+  }
+  return null;
+}

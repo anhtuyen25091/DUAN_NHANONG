@@ -1451,6 +1451,23 @@ export class Ledger {
     return this.removeRecords([['farm_logs', log], ...(usage ? [['supply_usages', usage] as const] : [])]);
   }
 
+  /**
+   * Nhật ký từ trang lô cảm biến (cùng id với việc trên máy chủ cảm biến): thêm mới hoặc sửa, giữ vật tư đã trừ kho (nếu có).
+   * Không đổi gì thì không ghi (tránh 2 bên gửi qua gửi lại).
+   */
+  async upsertFarmLogFromIot(id: string, input: NewFarmLog): Promise<boolean> {
+    const current = this.alive('farm_logs', id);
+    const next: FarmLog = { ...this.farmLogFrom({ ...input, supply_id: null }, id), supply_id: current?.supply_id ?? null, supply_usage_id: current?.supply_usage_id ?? null };
+    if (current && FARM_LOG_SYNC_FIELDS.every((key) => current[key] === next[key])) return false;
+    await this.write('farm_logs', [next]);
+    return true;
+  }
+
+  /** Mọi nhật ký canh tác, kể cả đã xóa (để đồng bộ việc xóa sang máy chủ cảm biến) */
+  farmLogsWithDeleted(): FarmLog[] {
+    return [...this.tables.farm_logs.values()];
+  }
+
   private farmLogFrom(input: NewFarmLog, id: string): FarmLog {
     if (!this.alive('gardens', input.garden_id)) throw new Error('Hãy chọn vườn.');
     const supply = input.supply_id ? this.alive('supplies', input.supply_id) : undefined;
@@ -1921,3 +1938,6 @@ function cleanOptions(options: string[] | null | undefined): string[] | null {
   const list = [...new Set((options ?? []).map((o) => o.trim()).filter(Boolean))];
   return list.length ? list : null;
 }
+
+/** Các ô nhật ký canh tác dùng chung với việc làm vườn trên máy chủ cảm biến */
+export const FARM_LOG_SYNC_FIELDS = ['garden_id', 'date', 'kind', 'title', 'quantity', 'unit', 'target', 'withholding_days', 'worker', 'note'] as const;

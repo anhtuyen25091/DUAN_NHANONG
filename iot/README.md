@@ -130,15 +130,18 @@ mosquitto_pub -h 127.0.0.1 -t 'nhanong/ND7K3M9QXA/ack' -q 1 -m '{"key":"ndk_…"
 
 Số đo gửi bù cũ hơn 24 giờ chỉ được lưu lại, không bắn cảnh báo muộn.
 
-**Người dùng** (token Sanctum từ `POST /auth/register`, `POST /auth/login`):
+**Người dùng** (token Sanctum):
+- `POST /auth/nhanong` (`{"token": "<token đăng nhập Nhà Nông>"}`): cách đăng nhập chính, web / app tự gọi khi đã đăng nhập Nhà Nông. Máy chủ hỏi backend `GET /api/v1/user`, lấy tài khoản cảm biến đã nối với tài khoản Nhà Nông đó (kể cả tài khoản email cũ), chưa có thì tạo (không email). Token Nhà Nông hết hạn → 422, backend không trả lời → 503.
+- `POST /auth/login` (email + mật khẩu): tài khoản cảm biến cũ, admin. `POST /auth/register` còn giữ cho bản app cũ.
+
 
 | | |
 |---|---|
 | `GET /metrics` | Danh mục chỉ số (không cần đăng nhập) |
 | `GET/POST /farms`, `PUT/DELETE /farms/{id}` | Trang trại (của mình và được chia sẻ; `role`: `owner` / `operator` / `viewer`) |
-| `GET/POST /farms/{id}/members` (`{"email": "…", "role": "operator\|viewer"}`), `PUT/DELETE /farm-members/{id}` | Chia sẻ trang trại cho người đã có tài khoản cảm biến. `operator` được bật / tắt máy + xử lý cảnh báo; `viewer` chỉ xem. Chỉ chủ được thêm / sửa / xóa; người được chia sẻ tự rời được (xóa chính mình). Mọi người đều nhận thông báo. |
+| `GET/POST /farms/{id}/members` (`{"phone": "0912…"}` hoặc `{"email": "…"}`, kèm `"role": "operator\|viewer"`), `PUT/DELETE /farm-members/{id}` | Chia sẻ trang trại cho người đã vào mục Cảm biến ít nhất 1 lần (tìm theo SĐT Nhà Nông hoặc email tài khoản cũ). `operator` được bật / tắt máy + xử lý cảnh báo; `viewer` chỉ xem. Chỉ chủ được thêm / sửa / xóa; người được chia sẻ tự rời được (xóa chính mình). Mọi người đều nhận thông báo. |
 | `GET /farms/{id}/rainfall?days=30` | Lượng mưa từng ngày tại vị trí trang trại (`rain_mm`: dữ liệu thời tiết; `gauge_mm`: máy đo mưa nếu có). Miễn phí xem 30 ngày; tài khoản đã nối với tài khoản Nhà Nông có gói xem 365 ngày. |
-| `PUT /me/nhanong` (`{"token": "<token đăng nhập Nhà Nông>"}`), `DELETE /me/nhanong` | Nối / bỏ nối tài khoản Nhà Nông để dùng chung gói trả phí. App tự nối khi máy đăng nhập cả 2 tài khoản. `GET /me` có thêm `plan`. |
+| `PUT /me/nhanong` (`{"token": "<token đăng nhập Nhà Nông>"}`), `DELETE /me/nhanong` | Nối / bỏ nối tài khoản Nhà Nông để dùng chung gói trả phí. Web / app tự nối tài khoản email cũ khi máy đăng nhập Nhà Nông (giao diện không còn nút bỏ nối). `GET /me` có thêm `plan`. |
 | `GET /farms/{id}/weather` | Dự báo 7 ngày (Open-Meteo, lưu 1 giờ) + mưa 24 giờ tới + lưu ý (mưa lớn với ao, mưa với ruộng / vườn, nắng nóng ≥ 35°C, gió ≥ 10 m/s). Trang trại cần có `lat` / `lng`. |
 | `POST /farms/{id}/plots`, `PUT/DELETE /plots/{id}` | Lô / ruộng / ao (`field`, `garden`, `pond`, `greenhouse`, `other`) |
 | `GET /plots/{id}/summary` | Số đo mới nhất của lô, so với ngưỡng, kèm cảnh báo đang mở và `role` của người xem |
@@ -155,6 +158,9 @@ Số đo gửi bù cũ hơn 24 giờ chỉ được lưu lại, không bắn c�
 | `POST /actuators/{id}/command` (`{"action": "on", "minutes": 30}`), `GET /actuators/{id}/commands` | Bật / tắt bằng tay, lịch sử lệnh. Bật luôn có số phút (≤ `max_minutes`); lệnh mới thay lệnh cũ chưa làm; mạch không nhận trong 10 phút thì lệnh hủy (không tự chạy muộn) và báo về điện thoại |
 | `GET /plots/{id}/schedules`, `POST /actuators/{id}/schedules`, `PUT/DELETE /schedules/{id}` | Lịch tưới: `{"start_time": "05:30", "minutes": 40, "every_days": 20, "months": [12,1,2,3,4], "skip_rain_mm": 10}`. `months` null = cả năm; mưa từ `skip_rain_mm` (từ hôm qua tới giờ) thì bỏ lượt |
 | `GET/POST /plots/{id}/rules`, `PUT/DELETE /rules/{id}` | Luật tự động: `{"metric": "water_do", "operator": "below", "value": 4, "off_value": 5, "actuator_id": 1, "minutes": 60, "cooldown_minutes": 30}`. Chạy mỗi khi có số đo mới của lô; tự bật thì báo về điện thoại; chỉ tự tắt máy do chính luật đã bật (không tắt máy người dùng bật tay) |
+| `GET /plots/{id}/events` (`?from=&to=` hoặc `?since=`), `POST /plots/{id}/events`, `PUT/DELETE /plot-events/{id}` | **Việc làm vườn**: `{"kind": "spray\|fertilize\|water\|prune\|other", "title": "Regent 800WG", "quantity": 2, "unit": "gói", "target": "sâu đục trái", "withholding_days": 14, "reentry_hours": 24, "rain_free_hours": 4, "planned": false, "done_at": "…"}`. Chủ + người được bật / tắt máy ghi được; xóa: chủ hoặc người đã ghi. Gửi lại cùng `uuid` thì cập nhật (không trùng); `{"uuid": "…", "deleted": true}` xóa theo uuid. `?since=` trả cả việc đã xóa (`deleted: true`) để đồng bộ với Nhật ký canh tác của Sổ thu chi (cùng uuid, xem `packages/shared/src/farmwork.ts`). Phun thuốc: báo mọi người của trang trại "không vào lô tới…, thu hoạch từ…", tạm dừng máy **tưới trên tán** (`irrigation_mode = canopy`, hoặc phun sương chưa khai báo) tới `done_at + rain_free_hours` (mặc định 6 giờ): luật / lịch tưới bỏ lượt và báo, bật tay trả 409 `code: spray_pause` (gửi lại `force: true` để vẫn bật). Bón phân: 3 ngày sau đó cảnh báo EC / đạm / lân / kali vượt ngưỡng có ghi chú "có thể do vừa bón…", không báo đẩy. Máy bơm / van / phun sương chạy xong tự ghi việc "tưới". `planned: true` = kế hoạch, 6:00 hôm đó nhắc; `PUT` với `planned: false` = đã làm |
+| `GET /plots/{id}/work-advice?kind=spray\|fertilize&rain_free_hours=` | Kiểm tra trước khi phun / bón: mưa trong số giờ thuốc cần khô (hoặc 48 giờ với phân bón), gió (trạm đo ở vườn trong 1 giờ qua, không có thì dự báo), nắng nóng, đất khô (so với ngưỡng độ ẩm của lô). Trả `level` (`ok` / `caution` / `avoid`), các dòng lưu ý và `best_time` (giờ phù hợp gần nhất). Mức gió / nhiệt / mưa ở `config/iot.php` › `farm_work`, chỉ là gợi ý chung; nhãn thuốc và cán bộ kỹ thuật được ưu tiên |
+| `GET /farms`, `GET /plots/{id}/summary` có thêm `plot.work` | Ảnh hưởng của việc đã làm: `no_entry_until`, `harvest_from`, `canopy_paused_until`, `fertilized_at` (kèm việc gây ra), số việc đã lên kế hoạch. Lô có `ledger_garden_id` / `ledger_garden_name` (chủ nối lô với vườn trong Sổ thu chi) |
 | `PUT /me/push-token`, `DELETE /me/push-token` | Expo push token của máy (`{"token": "ExponentPushToken[…]", "platform": "android"}`). Khi một chỉ số vừa vượt ngưỡng, máy nhận thông báo (kênh Android `iot-alerts`); vượt tiếp thì không báo lặp. |
 
 ## Lệnh
@@ -169,6 +175,7 @@ Số đo gửi bù cũ hơn 24 giờ chỉ được lưu lại, không bắn c�
 | `iot:mqtt-listen` | Nghe MQTT (`nhanong/+/up` số đo, `nhanong/+/ack` kết quả lệnh). Chạy liên tục bằng supervisor. |
 | `iot:simulate` | Giả lập thiết bị |
 | `iot:simulate-controller <uid>` | Giả lập mạch điều khiển relay: nhận lệnh bật / tắt, tự tắt khi hết giờ (để thử app khi chưa có phần cứng) |
+| `farmwork:remind` | 6:00 hằng ngày: nhắc việc làm vườn đã lên kế hoạch cho hôm nay (kèm lưu ý thời tiết nếu chưa phù hợp) |
 | `commands:expire` | Mỗi phút: hủy lệnh bật / tắt quá 10 phút mà mạch chưa nhận, báo chủ trang trại; gửi lệnh tắt cho máy LoRaWAN hết giờ chạy |
 | `schedules:run` | Mỗi phút: chạy lịch tưới tới giờ (bỏ lượt khi đã mưa đủ / ngoài mùa / khóa an toàn chặn) |
 | `weather:dry-spell` | 7:00 hằng ngày: nhắc trang trại đã N ngày liên tiếp không mưa (`dry_alert_days`) |

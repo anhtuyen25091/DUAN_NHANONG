@@ -67,6 +67,33 @@ class WeatherService
     }
 
     /**
+     * Dự báo từng giờ, tính từ giờ hiện tại (giờ Việt Nam): mưa, khả năng mưa, gió, nhiệt độ. Dùng để xem nên phun / bón lúc nào.
+     *
+     * @return list<array{time: string, rain_mm: float, rain_chance: int, wind_ms: ?float, temp: ?float}>
+     */
+    public function hourly(Farm $farm, int $hours = 48): array
+    {
+        $raw = $this->fetch(round((float) $farm->lat, 2), round((float) $farm->lng, 2));
+        $from = CarbonImmutable::now('Asia/Ho_Chi_Minh')->startOfHour()->format('Y-m-d\TH:i');
+
+        $result = [];
+        foreach ($raw['hourly']['time'] as $i => $time) {
+            if ($time < $from || count($result) >= $hours) {
+                continue;
+            }
+            $result[] = [
+                'time' => $time,
+                'rain_mm' => (float) $raw['hourly']['precipitation'][$i],
+                'rain_chance' => (int) $raw['hourly']['precipitation_probability'][$i],
+                'wind_ms' => isset($raw['hourly']['wind_speed_10m'][$i]) ? (float) $raw['hourly']['wind_speed_10m'][$i] : null,
+                'temp' => isset($raw['hourly']['temperature_2m'][$i]) ? (float) $raw['hourly']['temperature_2m'][$i] : null,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $daily
      * @param  array{rain_mm: float, rain_chance: int}  $next24h
      * @return list<string>
@@ -101,9 +128,9 @@ class WeatherService
      */
     private function fetch(float $lat, float $lng): array
     {
-        return Cache::remember("weather:{$lat},{$lng}", now()->addMinutes(config('iot.weather.cache_minutes')), fn () => $this->openMeteo->forecast($lat, $lng, [
+        return Cache::remember("weather:v2:{$lat},{$lng}", now()->addMinutes(config('iot.weather.cache_minutes')), fn () => $this->openMeteo->forecast($lat, $lng, [
             'daily' => 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max',
-            'hourly' => 'precipitation,precipitation_probability',
+            'hourly' => 'precipitation,precipitation_probability,wind_speed_10m,temperature_2m',
             'forecast_days' => 7,
             'wind_speed_unit' => 'ms',
         ]));

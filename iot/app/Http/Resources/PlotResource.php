@@ -21,6 +21,11 @@ class PlotResource extends JsonResource
             'type_label' => $this->type->getLabel(),
             'crop' => $this->crop,
             'area_m2' => $this->area_m2,
+            // Vườn trong Sổ thu chi của chủ trang trại (nhật ký canh tác 2 bên dùng chung)
+            'ledger_garden_id' => $this->ledger_garden_id,
+            'ledger_garden_name' => $this->ledger_garden_name,
+            // Đang cấm vào lô / cách ly thu hoạch / tạm dừng tưới trên tán... (danh sách trang trại, trang lô)
+            'work' => $this->when(array_key_exists('work_status', $this->resource->getAttributes()), fn () => $this->resource->getAttribute('work_status')),
         ];
     }
 }

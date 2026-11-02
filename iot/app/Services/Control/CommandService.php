@@ -12,6 +12,7 @@ use App\Models\AutomationRule;
 use App\Models\Device;
 use App\Models\User;
 use App\Notifications\ControlNotifier;
+use App\Services\FarmWork\PlotWork;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
@@ -22,12 +23,15 @@ use InvalidArgumentException;
  */
 class CommandService
 {
-    public function __construct(private readonly ControlNotifier $notifier, private readonly InterlockGuard $guard) {}
+    public function __construct(private readonly ControlNotifier $notifier, private readonly InterlockGuard $guard, private readonly PlotWork $work) {}
 
     /**
+     * @param  bool  $force  bật tay dù vừa phun thuốc (người dùng đã xác nhận)
+     *
      * @throws BlockedCommandException bật khi khóa an toàn đang chặn (VD nước nguồn mặn)
+     * @throws SprayPauseException máy tưới trên tán, lô vừa phun thuốc (luật / lịch tưới luôn dừng; bật tay thì hỏi lại)
      */
-    public function issue(Actuator $actuator, string $action, ?int $minutes, string $source, ?User $user = null, ?AutomationRule $rule = null, ?string $reason = null): ActuatorCommand
+    public function issue(Actuator $actuator, string $action, ?int $minutes, string $source, ?User $user = null, ?AutomationRule $rule = null, ?string $reason = null, bool $force = false): ActuatorCommand
     {
         if (! in_array($action, [ActuatorCommand::ON, ActuatorCommand::OFF], true)) {
             throw new InvalidArgumentException("Lệnh không hợp lệ: {$action}");
@@ -35,6 +39,14 @@ class CommandService
 
         if ($action === ActuatorCommand::ON && ($blocked = $this->guard->reasonToBlock($actuator)) !== null) {
             throw new BlockedCommandException("Không bật {$actuator->name}: {$blocked}.");
+        }
+
+        if ($action === ActuatorCommand::ON && ! ($force && $source === ActuatorCommand::SOURCE_MANUAL) && ($spray = $this->work->canopyPause($actuator)) !== null) {
+            $until = $spray->canopyPauseUntil();
+            throw new SprayPauseException(
+                "Tạm dừng {$actuator->name} (tưới trên tán): lô vừa phun {$spray->title} lúc {$spray->done_at->setTimezone('Asia/Ho_Chi_Minh')->format('H:i d/m')}, chờ thuốc khô tới {$until->setTimezone('Asia/Ho_Chi_Minh')->format('H:i d/m')}.",
+                $until->toIso8601String(),
+            );
         }
 
         // Bật luôn có giờ tắt (mạch tự tắt khi hết giờ, kể cả lúc mất mạng)
@@ -113,6 +125,9 @@ class CommandService
             'state_changed_at' => now(),
             'auto_off_at' => $on ? now()->addMinutes($command->minutes) : null,
         ])->save();
+
+        // Máy bơm / van / phun sương đã chạy: tự ghi nhật ký tưới của lô
+        $this->work->logWater($command);
     }
 
     /**
