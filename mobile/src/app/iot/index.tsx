@@ -7,7 +7,7 @@ import { inputStyle } from '../../components/fields';
 import { WorkBadges } from '../../components/farmWork';
 import { AlertCard, SectionTitle } from '../../components/iot';
 import { WeatherCard } from '../../components/iotWeather';
-import { Button, Card, Chip, Status, styles } from '../../components/ui';
+import { Button, Card, Status, styles } from '../../components/ui';
 import { useAuth } from '../../lib/auth';
 import { flushDeviceFiles, iotApi, setIotAuth, signOutIot, syncIotPush, syncIotWithNhanong, useIotAuth, usePendingDeviceFiles } from '../../lib/iot';
 import { useFarmWorkSyncOnFocus } from '../../lib/farmwork';

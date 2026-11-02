@@ -9,7 +9,7 @@ export type MapShop = Pick<Shop, 'id' | 'name' | 'lat' | 'lng' | 'phone' | 'addr
 /** Dữ liệu app đưa vào bản đồ mỗi lần tải xong khung đang xem (window.render) */
 export interface MapRender {
   shops: MapShop[];
-  clusters: Array<{ lat: number; lng: number; count: number }>;
+  clusters: { lat: number; lng: number; count: number }[];
   position: { lat: number; lng: number } | null;
   radiusKm: number;
 }

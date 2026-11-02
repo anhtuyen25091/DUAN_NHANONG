@@ -151,7 +151,7 @@ function FinanceCard({ data, profit, range, periodLabel }: { data: LedgerSnapsho
   const debts = debtSummary(debtStatus(data, today()));
   const deposit = contractSummaries(data).reduce((s, c) => s + c.depositLeft, 0);
   const interest = interestPaid(data, range);
-  const rows: Array<[string, number, 'in' | 'out']> = [
+  const rows: [string, number, 'in' | 'out'][] = [
     ['🏦 Tiền vay còn phải trả (gốc)', debts.loan, 'out'],
     ['🔴 Còn nợ cửa hàng (phân, thuốc mua thiếu)', debts.payable, 'out'],
     ['🟢 Người ta còn nợ mình', debts.receivable, 'in'],

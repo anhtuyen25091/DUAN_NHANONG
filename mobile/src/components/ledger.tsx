@@ -172,7 +172,7 @@ export function ItemRow({ icon, title, sub, subLines = 2, amount, amountColor, o
 }
 
 /** Cột thu (xanh) / chi (đỏ) theo tháng */
-export function MonthBars({ months }: { months: Array<Totals & { month: string }> }) {
+export function MonthBars({ months }: { months: (Totals & { month: string })[] }) {
   const W = 320;
   const H = 140;
   const max = Math.max(1, ...months.flatMap((m) => [m.income, m.expense]));

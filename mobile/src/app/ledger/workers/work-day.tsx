@@ -10,7 +10,7 @@ import { parseQty } from '../../../lib/qty';
 import { colors } from '../../../lib/theme';
 import { showToast } from '../../../lib/toast';
 
-const PRESETS: Array<[number, string]> = [
+const PRESETS: [number, string][] = [
   [0, 'Nghỉ'],
   [0.5, 'Nửa ngày'],
   [1, 'Cả ngày'],

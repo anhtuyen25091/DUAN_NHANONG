@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View, type TextInputProps } from 'react-native';
 import { Text, TextInput } from '../components/AppText';
 import { Button, Card, Chip, Status, styles } from '../components/ui';
+import { CheckRow } from '../components/fields';
 import { api } from '../lib/api';
 import { setAuth, updateAuthUser, useAuth } from '../lib/auth';
 import { adoptAccountLocation } from '../lib/myLocation';
@@ -181,15 +182,7 @@ function SignInForm({ memberDays, guestDays, onDone }: { memberDays: number; gue
       })}
       {tab === 'register' && <Text style={[styles.muted, { marginBottom: 6 }]}>Ít nhất 6 ký tự.</Text>}
       {error('password')}
-      <Pressable
-        onPress={() => setShowPassword(!showPassword)}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: showPassword }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, marginBottom: 6 }}
-      >
-        <Text style={{ fontSize: 22 }}>{showPassword ? '☑️' : '⬜️'}</Text>
-        <Text style={styles.body}>Hiện mật khẩu</Text>
-      </Pressable>
+      <CheckRow label="Hiện mật khẩu" checked={showPassword} onChange={setShowPassword} />
 
       {generalMessage && <Text style={[styles.body, { color: colors.error, marginBottom: 6 }]}>{generalMessage}</Text>}
       <Button label={sending ? 'Đang gửi…' : tab === 'register' ? 'Tạo tài khoản' : 'Đăng nhập'} onPress={submit} disabled={!canSubmit} />

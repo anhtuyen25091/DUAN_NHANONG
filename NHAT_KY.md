@@ -11,6 +11,28 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 02/11/2026 (tiếp 4): App: giao diện tối, đổi sáng / tối không mất chữ đang nhập, thêm ESLint
+
+**Đã làm**
+- Ô "Hiện mật khẩu" (Tài khoản, Lưu cả trên mạng) dùng ô đánh dấu vẽ theo bảng màu (`CheckRow`) thay cho emoji ⬜️ / ☑️ (nền tối thành ô trắng chói).
+- Nút bị khóa: nền phẳng + chữ xám, bỏ dải xanh và bóng (trước làm mờ 50% nên trên nền tối thành màu đục, khó đọc).
+- Đổi sáng / tối lúc đang mở app: còn ô nhập có chữ gõ dở thì **giữ bảng màu cũ**, rời form hoặc xóa hết chữ mới đổi (đổi bảng màu phải dựng lại các màn hình, trước đây mất chữ đang nhập). `lib/unsavedInput.ts`, `components/AppText.tsx`.
+- App có ESLint (`eslint-config-expo`, `npm run lint`); sửa các lỗi:
+  - `usePreset` ở `iot/schedules.tsx` đổi tên thành `applyPreset` (không phải hook)
+  - `iot/work-form.tsx`: bỏ setState trong effect
+  - thiếu phụ thuộc hook ở tab Cảnh báo, import thừa, kiểu `Array<T>`
+  - tắt quy tắc `react/no-unescaped-entities` (của HTML, không áp dụng cho chữ React Native)
+
+**Kiểm tra**
+- `expo lint` 0 lỗi 0 cảnh báo, typecheck sạch, Metro build bản Android được.
+- Bản web của app bằng Chrome tự động: nền tối → ô đánh dấu và nút khóa rõ ràng; gõ SĐT rồi đổi máy sang sáng → giữ nền tối, chữ còn nguyên; xóa chữ → chuyển sang sáng.
+
+**Còn tồn**
+- Ô tìm kiếm ở các tab (luôn mở) có chữ thì cũng giữ bảng màu cũ đến khi xóa chữ.
+- Chưa thử trên điện thoại thật.
+
+---
+
 ## 02/11/2026 (tiếp 3): Việc làm vườn (phun thuốc, bón phân, tưới) dùng chung giữa Sổ thu chi và cảm biến; sửa giới hạn số lần gọi API
 
 **Đã làm**

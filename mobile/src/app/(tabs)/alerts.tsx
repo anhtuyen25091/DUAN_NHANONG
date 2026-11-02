@@ -14,11 +14,12 @@ export default function AlertsScreen() {
   const [push, setPush] = useState<PushResult | null>(null);
 
   // Quay lại tab này sau khi đặt cảnh báo ở trang mặt hàng: tải lại
+  const { refetch } = alerts;
   useFocusEffect(
     useCallback(() => {
-      alerts.refetch();
+      refetch();
       registerPush(false).then(setPush);
-    }, [alerts.refetch]),
+    }, [refetch]),
   );
 
   const remove = (alert: PriceAlert) =>

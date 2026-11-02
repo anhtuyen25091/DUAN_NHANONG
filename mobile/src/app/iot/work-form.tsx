@@ -85,19 +85,21 @@ function WorkForm({ plotId, event, initialKind }: { plotId: number; event?: IotP
   // Kiểm tra thời tiết trước khi phun / bón (không cần khi ghi lại việc đã làm từ trước)
   const adviceKind = (kind === 'spray' || kind === 'fertilize') && when !== 'at' ? kind : null;
   const rainFreeHours = spray && Number(rainFree) > 0 ? Number(rainFree) : null;
-  const [advice, setAdvice] = useState<IotWorkAdvice | null>(null);
+  // Kết quả gắn với lần hỏi: đổi loại việc / giờ chờ khô thì kết quả cũ không dùng nữa (hiện "Đang xem…")
+  const adviceFor = `${plotId}|${adviceKind}|${rainFreeHours}`;
+  const [fetched, setFetched] = useState<{ key: string; advice: IotWorkAdvice } | null>(null);
+  const advice = fetched?.key === adviceFor ? fetched.advice : null;
   useEffect(() => {
-    setAdvice(null);
     if (!adviceKind) return;
     let active = true;
     iotApi.workAdvice(plotId, adviceKind, rainFreeHours).then(
-      (a) => active && setAdvice(a),
+      (a) => active && setFetched({ key: adviceFor, advice: a }),
       () => {},
     );
     return () => {
       active = false;
     };
-  }, [plotId, adviceKind, rainFreeHours]);
+  }, [plotId, adviceKind, rainFreeHours, adviceFor]);
 
   const save = async () => {
     let doneAt: string | null = null;

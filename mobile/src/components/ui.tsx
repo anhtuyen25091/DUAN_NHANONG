@@ -51,15 +51,25 @@ export function Button({ label, onPress, disabled, variant = 'primary' }: { labe
       accessibilityRole="button"
       style={({ pressed }) => [
         styles.button,
-        variant === 'primary' && primaryShadow,
+        variant === 'primary' && !disabled && primaryShadow,
         variant !== 'primary' && styles.buttonOutline,
         variant === 'danger' && { borderColor: colors.error },
-        disabled && { opacity: 0.5 },
+        // Bị khóa: nền phẳng + chữ xám (làm mờ dải xanh thì trên nền tối thành màu đục, khó đọc)
+        disabled && styles.buttonDisabled,
         pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
       ]}
     >
-      {variant === 'primary' && <BrandGradient radius={radius.control} />}
-      <Text style={[styles.buttonText, variant === 'outline' && { color: colors.primary }, variant === 'danger' && { color: colors.error }]}>{label}</Text>
+      {variant === 'primary' && !disabled && <BrandGradient radius={radius.control} />}
+      <Text
+        style={[
+          styles.buttonText,
+          variant === 'outline' && { color: colors.primary },
+          variant === 'danger' && { color: colors.error },
+          disabled && { color: colors.muted },
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -129,5 +139,6 @@ export const styles = themed(() =>
     },
     buttonOutline: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.primary, elevation: 0, shadowOpacity: 0 },
     buttonText: { color: '#fff', fontSize: font.body, fontWeight: '700' },
+    buttonDisabled: { backgroundColor: colors.surface2, borderWidth: 1.5, borderColor: colors.border, elevation: 0, shadowOpacity: 0 },
   }),
 );

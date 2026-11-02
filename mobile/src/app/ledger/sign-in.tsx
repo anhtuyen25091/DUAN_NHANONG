@@ -1,9 +1,10 @@
 import { CLOUD_PRIVACY_NOTE, ApiError, previousAccount, type AccountUser, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, View, type TextInputProps } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, View, type TextInputProps } from 'react-native';
 import { Text, TextInput } from '../../components/AppText';
 import { Button, Card, Chip, styles } from '../../components/ui';
+import { CheckRow } from '../../components/fields';
 import { api } from '../../lib/api';
 import { setAuth, useAuth } from '../../lib/auth';
 import { useLedger } from '../../lib/ledger';
@@ -177,15 +178,7 @@ function SignInForm({ data }: { data: LedgerSnapshot }) {
       })}
       {tab === 'register' && <Text style={[styles.muted, { marginBottom: 6 }]}>Ít nhất 6 ký tự. Ghi lại ở chỗ an toàn để không quên.</Text>}
       {error('password')}
-      <Pressable
-        onPress={() => setShowPassword(!showPassword)}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: showPassword }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, marginBottom: 6 }}
-      >
-        <Text style={{ fontSize: 22 }}>{showPassword ? '☑️' : '⬜️'}</Text>
-        <Text style={styles.body}>Hiện mật khẩu</Text>
-      </Pressable>
+      <CheckRow label="Hiện mật khẩu" checked={showPassword} onChange={setShowPassword} />
 
       {generalMessage && (
         <Card style={{ borderColor: colors.error }}>

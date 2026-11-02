@@ -94,7 +94,7 @@ function ScheduleForm({ schedule, actuators, presets, onDone }: { schedule?: Iot
     setMonths(next.length === 0 || next.length === 12 ? null : next);
   };
 
-  const usePreset = (preset: IotCropPreset) => {
+  const applyPreset = (preset: IotCropPreset) => {
     if (!preset.schedule) return;
     setEveryDays(preset.schedule.every_days);
     setMonths(preset.schedule.months);
@@ -135,7 +135,7 @@ function ScheduleForm({ schedule, actuators, presets, onDone }: { schedule?: Iot
           <Text style={[styles.body, { fontWeight: '700', marginBottom: 6 }]}>Gợi ý theo cây trồng</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {presets.map((p) => (
-              <Chip key={p.code} small label={p.name} active={false} onPress={() => usePreset(p)} />
+              <Chip key={p.code} small label={p.name} active={false} onPress={() => applyPreset(p)} />
             ))}
           </View>
           <Text style={[styles.muted, { marginTop: 6 }]}>Điền chu kỳ và mùa tưới theo tài liệu kỹ thuật; số phút bơm tùy công suất bơm của bạn.</Text>

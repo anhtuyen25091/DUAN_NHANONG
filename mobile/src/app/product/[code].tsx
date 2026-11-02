@@ -14,7 +14,7 @@ import { registerPush } from '../../lib/push';
 import { colors, font } from '../../lib/theme';
 import { useAsync } from '../../lib/useAsync';
 
-const RANGES: Array<{ days: number; label: string }> = [
+const RANGES: { days: number; label: string }[] = [
   { days: 10, label: '10 ngày' },
   { days: 30, label: '30 ngày' },
   { days: 90, label: '3 tháng' },

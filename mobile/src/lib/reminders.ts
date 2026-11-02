@@ -59,7 +59,7 @@ export function plannedNotifications(data: Pick<LedgerSnapshot, 'debts' | 'debt_
     if (r.overdue) continue;
     const verb = r.debt.kind === 'receivable' ? 'thu nợ' : 'trả nợ';
     const body = `${r.title} · ${formatDateLong(r.due)}`;
-    const slots: Array<[string, Date, string]> = [
+    const slots: [string, Date, string][] = [
       ['before', localTime(r.due, -1, 8), `🔔 Sắp đến hạn ${verb}`],
       ['day', localTime(r.due, 0, 7), '🔔 Hôm nay đến hạn'],
     ];

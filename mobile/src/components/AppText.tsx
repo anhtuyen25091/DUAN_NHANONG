@@ -1,6 +1,7 @@
-import { createContext, useContext, type ComponentProps } from 'react';
+import { createContext, useContext, useEffect, useState, type ComponentProps } from 'react';
 import { StyleSheet, Text as RNText, TextInput as RNTextInput, type StyleProp, type TextStyle } from 'react-native';
 import { colors, currentScheme, fontFamilyFor } from '../lib/theme';
+import { forgetInput, markInput } from '../lib/unsavedInput';
 
 /**
  * Text / TextInput dùng chung cho cả app (thay cho bản của react-native):
@@ -27,13 +28,25 @@ export function Text(props: ComponentProps<typeof RNText>) {
   return nested ? text : <InsideText.Provider value>{text}</InsideText.Provider>;
 }
 
+/** Ghi lại ô đang có chữ gõ dở để đổi sáng / tối không làm mất chữ (lib/unsavedInput.ts) */
 export function TextInput(props: ComponentProps<typeof RNTextInput>) {
+  const [token] = useState(() => ({}));
+  const { onChangeText, value } = props;
+  useEffect(() => () => forgetInput(token), [token]);
+  // Form tự xóa chữ (VD sau khi lưu): không còn nhập dở
+  useEffect(() => {
+    if (value === '') markInput(token, false);
+  }, [token, value]);
   return (
     <RNTextInput
       placeholderTextColor={colors.muted}
       keyboardAppearance={currentScheme()}
       selectionColor={colors.primary}
       {...props}
+      onChangeText={(text) => {
+        markInput(token, text !== '');
+        onChangeText?.(text);
+      }}
       style={textStyle(props.style, false)}
     />
   );

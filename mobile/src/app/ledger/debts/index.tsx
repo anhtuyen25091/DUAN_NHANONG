@@ -20,7 +20,7 @@ function DebtList({ data }: { data: LedgerSnapshot }) {
   const statuses = debtStatus(data, today());
   const sum = debtSummary(statuses);
   const groups = debtsByParty(statuses).filter((g) => (showPaid ? g.left <= 0 : g.left > 0));
-  const totals: Array<[string, number, string]> = [
+  const totals: [string, number, string][] = [
     ['🏦 Tiền vay còn nợ', sum.loan, colors.loss],
     ['🔴 Còn nợ cửa hàng', sum.payable, colors.loss],
     ['🟢 Người ta còn nợ mình', sum.receivable, colors.gain],

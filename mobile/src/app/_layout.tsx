@@ -9,7 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { gradientHeader } from '../components/Gradient';
 import { StatusBar } from 'expo-status-bar';
-import { Fragment, useEffect, useMemo, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useColorScheme } from 'react-native';
 import { DealNotices } from '../components/DealNotices';
 import { ToastHost } from '../components/ledger';
@@ -19,6 +19,7 @@ import { getAuth, subscribeAuth } from '../lib/auth';
 import { openLedger } from '../lib/ledger';
 import { syncIotPush } from '../lib/iot';
 import { onNotificationOpened, registerPush, type OpenedData } from '../lib/push';
+import { hasUnsavedInput, subscribeUnsavedInput } from '../lib/unsavedInput';
 import { applyScheme, brandGradient, colors, fontFamilyFor, fontStyle, setFontsReady, type Scheme } from '../lib/theme';
 
 function openFromNotification(data: OpenedData) {
@@ -60,8 +61,12 @@ export default function RootLayout() {
   // Nạp lỗi thì dùng phông hệ thống
   setFontsReady(fontsLoaded);
 
-  // Sáng / tối theo cài đặt của máy: đổi bảng màu ngay trong lúc dựng, trước khi các màn hình con đọc colors
-  const scheme: Scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  // Sáng / tối theo cài đặt của máy: đổi bảng màu ngay trong lúc dựng, trước khi các màn hình con đọc colors.
+  // Đổi thì phải dựng lại các màn hình (mất chữ đang gõ): còn ô nhập dở thì giữ bảng màu cũ đến khi rời form.
+  const system: Scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const unsaved = useSyncExternalStore(subscribeUnsavedInput, hasUnsavedInput);
+  const [scheme, setScheme] = useState<Scheme>(system);
+  if (scheme !== system && !unsaved) setScheme(system);
   applyScheme(scheme);
 
   useEffect(() => {
