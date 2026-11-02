@@ -1,7 +1,8 @@
 import { formatDate, formatKg, formatVnd, itemsText, monthLabel, monthStart, purchaseTotals, today, TRADE_KIND_LABELS, type TradeKind } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { DealsSignIn } from '../../components/deals';
 import { DateField, TextField } from '../../components/fields';
 import { RowCard } from '../../components/ledger';

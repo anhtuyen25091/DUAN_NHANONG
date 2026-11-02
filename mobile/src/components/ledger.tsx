@@ -1,10 +1,11 @@
 import { fieldLines, formatDate, formatVnd, groupByDate, SYNC_STATUS_LABELS, today, type DebtKind, type Ledger, type LedgerSnapshot, type Totals, type Transaction } from '@nhanong/shared';
 import { router, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { Text } from './AppText';
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { getSync, useSyncStatus } from '../lib/sync';
-import { colors, font } from '../lib/theme';
+import { colors, font, fontFamilyFor } from '../lib/theme';
 import { hideToast, showToast, useToast } from '../lib/toast';
 import { Button, Card, styles } from './ui';
 
@@ -187,7 +188,7 @@ export function MonthBars({ months }: { months: Array<Totals & { month: string }
           return [
             <Rect key={`${m.month}i`} x={x - bar - 1} y={y(m.income)} width={bar} height={H - 20 - y(m.income)} rx={3} fill={colors.gain} />,
             <Rect key={`${m.month}e`} x={x + 1} y={y(m.expense)} width={bar} height={H - 20 - y(m.expense)} rx={3} fill={colors.loss} />,
-            <SvgText key={`${m.month}t`} x={x} y={H - 5} fontSize={11} fill={colors.muted} textAnchor="middle">
+            <SvgText fontFamily={fontFamilyFor('400') ?? undefined} key={`${m.month}t`} x={x} y={H - 5} fontSize={11} fill={colors.muted} textAnchor="middle">
               {`T${Number(m.month.slice(5))}`}
             </SvgText>,
           ];
@@ -222,7 +223,7 @@ export function Fab({ label, href }: { label: string; href: Href }) {
         shadowOffset: { width: 0, height: 3 },
       })}
     >
-      <Text style={{ color: '#fff', fontSize: font.body + 2, fontWeight: '700' }}>{label}</Text>
+      <Text style={{ color: colors.onPrimary, fontSize: font.body + 2, fontWeight: '700' }}>{label}</Text>
     </Pressable>
   );
 }

@@ -1,6 +1,7 @@
 import { addDays, calendarCells, formatDateLong, today } from '@nhanong/shared';
 import { useState } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
+import { Text } from './AppText';
 import { colors, font } from '../lib/theme';
 import { Button, Chip, styles } from './ui';
 
@@ -85,7 +86,7 @@ export function DatePicker({
       </View>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 16 }}>
+        <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: colors.backdrop, justifyContent: 'center', padding: 16 }}>
           {/* Bấm trong lịch không đóng lịch */}
           <Pressable onPress={() => {}} style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 16, maxWidth: 420, width: '100%', alignSelf: 'center' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -131,7 +132,7 @@ export function DatePicker({
                         borderColor: colors.primary,
                       }}
                     >
-                      <Text style={{ fontSize: font.body, fontWeight: selected || isToday ? '700' : '400', color: selected ? '#fff' : ok ? (i % 7 === 6 ? colors.loss : colors.text) : colors.border }}>
+                      <Text style={{ fontSize: font.body, fontWeight: selected || isToday ? '700' : '400', color: selected ? colors.onPrimary : ok ? (i % 7 === 6 ? colors.loss : colors.text) : colors.border }}>
                         {day}
                       </Text>
                     </View>

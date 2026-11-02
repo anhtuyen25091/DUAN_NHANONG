@@ -1,7 +1,8 @@
 import { contractSummaries, CUT_GRADES, cutKg, cutValue, formatQty, formatVnd, today, type CutLine, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { Text, TextInput } from '../../../components/AppText';
 import { checkDate, DateField, ErrorNote, groupDigits, inputStyle, MoneyField, TextField } from '../../../components/fields';
 import { Button, Card, Chip, styles } from '../../../components/ui';
 import { useLedger } from '../../../lib/ledger';

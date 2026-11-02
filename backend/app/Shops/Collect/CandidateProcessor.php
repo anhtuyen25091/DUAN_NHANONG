@@ -134,6 +134,9 @@ class CandidateProcessor
     /** Lý do bắt buộc admin xem, dù nguồn tin cậy */
     private function blocker(ShopCandidate $candidate): ?string
     {
+        if (($candidate->raw['ocr'] ?? false) === true) {
+            return 'Đọc từ PDF bản scan (OCR): kiểm tra lại tên, địa chỉ, số điện thoại';
+        }
         if ($candidate->types->isEmpty()) {
             return 'Không rõ loại điểm (thu mua / phân bón / BVTV)';
         }

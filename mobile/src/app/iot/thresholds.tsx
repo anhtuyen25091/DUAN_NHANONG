@@ -1,7 +1,8 @@
-import { formatDecimal, parseDecimalInput, thresholdLabel, type IotCropPreset, type IotMetric, type IotPlotType, type IotThreshold } from '@nhanong/shared';
+import { canManage, formatDecimal, parseDecimalInput, thresholdLabel, type IotCropPreset, type IotMetric, type IotPlotType, type IotRole, type IotThreshold } from '@nhanong/shared';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { SectionTitle } from '../../components/iot';
 import { FormInput, FormMessage, NO_ERRORS, toFormErrors } from '../../components/iotForm';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
@@ -21,7 +22,9 @@ const GROUPS: Record<IotPlotType, IotMetric['group'][]> = {
 
 /** Ngưỡng cảnh báo của 1 lô: vượt ngưỡng thì báo về điện thoại */
 export default function IotThresholdsScreen() {
-  const { plot, name, type } = useLocalSearchParams<{ plot: string; name?: string; type?: IotPlotType }>();
+  const { plot, name, type, role } = useLocalSearchParams<{ plot: string; name?: string; type?: IotPlotType; role?: IotRole }>();
+  // Người dùng chung chỉ xem, không sửa
+  const manage = canManage(role);
   const data = useAsync(() => Promise.all([iotApi.thresholds(Number(plot)), iotApi.metrics(), iotApi.cropPresets()]), [plot]);
   const [applied, setApplied] = useState<IotCropPreset | null>(null);
   const [applying, setApplying] = useState(false);
@@ -43,7 +46,7 @@ export default function IotThresholdsScreen() {
   const groups = GROUPS[type ?? 'other'];
   const choices = metrics.filter((m) => m.group !== 'device' && (showAll || groups.includes(m.group)) && !thresholds.some((t) => t.metric === m.code));
 
-  if (editing) {
+  if (editing && manage) {
     return (
       <ThresholdForm
         plotId={Number(plot)}
@@ -61,6 +64,7 @@ export default function IotThresholdsScreen() {
     <ScrollView contentContainerStyle={{ padding: 16 }}>
       <Stack.Screen options={{ title: `Ngưỡng · ${name ?? 'lô'}` }} />
       <Text style={[styles.muted, { marginBottom: 8 }]}>Số đo ra ngoài ngưỡng thì app báo về điện thoại (1 lần, tới khi số đo trở lại bình thường).</Text>
+      {!manage && <Text style={[styles.muted, { marginBottom: 8 }]}>🔒 Bạn đang xem trang trại được chia sẻ. Chỉ chủ trang trại được thêm / sửa / xóa.</Text>}
 
       <SectionTitle text="Đang đặt" />
       {thresholds.length === 0 && (
@@ -71,7 +75,7 @@ export default function IotThresholdsScreen() {
       {thresholds.map((t) => {
         const metric = metricOf(t.metric);
         return (
-          <Pressable key={t.id} onPress={() => setEditing({ metric: t.metric, threshold: t })} accessibilityRole="button">
+          <Pressable key={t.id} disabled={!manage} onPress={() => setEditing({ metric: t.metric, threshold: t })} accessibilityRole="button">
             <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.body, { fontWeight: '700' }]}>{metric?.name ?? t.metric}</Text>
@@ -81,29 +85,33 @@ export default function IotThresholdsScreen() {
                 </Text>
                 {t.note && <Text style={styles.muted}>{t.note}</Text>}
               </View>
-              <Text style={{ fontSize: 22, color: colors.primary }}>›</Text>
+              {manage && <Text style={{ fontSize: 22, color: colors.primary }}>›</Text>}
             </Card>
           </Pressable>
         );
       })}
 
-      <SectionTitle text="Gợi ý theo cây trồng" />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-        {presets.map((p) => (
-          <Chip key={p.code} small label={p.name} active={applied?.code === p.code} onPress={() => !applying && void apply(p)} />
-        ))}
-      </View>
-      {applied && <PresetNotes preset={applied} />}
+      {manage && (
+        <>
+          <SectionTitle text="Gợi ý theo cây trồng" />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+            {presets.map((p) => (
+              <Chip key={p.code} small label={p.name} active={applied?.code === p.code} onPress={() => !applying && void apply(p)} />
+            ))}
+          </View>
+          {applied && <PresetNotes preset={applied} />}
 
-      <SectionTitle text="Thêm ngưỡng" />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {choices.map((m) => (
-          <Chip key={m.code} label={`＋ ${m.name}`} active={false} onPress={() => setEditing({ metric: m.code })} small />
-        ))}
-      </View>
-      <Text onPress={() => setShowAll(!showAll)} accessibilityRole="button" style={{ color: colors.primary, padding: 12, fontWeight: '600' }}>
-        {showAll ? 'Chỉ hiện chỉ số hay dùng' : 'Hiện tất cả chỉ số'}
-      </Text>
+          <SectionTitle text="Thêm ngưỡng" />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {choices.map((m) => (
+              <Chip key={m.code} label={`＋ ${m.name}`} active={false} onPress={() => setEditing({ metric: m.code })} small />
+            ))}
+          </View>
+          <Text onPress={() => setShowAll(!showAll)} accessibilityRole="button" style={{ color: colors.primary, padding: 12, fontWeight: '600' }}>
+            {showAll ? 'Chỉ hiện chỉ số hay dùng' : 'Hiện tất cả chỉ số'}
+          </Text>
+        </>
+      )}
     </ScrollView>
   );
 }

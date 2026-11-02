@@ -14,7 +14,15 @@ return [
         'password' => env('IOT_MQTT_PASSWORD'),
         // nhanong/{mã thiết bị}/up
         'topic' => 'nhanong/+/up',
+        // Mạch điều khiển báo kết quả lệnh / trạng thái relay: nhanong/{mã thiết bị}/ack
+        'ack_topic' => 'nhanong/+/ack',
         'client_id' => env('IOT_MQTT_CLIENT_ID', 'nhanong-iot-listener'),
+        // Đẩy lệnh bật / tắt + cấu hình xuống nhanong/{mã thiết bị}/down cho mạch đang dùng MQTT
+        // (đã gửi bản tin MQTT hợp lệ trong offline_after_hours giờ qua). Không đẩy được thì mạch vẫn lấy qua HTTP.
+        'downlink' => (bool) env('IOT_MQTT_DOWNLINK', true),
+        // Mã client của tiến trình đẩy lệnh (queue worker); thêm đuôi ngẫu nhiên để nhiều worker không đá nhau
+        'publisher_client_id' => env('IOT_MQTT_PUBLISHER_CLIENT_ID', 'nhanong-iot-pub'),
+        'timeout_seconds' => (int) env('IOT_MQTT_TIMEOUT', 5),
     ],
 
     // Số dòng tối đa mỗi lần gửi (thiết bị gửi bù dữ liệu tồn theo nhiều lô)

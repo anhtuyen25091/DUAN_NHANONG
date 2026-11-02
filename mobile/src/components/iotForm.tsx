@@ -1,6 +1,7 @@
 import { ApiError } from '@nhanong/shared';
 import type { ReactNode } from 'react';
-import { Text, TextInput, View, type TextInputProps } from 'react-native';
+import { View, type TextInputProps } from 'react-native';
+import { Text, TextInput } from './AppText';
 import { colors, font } from '../lib/theme';
 import { inputStyle } from './fields';
 import { styles } from './ui';

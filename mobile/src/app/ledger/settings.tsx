@@ -3,13 +3,14 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Platform, ScrollView, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, ScrollView, Switch, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { Button, Card, styles } from '../../components/ui';
 import { getAuth } from '../../lib/auth';
 import { useLedger } from '../../lib/ledger';
 import { disableDueReminders, dueRemindersEnabled, enableDueReminders, remindersUnsupported } from '../../lib/reminders';
 import { getSync, useSyncStatus } from '../../lib/sync';
-import { colors, font } from '../../lib/theme';
+import { colors, font, themed } from '../../lib/theme';
 import { showToast } from '../../lib/toast';
 
 export default function LedgerSettingsScreen() {
@@ -241,7 +242,7 @@ function StoragePlace({ data }: { data: LedgerSnapshot }) {
   );
 }
 
-const heading = { fontSize: font.body + 1, fontWeight: '700' as const, color: colors.text, marginBottom: 6 };
+const heading = themed(() => ({ fontSize: font.body + 1, fontWeight: '700' as const, color: colors.text, marginBottom: 6 }));
 
 /** Token của sổ đang dùng chung cho đăng nhập xem giá: tắt đồng bộ thì giữ token, không làm người dùng bị đăng xuất */
 function tokenShared(data: LedgerSnapshot): boolean {

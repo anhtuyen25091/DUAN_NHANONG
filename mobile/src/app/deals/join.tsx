@@ -1,7 +1,8 @@
 import { ApiError } from '@nhanong/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, TextInput } from 'react-native';
+import { ScrollView } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { DealsSignIn } from '../../components/deals';
 import { ErrorNote, Field, inputStyle } from '../../components/fields';
 import { Button, styles } from '../../components/ui';

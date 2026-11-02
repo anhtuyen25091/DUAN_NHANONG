@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\SendMqttDownlink;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -37,6 +38,12 @@ class FirmwareRelease extends Model
             }
         });
         static::deleted(fn (FirmwareRelease $release) => Storage::disk(self::DISK)->delete($release->path));
+        // Có bản mới: báo ngay cho mạch điều khiển đang nối MQTT (mạch vẫn chỉ cài khi không máy nào chạy)
+        static::created(function (FirmwareRelease $release) {
+            if ($release->device?->usesMqttDownlink()) {
+                SendMqttDownlink::dispatch($release->device_id)->afterCommit();
+            }
+        });
     }
 
     /**

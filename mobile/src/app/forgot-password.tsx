@@ -1,7 +1,8 @@
 import { ApiError, smsHref, type PasswordResetRequest } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Linking, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import { Linking, Platform, ScrollView, View } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { Button, Card, styles } from '../components/ui';
 import { api } from '../lib/api';
 import { setAuth } from '../lib/auth';

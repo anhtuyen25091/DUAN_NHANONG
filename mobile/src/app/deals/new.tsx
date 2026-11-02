@@ -1,7 +1,8 @@
 import { today, type DealRole } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { DealsSignIn } from '../../components/deals';
 import { checkDate, DateField, ErrorNote, MoneyField, TextField } from '../../components/fields';
 import { Button, styles } from '../../components/ui';

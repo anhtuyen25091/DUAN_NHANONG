@@ -90,6 +90,36 @@ php artisan shops:import-csv ds-dai-ly.csv --source="Sở NN&MT Đắk Lắk" --
   - form thêm điểm mới hoặc báo sai
 - Chưa có bản đồ để giữ app nhẹ. Khi cần sẽ thêm Leaflet cho web và react-native-maps cho app.
 
+### Thu thập danh sách của các Sở (`shops:collect`), PDF bản scan cần OCR
+
+```bash
+php artisan shops:collect                       # mọi nguồn trong config/shops.php (lịch: 3:00 ngày 2 hằng tháng)
+php artisan shops:collect so-son-la-pb          # 1 nguồn
+php artisan shops:collect-file ds.pdf --source=so-x-pb --province=son-la --type=phan_bon   # file Sở gửi qua email
+```
+
+- File PDF có chữ thì đọc thẳng. File PDF **bản scan** (ảnh, không có lớp chữ) thì hệ thống tự nhận dạng chữ (OCR):
+  - `pdftoppm` (poppler) vẽ từng trang ra ảnh 300 dpi, `tesseract -l vie --psm 6` đọc chữ, rồi dựng bảng như PDF có chữ.
+  - Điểm đọc từ OCR luôn **chờ admin duyệt** (lý do "Đọc từ PDF bản scan (OCR)…", lọc được trong `/admin` → "Điểm bán thu thập").
+  - Máy chưa cài công cụ thì nguồn đó bị bỏ qua (cảnh báo trong log và trên màn hình), các nguồn khác vẫn chạy.
+- Cài công cụ OCR trên **server Ubuntu**:
+
+  ```bash
+  sudo apt install tesseract-ocr tesseract-ocr-vie poppler-utils
+  ```
+
+- Trên **máy dev macOS** (gói `tesseract-lang` rất nặng, chỉ cần tải riêng tiếng Việt):
+
+  ```bash
+  brew install tesseract poppler
+  mkdir -p backend/storage/app/tessdata
+  curl -L -o backend/storage/app/tessdata/vie.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/vie.traineddata
+  ```
+
+  rồi thêm vào `backend/.env`: `TESSDATA_PREFIX=storage/app/tessdata` (thư mục này không đưa lên git).
+- Cấu hình khác (`backend/.env`): `TESSERACT_BIN`, `PDFTOPPM_BIN` (đường dẫn lệnh, mặc định tìm trong PATH), `SHOPS_OCR_DPI` (300), `SHOPS_OCR_TIMEOUT` (giây / trang, 180), `SHOPS_OCR_MAX_PAGES` (200).
+- Kiểm tra đã cài đủ: `tesseract --list-langs` (có `vie`), `pdftoppm -v`.
+
 ## Sổ thu chi
 
 - Mặc định chỉ lưu trên máy: web dùng IndexedDB, app dùng SQLite. Không gửi gì lên server.

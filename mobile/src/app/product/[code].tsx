@@ -1,7 +1,8 @@
 import { ALERT_CONDITION_LABELS, ApiError, formatDate, formatNumber, formatPriceRange, parseVnd, readVnd, type AccessTier, type AlertCondition } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { PriceChart } from '../../components/PriceChart';
 import { LocationBar } from '../../components/LocationPicker';
 import { LocalPriceList } from '../../components/localPrices';

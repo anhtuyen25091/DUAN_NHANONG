@@ -1,14 +1,15 @@
 import { extraTexts, fieldsFor, formatVnd, pressAmountKey, readVnd, saveExtra, today, type AmountKey, type EntryType, type QuickTemplate } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, type TextInputInstance } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View, type TextInputInstance } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { DatePicker } from '../../components/DatePicker';
 import { CustomFieldInputs } from '../../components/extraFields';
 import { CheckRow } from '../../components/fields';
 import { ReceiptPhoto } from '../../components/ReceiptPhoto';
 import { Button, Chip, styles } from '../../components/ui';
 import { useLedger } from '../../lib/ledger';
-import { colors, font } from '../../lib/theme';
+import { colors, font, themed } from '../../lib/theme';
 import { showToast } from '../../lib/toast';
 
 const KEYS: AmountKey[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0', 'xóa'];
@@ -91,7 +92,7 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
                 accessibilityState={{ selected: active }}
                 style={{ flex: 1, minHeight: 52, borderRadius: 12, borderWidth: 1, borderColor: active ? color : colors.border, backgroundColor: active ? color : colors.surface, alignItems: 'center', justifyContent: 'center' }}
               >
-                <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: active ? '#fff' : colors.text }}>{t === 'expense' ? 'Tiền ra' : 'Tiền vào'}</Text>
+                <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: active ? colors.onPrimary : colors.text }}>{t === 'expense' ? 'Tiền ra' : 'Tiền vào'}</Text>
               </Pressable>
             );
           })}
@@ -219,4 +220,4 @@ function AddEntry({ ledger, data }: { ledger: NonNullable<ReturnType<typeof useL
   );
 }
 
-const inputStyle = { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: font.body, backgroundColor: colors.surface, color: colors.text };
+const inputStyle = themed(() => ({ minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: font.body, backgroundColor: colors.surface, color: colors.text }));

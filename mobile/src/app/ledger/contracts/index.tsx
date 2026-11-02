@@ -1,6 +1,7 @@
 import { CONTRACT_STATUS_LABELS, contractSummaries, formatVnd, type LedgerSnapshot } from '@nhanong/shared';
 import { router } from 'expo-router';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { Text } from '../../../components/AppText';
 import { Fab, RowCard } from '../../../components/ledger';
 import { Card, styles } from '../../../components/ui';
 import { useLedger } from '../../../lib/ledger';

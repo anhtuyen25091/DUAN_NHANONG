@@ -1,5 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { RefreshControl, ScrollView, Text } from 'react-native';
+import { RefreshControl, ScrollView } from 'react-native';
+import { Text } from '../../components/AppText';
 import { RainHistory } from '../../components/iotRain';
 import { DayRow, Hints, rainText } from '../../components/iotWeather';
 import { Card, Status, styles } from '../../components/ui';

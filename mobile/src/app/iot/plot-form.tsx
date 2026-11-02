@@ -1,7 +1,8 @@
 import { type IotPlot, type IotPlotType } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text } from 'react-native';
+import { ScrollView } from 'react-native';
+import { Text } from '../../components/AppText';
 import { FormInput, FormMessage, FormSection, NO_ERRORS, toFormErrors } from '../../components/iotForm';
 import { Button, Chip, Status } from '../../components/ui';
 import { confirmAsync } from '../../lib/confirm';

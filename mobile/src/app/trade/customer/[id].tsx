@@ -1,7 +1,8 @@
 import { formatVnd, monthStart, telHref, today } from '@nhanong/shared';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Linking, ScrollView, Text, View } from 'react-native';
+import { Linking, ScrollView, View } from 'react-native';
+import { Text } from '../../../components/AppText';
 import { DealsSignIn, Notice } from '../../../components/deals';
 import { DateField } from '../../../components/fields';
 import { PrintButtons } from '../../../components/PrintButtons';

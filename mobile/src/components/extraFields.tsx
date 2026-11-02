@@ -1,5 +1,6 @@
 import { fieldLines, fieldsFor, type CustomFieldDef, type CustomFieldTarget } from '@nhanong/shared';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from './AppText';
 import { DateField, Field, TextField } from './fields';
 import { Chip, styles } from './ui';
 

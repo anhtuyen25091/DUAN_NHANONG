@@ -2,7 +2,8 @@ import { DOCUMENT_FORMAT_LABELS, type DocumentFormat, type DocumentTarget } from
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
-import { Alert, Platform, Text, View } from 'react-native';
+import { Alert, Platform, View } from 'react-native';
+import { Text } from './AppText';
 import { api } from '../lib/api';
 import { Button, styles } from './ui';
 

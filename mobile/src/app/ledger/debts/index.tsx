@@ -1,7 +1,8 @@
 import { debtsByParty, debtStatus, debtSummary, formatDate, formatVnd, today, type LedgerSnapshot } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { Text } from '../../../components/AppText';
 import { Fab, KIND_ICON, RowCard } from '../../../components/ledger';
 import { Card, Chip, styles } from '../../../components/ui';
 import { useLedger } from '../../../lib/ledger';

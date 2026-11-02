@@ -53,7 +53,7 @@ Màu dây khác nhau tùy hãng, nên xem nhãn trên cảm biến. Nếu nối 
    pio run -t upload && pio device monitor
    ```
 
-Bảng phân vùng riêng (`partitions.csv`): 1,5 MB cho chương trình, 2,4 MB LittleFS cho hàng đợi số đo. Không có cập nhật firmware qua mạng (OTA). Đã biên dịch thử cho `esp32dev` với cả bản mặc định (HTTP) và bản bật MQTT + SMS.
+Bảng phân vùng riêng (`partitions.csv`): 1,5 MB cho chương trình, 2,4 MB LittleFS cho hàng đợi số đo. Không có cập nhật firmware qua mạng (OTA). Đã biên dịch thử cho `esp32dev` với cả bản mặc định (HTTP) và bản bật MQTT + SMS (trước khi thêm nhận lệnh qua MQTT; phần nhận lệnh MQTT chưa biên dịch thử, xem mục Mạch điều khiển + MQTT).
 
 ## Khi không có Internet
 
@@ -91,6 +91,31 @@ ESP32 GPIO13 ── IN3 (kênh 3)     ESP32 GPIO23 ── IN4 (kênh 4)
 
 Lưu ý: firmware publish ở QoS 0, nghĩa là không có xác nhận từ máy chủ. Nếu cần chắc chắn dữ liệu đã tới nơi thì dùng HTTP.
 
+### Mạch điều khiển + MQTT (`CONTROLLER_MODE 1` + `USE_MQTT 1`): nhận lệnh ngay, không chờ hỏi
+
+| Topic | Chiều | Nội dung |
+|---|---|---|
+| `nhanong/<mã>/up` | mạch → máy chủ | số đo (như trên) |
+| `nhanong/<mã>/down` | máy chủ → mạch (QoS 1, không giữ lại) | `{"data": "<JSON>", "sig": "<HMAC-SHA256 của data bằng khóa thiết bị>"}`; `data` giống phản hồi `GET /device/commands`: `{"commands": [{"id": 12, "channel": 1, "action": "on", "minutes": 30}], "server_time": …, "exp": …, "config": {…}, "firmware_update": {…}}` |
+| `nhanong/<mã>/ack` | mạch → máy chủ | kết quả lệnh `{"key": "ndk_…", "id": 12, "ok": true, "message": null, "states": "1:1,2:0"}`; không có `id` = chỉ báo trạng thái relay (lúc vừa nối MQTT và mỗi giờ) |
+
+- Mã client MQTT = mã thiết bị (`DEVICE_UID`); broker chạy thật chỉ cho mỗi mạch đọc `nhanong/<mã client>/down` (`deploy/mosquitto-acl`).
+- Mạch chỉ làm lệnh có **chữ ký đúng** (tài khoản MQTT dùng chung cho mọi thiết bị) và **chưa quá `exp`** (bản tin cũ phát lại). Lệnh chạy qua đúng hàm xử lý lệnh hỏi qua HTTP.
+- Máy chủ chỉ đẩy qua MQTT khi mạch đã gửi bản tin MQTT hợp lệ trong 24 giờ qua (lúc nối MQTT mạch tự báo trạng thái lên `ack`).
+- **HTTP vẫn là đường dự phòng**: mạch vẫn hỏi `GET /device/commands`, nhưng thưa hơn (`MQTT_POLL_SECONDS`, mặc định 60 giây) khi đang nối MQTT. Lỡ bản tin MQTT (mất mạng lúc đẩy) thì lần hỏi HTTP lấy được. Báo cáo `ack` gửi QoS 0, mất thì lần hỏi sau lệnh còn đó, mạch thấy id đã làm thì **chỉ báo lại, không bật / tắt lần 2** (nhớ 16 id gần nhất).
+- Mạch giữ 2 kết nối riêng cho MQTT và HTTP (dùng chung 1 kết nối thì HTTP cắt MQTT). Bật cả `MQTT_TLS` lẫn `https` thì tốn thêm ~40 KB RAM cho phiên TLS thứ 2.
+- Đổi chu kỳ đo / có firmware mới: máy chủ đẩy qua `down` luôn (lệnh rỗng). Mạch đo chạy pin + MQTT thì không nhận (chỉ gửi lên rồi ngủ).
+
+Thử không cần mạch (broker dev `docker compose up -d mosquitto`, chạy `php artisan iot:mqtt-listen` và `php artisan queue:work`):
+
+```bash
+# Nghe lệnh máy chủ đẩy xuống mạch ND7K3M9QXA (bấm bật máy bơm trong app sau đó)
+mosquitto_sub -h 127.0.0.1 -t 'nhanong/ND7K3M9QXA/down' -q 1 -v
+# Giả làm mạch: báo trạng thái (để máy chủ biết mạch nghe MQTT), rồi báo đã làm lệnh 12
+mosquitto_pub -h 127.0.0.1 -t 'nhanong/ND7K3M9QXA/ack' -q 1 -m '{"key":"ndk_…","states":"1:0,2:0"}'
+mosquitto_pub -h 127.0.0.1 -t 'nhanong/ND7K3M9QXA/ack' -q 1 -m '{"key":"ndk_…","id":12,"ok":true,"states":"1:1,2:0"}'
+```
+
 ## HTTPS / MQTT có mã hóa
 
 - Chạy thật: đặt `API_BASE` dạng `https://…` và dán chứng chỉ gốc của máy chủ (PEM) vào `TLS_ROOT_CA`. Ví dụ máy chủ dùng Let's Encrypt thì lấy "ISRG Root X1" ở letsencrypt.org/certificates, hoặc chứng chỉ cuối cùng khi chạy `openssl s_client -connect iot.tenmien.vn:443 -showcerts </dev/null`.
@@ -99,7 +124,7 @@ Lưu ý: firmware publish ở QoS 0, nghĩa là không có xác nhận từ máy
 
 ## Đổi cấu hình từ xa
 
-Chu kỳ đo đặt trong app, web hoặc `/admin` (Thiết bị › Chu kỳ đo, 5–240 phút). Máy chủ gửi kèm phản hồi `/ingest` và `/device/commands` (`"config": {"measure_interval_min": 30}`). Thiết bị lưu vào `/config.json`, mất điện vẫn giữ. Gửi qua MQTT thì không nhận được (MQTT không có phản hồi).
+Chu kỳ đo đặt trong app, web hoặc `/admin` (Thiết bị › Chu kỳ đo, 5–240 phút). Máy chủ gửi kèm phản hồi `/ingest` và `/device/commands` (`"config": {"measure_interval_min": 30}`). Thiết bị lưu vào `/config.json`, mất điện vẫn giữ. Mạch điều khiển + MQTT nhận ngay qua `nhanong/<mã>/down`; mạch đo chạy pin gửi qua MQTT thì không nhận được (MQTT không có phản hồi).
 
 ## Cập nhật firmware qua mạng (OTA)
 

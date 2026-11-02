@@ -1,7 +1,8 @@
 import { ApiError, canControl, canManage, formatDecimal, timeAgo, type IotActuator, type IotPlotType, type IotRole } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from './AppText';
 import { iotApi } from '../lib/iot';
 import { colors, font } from '../lib/theme';
 import { showToast } from '../lib/toast';
@@ -52,21 +53,20 @@ export function ControlSection({ plotId, plotName, plotType, farmId, role }: { p
       {list.map((actuator) => (
         <ActuatorCard key={actuator.id} actuator={actuator} role={role} onChanged={actuators.refetch} />
       ))}
-      {canManage(role) && (
-        <>
-          <View style={{ marginBottom: 8 }}>
-            <Button label="🗓️ Lịch tưới" variant="outline" onPress={() => router.push({ pathname: '/iot/schedules', params: { plot: String(plotId), name: plotName } })} />
+      {/* Lịch tưới, luật tự động: người dùng chung xem được, chỉ chủ được thêm / sửa */}
+      <View style={{ marginBottom: 8 }}>
+        <Button label="🗓️ Lịch tưới" variant="outline" onPress={() => router.push({ pathname: '/iot/schedules', params: { plot: String(plotId), name: plotName, role } })} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+        <View style={{ flex: 1 }}>
+          <Button label="⚡ Luật tự động" variant="outline" onPress={() => router.push({ pathname: '/iot/rules', params: { plot: String(plotId), name: plotName, type: plotType, role } })} />
+        </View>
+        {canManage(role) && (
+          <View style={{ flex: 1 }}>
+            <Button label="＋ Thêm máy bơm / quạt" variant="outline" onPress={() => router.push({ pathname: '/iot/actuator-form', params: { plot: String(plotId), farm: String(farmId) } })} />
           </View>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-            <View style={{ flex: 1 }}>
-              <Button label="⚡ Luật tự động" variant="outline" onPress={() => router.push({ pathname: '/iot/rules', params: { plot: String(plotId), name: plotName, type: plotType } })} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button label="＋ Thêm máy bơm / quạt" variant="outline" onPress={() => router.push({ pathname: '/iot/actuator-form', params: { plot: String(plotId), farm: String(farmId) } })} />
-            </View>
-          </View>
-        </>
-      )}
+        )}
+      </View>
     </View>
   );
 }
@@ -114,7 +114,7 @@ function ActuatorCard({ actuator, role, onChanged }: { actuator: IotActuator; ro
           </Text>
         )}
       </View>
-      <Text style={{ fontSize: font.body, fontWeight: '600', color: pending ? '#7a4a00' : actuator.is_on ? colors.primary : colors.muted, marginBottom: 8 }}>{state}</Text>
+      <Text style={{ fontSize: font.body, fontWeight: '600', color: pending ? colors.accentText : actuator.is_on ? colors.primary : colors.muted, marginBottom: 8 }}>{state}</Text>
       <Text
         onPress={() => router.push({ pathname: '/iot/history', params: { actuator: String(actuator.id), name: actuator.name } })}
         accessibilityRole="button"

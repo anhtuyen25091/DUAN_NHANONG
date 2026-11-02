@@ -1,7 +1,8 @@
 import { ApiError, BID_STATUS_LABELS, formatDate, formatQuantity, formatVnd, kgInputText, OFFER_STATUS_LABELS, offerValue, parseKgText, telHref, type ProduceOffer } from '@nhanong/shared';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Linking, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { DealsSignIn } from '../../components/deals';
 import { MoneyField, QtyField, TextField } from '../../components/fields';
 import { SmallTitle } from '../../components/trade';

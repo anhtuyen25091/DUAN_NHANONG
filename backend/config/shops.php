@@ -159,4 +159,23 @@ return [
     */
     'geocode_delay_ms' => (int) env('SHOPS_GEOCODE_DELAY_MS', 1100),
 
+    /*
+    | Nhận dạng chữ (OCR) cho danh sách PDF bản scan (ảnh): pdftoppm (poppler) vẽ trang ra ảnh, tesseract đọc chữ tiếng Việt.
+    | Cài: macOS `brew install tesseract poppler` + tải vie.traineddata; Ubuntu `apt install tesseract-ocr tesseract-ocr-vie poppler-utils`.
+    | Thiếu công cụ thì nguồn PDF bản scan bị bỏ qua (có cảnh báo), các nguồn khác vẫn chạy.
+    */
+    'ocr' => [
+        'tesseract' => env('TESSERACT_BIN', 'tesseract'),
+        'pdftoppm' => env('PDFTOPPM_BIN', 'pdftoppm'),
+        // Thư mục chứa vie.traineddata (để trống: dùng thư mục mặc định của tesseract); đường dẫn tương đối tính từ backend/
+        'tessdata' => env('TESSDATA_PREFIX'),
+        'lang' => env('SHOPS_OCR_LANG', 'vie'),
+        'dpi' => (int) env('SHOPS_OCR_DPI', 300),
+        // 6: 1 khối chữ đều (giữ được từng hàng của bảng)
+        'psm' => (int) env('SHOPS_OCR_PSM', 6),
+        // Giây cho mỗi lần chạy pdftoppm / tesseract (1 trang)
+        'timeout' => (int) env('SHOPS_OCR_TIMEOUT', 180),
+        'max_pages' => (int) env('SHOPS_OCR_MAX_PAGES', 200),
+    ],
+
 ];

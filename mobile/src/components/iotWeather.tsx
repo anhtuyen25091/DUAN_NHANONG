@@ -1,6 +1,7 @@
 import { ApiError, formatDecimal, weatherDayLabel, type IotFarm, type IotWeather } from '@nhanong/shared';
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { Text } from './AppText';
 import { iotApi } from '../lib/iot';
 import { colors, font } from '../lib/theme';
 import { useAsync } from '../lib/useAsync';
@@ -32,7 +33,7 @@ export function WeatherCard({ farm }: { farm: IotFarm }) {
 
   return (
     <Pressable onPress={() => router.push({ pathname: '/iot/weather', params: { farm: String(farmId), name: farmName } })} accessibilityRole="button">
-      <Card style={{ backgroundColor: '#eef6fb', borderColor: '#d3e6f2' }}>
+      <Card style={{ backgroundColor: colors.infoSoft, borderColor: colors.infoBorder }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Text style={{ fontSize: 34 }}>{today.icon}</Text>
           <View style={{ flex: 1 }}>
@@ -44,13 +45,13 @@ export function WeatherCard({ farm }: { farm: IotFarm }) {
           <Text style={{ fontSize: 22, color: colors.primary }}>›</Text>
         </View>
         {farm.raining && (
-          <Text style={{ marginTop: 10, fontSize: font.body, fontWeight: '700', color: '#fff', backgroundColor: '#2b7bb9', padding: 10, borderRadius: 10, overflow: 'hidden' }}>
+          <Text style={{ marginTop: 10, fontSize: font.body, fontWeight: '700', color: colors.onPrimary, backgroundColor: colors.info, padding: 10, borderRadius: 10, overflow: 'hidden' }}>
             🌧️ Đang mưa từ {timeOf(farm.raining.since)}
             {farm.raining.mm >= 0.5 ? `, khoảng ${formatDecimal(farm.raining.mm)} mm` : ''}
           </Text>
         )}
         {farm.dry_days !== null && farm.dry_days >= 3 && !farm.raining && (
-          <Text style={{ marginTop: 10, fontSize: font.body, fontWeight: '700', color: '#7a4a00', backgroundColor: colors.accentSoft, padding: 10, borderRadius: 10, overflow: 'hidden' }}>
+          <Text style={{ marginTop: 10, fontSize: font.body, fontWeight: '700', color: colors.accentText, backgroundColor: colors.accentSoft, padding: 10, borderRadius: 10, overflow: 'hidden' }}>
             ☀️ Đã {farm.dry_days} ngày không mưa
           </Text>
         )}
@@ -75,7 +76,7 @@ export function Hints({ hints }: { hints: string[] }) {
   return (
     <View style={{ marginTop: 10, gap: 6 }}>
       {hints.map((hint) => (
-        <Text key={hint} style={{ fontSize: font.small + 1, color: '#7a4a00', backgroundColor: colors.accentSoft, padding: 8, borderRadius: 10, overflow: 'hidden' }}>
+        <Text key={hint} style={{ fontSize: font.small + 1, color: colors.accentText, backgroundColor: colors.accentSoft, padding: 8, borderRadius: 10, overflow: 'hidden' }}>
           💡 {hint}
         </Text>
       ))}

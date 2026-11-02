@@ -1,6 +1,7 @@
 import { describeCommand, timeAgo } from '@nhanong/shared';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { RefreshControl, ScrollView, Text } from 'react-native';
+import { RefreshControl, ScrollView } from 'react-native';
+import { Text } from '../../components/AppText';
 import { Card, Status, styles } from '../../components/ui';
 import { iotApi } from '../../lib/iot';
 import { colors } from '../../lib/theme';

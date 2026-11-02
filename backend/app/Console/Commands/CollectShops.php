@@ -4,9 +4,11 @@ namespace App\Console\Commands;
 
 use App\Shops\Collect\ShopCollector;
 use App\Shops\Collect\ShopSource;
+use App\Shops\Collect\Sources\OcrUnavailableException;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 #[Signature('shops:collect {sources?* : Khóa nguồn trong config/shops.php; để trống là tất cả} {--no-process : Chỉ lưu vào bảng chờ, chưa xử lý}')]
@@ -36,6 +38,10 @@ class CollectShops extends Command
                     $result = $collector->process($key);
                     $this->line("  Đưa vào danh sách {$result['published']}, chờ duyệt {$result['pending']}, để lần sau (lỗi tra tọa độ) {$result['deferred']}.");
                 }
+            } catch (OcrUnavailableException $e) {
+                // PDF bản scan mà máy chưa cài công cụ OCR: chỉ cảnh báo, bỏ qua nguồn này
+                Log::warning("shops:collect bỏ qua nguồn {$key}: {$e->getMessage()}");
+                $this->warn("{$source->label()}: bỏ qua. {$e->getMessage()}");
             } catch (Throwable $e) {
                 report($e);
                 $this->error("{$source->label()}: lỗi {$e->getMessage()}");

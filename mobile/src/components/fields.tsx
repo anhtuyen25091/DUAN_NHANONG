@@ -1,11 +1,12 @@
 import { parseVnd, readVnd, today, type EntryType, type LedgerSnapshot } from '@nhanong/shared';
 import type { ReactNode } from 'react';
-import { Pressable, Text, TextInput, View, type TextInputProps } from 'react-native';
-import { colors, font } from '../lib/theme';
+import { Pressable, View, type TextInputProps } from 'react-native';
+import { Text, TextInput } from './AppText';
+import { colors, font, themed } from '../lib/theme';
 import { DatePicker } from './DatePicker';
 import { Chip, styles } from './ui';
 
-export const inputStyle = {
+export const inputStyle = themed(() => ({
   minHeight: 48,
   borderWidth: 1,
   borderColor: colors.border,
@@ -14,7 +15,7 @@ export const inputStyle = {
   fontSize: font.body,
   backgroundColor: colors.surface,
   color: colors.text,
-};
+}));
 
 /** Nhãn + ô (hoặc nhóm nút) bên dưới */
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string | null }) {
@@ -147,7 +148,7 @@ export function CheckRow({ label, checked, onChange }: { label: string; checked:
           justifyContent: 'center',
         }}
       >
-        {checked ? <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800' }}>✓</Text> : null}
+        {checked ? <Text style={{ color: colors.onPrimary, fontSize: 18, fontWeight: '800' }}>✓</Text> : null}
       </View>
       <Text style={[styles.body, { flex: 1 }]}>{label}</Text>
     </Pressable>

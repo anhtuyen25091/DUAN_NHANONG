@@ -1,17 +1,17 @@
 import { formatDecimal, rainOfDay, type IotRainfall } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from './AppText';
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { iotApi } from '../lib/iot';
-import { colors, font } from '../lib/theme';
+import { colors, font, fontFamilyFor } from '../lib/theme';
 import { useAsync } from '../lib/useAsync';
 import { Button, Card, Chip, Status, styles } from './ui';
 
 const RANGES = [7, 30, 90, 365];
 const H = 160;
 const PAD = { top: 10, right: 6, bottom: 22, left: 34 };
-const RAIN_BLUE = '#2b7bb9';
 
 /** Lượng mưa từng ngày tại vườn. Miễn phí xem 30 ngày, có gói Nhà Nông xem 1 năm. */
 export function RainHistory({ farmId }: { farmId: number }) {
@@ -48,9 +48,9 @@ export function RainHistory({ farmId }: { farmId: number }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <View style={{ flex: 1, backgroundColor: '#eef6fb', borderRadius: 12, padding: 10 }}>
+    <View style={{ flex: 1, backgroundColor: colors.infoSoft, borderRadius: 12, padding: 10 }}>
       <Text style={styles.muted}>{label}</Text>
-      <Text style={{ fontSize: font.title - 2, fontWeight: '800', color: RAIN_BLUE }}>{value}</Text>
+      <Text style={{ fontSize: font.title - 2, fontWeight: '800', color: colors.info }}>{value}</Text>
     </View>
   );
 }
@@ -58,7 +58,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 function PlanNotice({ data }: { data: IotRainfall }) {
   return (
     <View style={{ backgroundColor: colors.accentSoft, borderRadius: 12, padding: 12, marginTop: 10, gap: 8 }}>
-      <Text style={[styles.body, { color: '#7a4a00' }]}>
+      <Text style={[styles.body, { color: colors.accentText }]}>
         🔒 Tài khoản miễn phí chỉ xem được {data.max_days} ngày gần nhất. Có gói Nhà Nông thì xem lượng mưa 1 năm.
       </Text>
       {!data.plan.linked && <Text style={styles.muted}>Đăng nhập tài khoản Nhà Nông (mục Tài khoản) trên máy này để dùng chung gói.</Text>}
@@ -115,19 +115,19 @@ function RainBars({ data }: { data: IotRainfall }) {
               <Line key={`g${v}`} x1={PAD.left} x2={width - PAD.right} y1={y(v)} y2={y(v)} stroke={colors.border} />
             ))}
             {[0, max / 2, max].map((v) => (
-              <SvgText key={`t${v}`} x={PAD.left - 4} y={y(v) + 4} fontSize={10} fill={colors.muted} textAnchor="end">
+              <SvgText fontFamily={fontFamilyFor('400') ?? undefined} key={`t${v}`} x={PAD.left - 4} y={y(v) + 4} fontSize={10} fill={colors.muted} textAnchor="end">
                 {Math.round(v)}
               </SvgText>
             ))}
             {bars.map((b, i) =>
               b.mm === null || b.mm === 0 ? null : (
-                <Rect key={i} x={PAD.left + i * barW + barW * 0.15} y={y(b.mm)} width={Math.max(barW * 0.7, 1)} height={Math.max(innerH - (y(b.mm) - PAD.top), 1)} rx={Math.min(3, barW / 3)} fill={i === active ? colors.primary : RAIN_BLUE} />
+                <Rect key={i} x={PAD.left + i * barW + barW * 0.15} y={y(b.mm)} width={Math.max(barW * 0.7, 1)} height={Math.max(innerH - (y(b.mm) - PAD.top), 1)} rx={Math.min(3, barW / 3)} fill={i === active ? colors.primary : colors.info} />
               ),
             )}
-            <SvgText x={PAD.left} y={H - 6} fontSize={11} fill={colors.muted}>
+            <SvgText fontFamily={fontFamilyFor('400') ?? undefined} x={PAD.left} y={H - 6} fontSize={11} fill={colors.muted}>
               {bars[0]?.label.replace('tuần từ ', '')}
             </SvgText>
-            <SvgText x={width - PAD.right} y={H - 6} fontSize={11} fill={colors.muted} textAnchor="end">
+            <SvgText fontFamily={fontFamilyFor('400') ?? undefined} x={width - PAD.right} y={H - 6} fontSize={11} fill={colors.muted} textAnchor="end">
               Hôm nay
             </SvgText>
           </Svg>

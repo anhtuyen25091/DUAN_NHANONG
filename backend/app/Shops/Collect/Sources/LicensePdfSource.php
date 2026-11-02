@@ -8,9 +8,10 @@ use App\Shops\Collect\CandidateData;
 use App\Shops\Collect\ShopSource;
 
 /**
- * Danh sách cơ sở được cấp giấy đủ điều kiện buôn bán dạng file PDF có chữ (không phải bản scan).
+ * Danh sách cơ sở được cấp giấy đủ điều kiện buôn bán dạng file PDF.
  * Bảng được dựng lại theo vị trí chữ (PdfTable), rồi đọc như bảng Excel / HTML (LicenseTable).
- * Bản scan (ảnh) thì không có chữ: lệnh báo 0 điểm, cần nhận dạng chữ (OCR) riêng.
+ * Bản scan (ảnh, không có lớp chữ): nhận dạng chữ bằng tesseract (PdfOcr) rồi dựng bảng cùng cách; các điểm đọc từ OCR
+ * có raw['ocr'] = true để luôn chờ admin duyệt. Máy chưa cài công cụ OCR thì báo OcrUnavailableException (bỏ qua nguồn).
  *
  * Cấu hình trong config/shops.php:
  *   'so-x-bvtv' => ['class' => LicensePdfSource::class, 'url' => '…pdf', 'province' => '…', 'types' => ['thuoc_bvtv'],
@@ -30,6 +31,7 @@ class LicensePdfSource implements ShopSource
         private array $types,
         private int $trust = 85,
         private ?string $page = null,
+        private ?PdfOcr $ocr = null,
     ) {}
 
     /**
@@ -74,6 +76,30 @@ class LicensePdfSource implements ShopSource
      */
     public function read(string $pdfContent): iterable
     {
-        return LicenseTable::candidates(PdfTable::rows($pdfContent), $this->province, $this->types, $this->page ?? $this->url);
+        $pages = PdfTable::pages($pdfContent);
+        if (PdfTable::hasTextLayer($pages)) {
+            return LicenseTable::candidates(PdfTable::fromPages($pages), $this->province, $this->types, $this->page ?? $this->url);
+        }
+        if ($pages === []) {
+            return [];
+        }
+
+        // Bản scan: OCR từng trang rồi dựng bảng như PDF có chữ
+        $ocrPages = ($this->ocr ?? app(PdfOcr::class))->pages($pdfContent, count($pages));
+
+        return self::markOcr(LicenseTable::candidates(PdfTable::fromPages($ocrPages), $this->province, $this->types, $this->page ?? $this->url));
+    }
+
+    /**
+     * Đánh dấu điểm đọc từ OCR (chữ có thể sai): CandidateProcessor để các điểm này chờ admin duyệt.
+     *
+     * @param  iterable<CandidateData>  $candidates
+     * @return iterable<CandidateData>
+     */
+    private static function markOcr(iterable $candidates): iterable
+    {
+        foreach ($candidates as $candidate) {
+            yield new CandidateData(...[...get_object_vars($candidate), 'raw' => [...$candidate->raw, 'ocr' => true]]);
+        }
     }
 }

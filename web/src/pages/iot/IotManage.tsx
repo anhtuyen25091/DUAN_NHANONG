@@ -432,7 +432,7 @@ const GROUPS: Record<IotPlotType, IotMetric['group'][]> = {
   other: ['soil', 'water', 'weather'],
 }
 
-export function ThresholdsPage({ plotId, plotName, type }: { plotId: number; plotName: string; type: IotPlotType }) {
+export function ThresholdsPage({ plotId, plotName, type, editable }: { plotId: number; plotName: string; type: IotPlotType; editable: boolean }) {
   const [data, reload] = useAsync(() => Promise.all([iotApi.thresholds(plotId), iotApi.metrics(), iotApi.cropPresets()]), [plotId])
   const [editing, setEditing] = useState<{ metric: IotMetric; threshold?: IotThreshold } | null>(null)
   const [applied, setApplied] = useState<IotCropPreset | null>(null)
@@ -441,7 +441,7 @@ export function ThresholdsPage({ plotId, plotName, type }: { plotId: number; plo
   const [thresholds, metrics, presets] = data.data
   const metricOf = (code: string) => metrics.find((m) => m.code === code)
 
-  if (editing) return <ThresholdForm plotId={plotId} {...editing} onDone={() => (setEditing(null), reload())} />
+  if (editing && editable) return <ThresholdForm plotId={plotId} {...editing} onDone={() => (setEditing(null), reload())} />
 
   const apply = async (preset: IotCropPreset) => {
     if (!window.confirm(`Dùng gợi ý cho ${preset.name}? Đặt ngưỡng theo tài liệu kỹ thuật (ghi đè ngưỡng cùng chỉ số).`)) return
@@ -455,12 +455,13 @@ export function ThresholdsPage({ plotId, plotName, type }: { plotId: number; plo
       <Back to={`cam-bien/lo/${plotId}`} label={plotName || 'Lô'} />
       <h1>Ngưỡng cảnh báo</h1>
       <p className="muted">Số đo ra ngoài ngưỡng thì báo về điện thoại (1 lần, tới khi số đo trở lại bình thường).</p>
+      {!editable && <p className="notice">🔒 Bạn đang xem trang trại được chia sẻ. Chỉ chủ trang trại được thêm / sửa / xóa.</p>}
       <h2 className="section-title">Đang đặt</h2>
       {thresholds.length === 0 && <p className="muted">Chưa đặt ngưỡng nào.</p>}
       {thresholds.map((t) => {
         const metric = metricOf(t.metric)
         return (
-          <button key={t.id} type="button" className="card" style={{ display: 'block', width: '100%', textAlign: 'left' }} onClick={() => metric && setEditing({ metric, threshold: t })}>
+          <button key={t.id} type="button" className="card" disabled={!editable} style={{ display: 'block', width: '100%', textAlign: 'left', cursor: editable ? undefined : 'default' }} onClick={() => metric && setEditing({ metric, threshold: t })}>
             <b>{metric?.name ?? t.metric}</b> · {thresholdLabel(t.min, t.max)}
             {metric?.unit ? ` ${metric.unit}` : ''}
             {t.note && (
@@ -472,30 +473,34 @@ export function ThresholdsPage({ plotId, plotName, type }: { plotId: number; plo
           </button>
         )
       })}
-      <h2 className="section-title">Gợi ý theo cây trồng</h2>
-      <div className="segmented wrap">
-        {presets.map((p) => (
-          <button key={p.code} type="button" className={applied?.code === p.code ? 'active' : ''} onClick={() => void apply(p)}>
-            {p.name}
-          </button>
-        ))}
-      </div>
-      {applied && <PresetNotes preset={applied} />}
-      <h2 className="section-title">Thêm ngưỡng</h2>
-      <div className="segmented wrap">
-        {metrics
-          .filter((m) => m.group !== 'device' && (showAll || GROUPS[type].includes(m.group)) && !thresholds.some((t) => t.metric === m.code))
-          .map((m) => (
-            <button key={m.code} type="button" onClick={() => setEditing({ metric: m })}>
-              ＋ {m.name}
+      {editable && (
+        <>
+          <h2 className="section-title">Gợi ý theo cây trồng</h2>
+          <div className="segmented wrap">
+            {presets.map((p) => (
+              <button key={p.code} type="button" className={applied?.code === p.code ? 'active' : ''} onClick={() => void apply(p)}>
+                {p.name}
+              </button>
+            ))}
+          </div>
+          {applied && <PresetNotes preset={applied} />}
+          <h2 className="section-title">Thêm ngưỡng</h2>
+          <div className="segmented wrap">
+            {metrics
+              .filter((m) => m.group !== 'device' && (showAll || GROUPS[type].includes(m.group)) && !thresholds.some((t) => t.metric === m.code))
+              .map((m) => (
+                <button key={m.code} type="button" onClick={() => setEditing({ metric: m })}>
+                  ＋ {m.name}
+                </button>
+              ))}
+          </div>
+          <p>
+            <button type="button" className="linklike" onClick={() => setShowAll(!showAll)}>
+              {showAll ? 'Chỉ hiện chỉ số hay dùng' : 'Hiện tất cả chỉ số'}
             </button>
-          ))}
-      </div>
-      <p>
-        <button type="button" className="linklike" onClick={() => setShowAll(!showAll)}>
-          {showAll ? 'Chỉ hiện chỉ số hay dùng' : 'Hiện tất cả chỉ số'}
-        </button>
-      </p>
+          </p>
+        </>
+      )}
     </section>
   )
 }
@@ -713,13 +718,13 @@ function ActuatorFormInner({ actuator, plotId, controllers, sensors }: { actuato
 
 // ---------- Luật tự động ----------
 
-export function RulesPage({ plotId, plotName, type }: { plotId: number; plotName: string; type: IotPlotType }) {
+export function RulesPage({ plotId, plotName, type, editable }: { plotId: number; plotName: string; type: IotPlotType; editable: boolean }) {
   const [data, reload] = useAsync(() => Promise.all([iotApi.rules(plotId), iotApi.actuators(plotId), iotApi.metrics()]), [plotId])
   const [editing, setEditing] = useState<IotRule | 'new' | null>(null)
   if (data.status !== 'ok') return <Status state={data} retry={reload} />
   const [rules, actuators, metrics] = data.data
 
-  if (editing) {
+  if (editing && editable) {
     return (
       <RuleForm
         plotId={plotId}
@@ -736,10 +741,11 @@ export function RulesPage({ plotId, plotName, type }: { plotId: number; plotName
       <Back to={`cam-bien/lo/${plotId}`} label={plotName || 'Lô'} />
       <h1>⚡ Luật tự động</h1>
       <p className="muted">Số đo vượt mức thì tự bật máy và báo về điện thoại. Có thời gian nghỉ giữa 2 lần bật; máy bạn bật tay thì luật không tự tắt.</p>
+      {!editable && <p className="notice">🔒 Bạn đang xem trang trại được chia sẻ. Chỉ chủ trang trại được thêm / sửa / xóa.</p>}
       {actuators.length === 0 && <p className="notice">Lô chưa có máy bơm / quạt điều khiển được.</p>}
       {rules.length === 0 && <p className="muted">Chưa có luật nào.</p>}
       {rules.map((rule) => (
-        <button key={rule.id} type="button" className="card" style={{ display: 'block', width: '100%', textAlign: 'left', opacity: rule.enabled ? 1 : 0.6 }} onClick={() => setEditing(rule)}>
+        <button key={rule.id} type="button" className="card" disabled={!editable} style={{ display: 'block', width: '100%', textAlign: 'left', opacity: rule.enabled ? 1 : 0.6, cursor: editable ? undefined : 'default' }} onClick={() => setEditing(rule)}>
           <b>{describeRule(rule)}</b>
           <br />
           <span className="small muted">
@@ -748,7 +754,7 @@ export function RulesPage({ plotId, plotName, type }: { plotId: number; plotName
           </span>
         </button>
       ))}
-      {actuators.length > 0 && (
+      {editable && actuators.length > 0 && (
         <button type="button" className="button primary" onClick={() => setEditing('new')}>
           ＋ Thêm luật
         </button>
@@ -840,13 +846,13 @@ function RuleForm({ plotId, rule, actuators, metrics, onDone }: { plotId: number
 
 const DRY_SEASON = [12, 1, 2, 3, 4]
 
-export function SchedulesPage({ plotId, plotName }: { plotId: number; plotName: string }) {
+export function SchedulesPage({ plotId, plotName, editable }: { plotId: number; plotName: string; editable: boolean }) {
   const [data, reload] = useAsync(() => Promise.all([iotApi.schedules(plotId), iotApi.actuators(plotId), iotApi.cropPresets()]), [plotId])
   const [editing, setEditing] = useState<IotSchedule | 'new' | null>(null)
   if (data.status !== 'ok') return <Status state={data} retry={reload} />
   const [schedules, actuators, presets] = data.data
 
-  if (editing) {
+  if (editing && editable) {
     return (
       <ScheduleForm
         schedule={editing === 'new' ? undefined : editing}
@@ -862,10 +868,11 @@ export function SchedulesPage({ plotId, plotName }: { plotId: number; plotName: 
       <Back to={`cam-bien/lo/${plotId}`} label={plotName || 'Lô'} />
       <h1>🗓️ Lịch tưới</h1>
       <p className="muted">Tới giờ tự bật máy bơm, chạy đủ số phút rồi tự tắt; có thể chỉ tưới mùa khô và bỏ lượt khi vườn vừa mưa đủ.</p>
+      {!editable && <p className="notice">🔒 Bạn đang xem trang trại được chia sẻ. Chỉ chủ trang trại được thêm / sửa / xóa.</p>}
       {actuators.length === 0 && <p className="notice">Lô chưa có máy bơm / van điều khiển được.</p>}
       {schedules.length === 0 && <p className="muted">Chưa có lịch tưới nào.</p>}
       {schedules.map((s) => (
-        <button key={s.id} type="button" className="card" style={{ display: 'block', width: '100%', textAlign: 'left', opacity: s.enabled ? 1 : 0.6 }} onClick={() => setEditing(s)}>
+        <button key={s.id} type="button" className="card" disabled={!editable} style={{ display: 'block', width: '100%', textAlign: 'left', opacity: s.enabled ? 1 : 0.6, cursor: editable ? undefined : 'default' }} onClick={() => setEditing(s)}>
           <b>{s.actuator.name}</b>: {describeSchedule(s)}
           <br />
           <span className="small muted">
@@ -875,7 +882,7 @@ export function SchedulesPage({ plotId, plotName }: { plotId: number; plotName: 
           </span>
         </button>
       ))}
-      {actuators.length > 0 && (
+      {editable && actuators.length > 0 && (
         <button type="button" className="button primary" onClick={() => setEditing('new')}>
           ＋ Thêm lịch tưới
         </button>

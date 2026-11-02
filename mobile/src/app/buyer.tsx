@@ -17,7 +17,8 @@ import {
 import * as Location from 'expo-location';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { Text } from '../components/AppText';
 import { DateField, ErrorNote, Field, MoneyField, TextField } from '../components/fields';
 import { ItemRow } from '../components/ledger';
 import { Button, Card, Chip, Status, styles } from '../components/ui';
@@ -69,7 +70,7 @@ export default function BuyerScreen() {
 }
 
 function StatusCard({ buyer, onEdit }: { buyer: BuyerProfile; onEdit: () => void }) {
-  const color = buyer.status === 'approved' ? colors.gain : buyer.status === 'pending' ? '#ca8a04' : colors.loss;
+  const color = buyer.status === 'approved' ? colors.gain : buyer.status === 'pending' ? colors.warn : colors.loss;
   return (
     <Card style={{ borderLeftWidth: 6, borderLeftColor: color, gap: 4 }}>
       <Text style={{ fontSize: font.body + 1, fontWeight: '700', color: colors.text }}>

@@ -1,7 +1,8 @@
 import { formatDate, formatQty, formatVnd, supplyCost, supplyStock, today, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { Text } from '../../../components/AppText';
 import { checkDate, DateField, ErrorNote, GardenPicker, QtyField } from '../../../components/fields';
 import { FieldLines } from '../../../components/extraFields';
 import { ItemRow, SectionTitle } from '../../../components/ledger';

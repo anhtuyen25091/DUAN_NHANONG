@@ -13,7 +13,8 @@ import {
   type LoanPlan,
 } from '@nhanong/shared';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { Text, TextInput } from './AppText';
 import { loanTermsOf, type LoanDraft } from '../lib/loanDraft';
 import { colors, font } from '../lib/theme';
 import { Field, inputStyle } from './fields';

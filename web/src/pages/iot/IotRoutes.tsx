@@ -42,14 +42,16 @@ export default function IotRoutes({ path, query }: { path: string[]; query: URLS
   const id = path[2] && path[2] !== 'moi' ? Number(path[2]) : null
   const num = (key: string) => (query.get(key) ? Number(query.get(key)) : null)
   const plotType = (query.get('type') ?? 'other') as IotPlotType
+  // Người dùng chung (role khác owner) chỉ xem ngưỡng / luật / lịch tưới, không sửa
+  const editable = canManage((query.get('role') ?? undefined) as IotRole | undefined)
   if (path[1] === 'trang-trai') return <FarmForm id={id} />
   if (path[1] === 'lo-moi') return <PlotForm id={null} farmId={num('farm')} />
   if (path[1] === 'sua-lo' && id) return <PlotForm id={id} farmId={null} />
   if (path[1] === 'thiet-bi') return <DeviceForm id={id} farmId={num('farm')} plotId={num('plot')} />
-  if (path[1] === 'nguong' && id) return <ThresholdsPage plotId={id} plotName={query.get('ten') ?? ''} type={plotType} />
+  if (path[1] === 'nguong' && id) return <ThresholdsPage plotId={id} plotName={query.get('ten') ?? ''} type={plotType} editable={editable} />
   if (path[1] === 'may' && num('plot')) return <ActuatorForm id={id} plotId={num('plot') ?? 0} />
-  if (path[1] === 'luat' && id) return <RulesPage plotId={id} plotName={query.get('ten') ?? ''} type={plotType} />
-  if (path[1] === 'lich' && id) return <SchedulesPage plotId={id} plotName={query.get('ten') ?? ''} />
+  if (path[1] === 'luat' && id) return <RulesPage plotId={id} plotName={query.get('ten') ?? ''} type={plotType} editable={editable} />
+  if (path[1] === 'lich' && id) return <SchedulesPage plotId={id} plotName={query.get('ten') ?? ''} editable={editable} />
   if (path[1] === 'lich-su' && id) return <HistoryPage actuatorId={id} name={query.get('ten') ?? ''} plotId={query.get('plot')} />
   if (path[1] === 'gui-file') return <UploadPage />
   if (path[1] === 'chia-se' && id) return <MembersPage farmId={id} farmName={query.get('ten') ?? ''} />
@@ -323,15 +325,13 @@ function PlotPage({ id }: { id: number }) {
             ))}
           </div>
           <div className="btn-row">
+            <a className="button" href={href(`cam-bien/nguong/${id}`, { ten: data.plot.name, type: data.plot.type, role: data.role })}>
+              🎯 Ngưỡng cảnh báo
+            </a>
             {canManage(data.role) && (
-              <>
-                <a className="button" href={href(`cam-bien/nguong/${id}`, { ten: data.plot.name, type: data.plot.type })}>
-                  🎯 Ngưỡng cảnh báo
-                </a>
-                <a className="button" href={href(`cam-bien/sua-lo/${id}`)}>
-                  ✏️ Sửa lô
-                </a>
-              </>
+              <a className="button" href={href(`cam-bien/sua-lo/${id}`)}>
+                ✏️ Sửa lô
+              </a>
             )}
             <ExportButton plotId={id} />
           </div>
@@ -406,13 +406,15 @@ function Controls({ plotId, plotName, type, role }: { plotId: number; plotName: 
       {list.map((actuator) => (
         <ActuatorCard key={actuator.id} actuator={actuator} plotId={plotId} role={role} onChanged={() => reloadRef.current()} />
       ))}
-      {canManage(role) && (
+      {(canManage(role) || list.length > 0) && (
         <div className="btn-row">
-          <a className="button" href={href('cam-bien/may/moi', { plot: String(plotId) })}>
-            ＋ Thêm máy bơm / quạt
-          </a>
+          {canManage(role) && (
+            <a className="button" href={href('cam-bien/may/moi', { plot: String(plotId) })}>
+              ＋ Thêm máy bơm / quạt
+            </a>
+          )}
           {list.length > 0 && (
-            <a className="button" href={href(`cam-bien/luat/${plotId}`, { ten: plotName, type })}>
+            <a className="button" href={href(`cam-bien/luat/${plotId}`, { ten: plotName, type, role })}>
               ⚡ Luật tự động
             </a>
           )}

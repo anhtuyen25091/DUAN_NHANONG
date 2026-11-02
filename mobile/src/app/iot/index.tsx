@@ -1,7 +1,8 @@
 import { ApiError, canControl, canManage, planLabel, ROLE_LABELS } from '@nhanong/shared';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { inputStyle } from '../../components/fields';
 import { AlertCard, SectionTitle } from '../../components/iot';
 import { WeatherCard } from '../../components/iotWeather';

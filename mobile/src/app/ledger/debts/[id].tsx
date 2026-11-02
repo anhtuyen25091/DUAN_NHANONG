@@ -1,7 +1,8 @@
 import { DEBT_KIND_LABELS, debtStatus, formatDate, formatVnd, interestPaid, LENDER_TYPE_LABELS, loanSchedule, monthlyInterest, telHref, today, type Installment, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View, type ScrollViewInstance } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, View, type ScrollViewInstance } from 'react-native';
+import { Text } from '../../../components/AppText';
 import { checkDate, DateField, ErrorNote, MoneyField } from '../../../components/fields';
 import { ItemRow, KIND_ICON, SectionTitle } from '../../../components/ledger';
 import { LoanScheduleCard } from '../../../components/loan';

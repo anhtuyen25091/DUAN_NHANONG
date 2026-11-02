@@ -1,7 +1,8 @@
 import { FARM_LOG_KIND_LABELS, FARM_LOG_KINDS, formatQty, supplyStock, today, WITHHOLDING_PRESETS, type FarmLogKind, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { DateField, ErrorNote, Field, GardenPicker, QtyField, TextField } from '../../components/fields';
 import { Button, Chip, styles } from '../../components/ui';
 import { useLedger } from '../../lib/ledger';

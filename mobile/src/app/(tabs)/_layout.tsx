@@ -1,9 +1,10 @@
 import { router, Tabs } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDealWatch } from '../../lib/dealWatch';
 import { gradientHeader } from '../../components/Gradient';
-import { colors, shadow } from '../../lib/theme';
+import { brandGradient, colors, fontStyle, shadow } from '../../lib/theme';
 
 /** Khung biểu tượng tab: Android mặc định chỉ 24×24 nên phải nới ra (tabBarIconStyle) để emoji + nền không bị cắt */
 const ICON_BOX = { width: 56, height: 32 };
@@ -29,7 +30,7 @@ export default function TabsLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 13, fontWeight: '600', marginTop: 2 },
+        tabBarLabelStyle: { fontSize: 13, ...fontStyle('600'), marginTop: 2 },
         tabBarIconStyle: ICON_BOX,
         // Biểu tượng 32 + chữ ~18 + lề của ô (~10): Android mặc định chỉ cao ~56 nên chữ bị đẩy mất; tính đủ chỗ + vùng thanh điều hướng của máy
         tabBarStyle: {
@@ -45,10 +46,10 @@ export default function TabsLayout() {
           elevation: 12,
         },
         tabBarLabelPosition: 'below-icon',
-        headerStyle: { backgroundColor: colors.primary },
+        headerStyle: { backgroundColor: brandGradient[1] },
         headerBackground: gradientHeader,
         headerTintColor: '#fff',
-        headerTitleStyle: { color: '#fff', fontWeight: '800', fontSize: 19 },
+        headerTitleStyle: { color: '#fff', ...fontStyle('800'), fontSize: 19 },
         headerShadowVisible: false,
         sceneStyle: { backgroundColor: colors.bg },
       }}

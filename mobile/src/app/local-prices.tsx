@@ -1,7 +1,8 @@
 import { CATEGORY_TYPE_LABELS, type CategoryType } from '@nhanong/shared';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { Text } from '../components/AppText';
 import { LocationBar } from '../components/LocationPicker';
 import { LocalPriceList, NearbyServices } from '../components/localPrices';
 import { Button, Chip, styles } from '../components/ui';

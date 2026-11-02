@@ -1,7 +1,8 @@
 import { CUT_GRADES, cutValue, formatQty, formatVnd, today, type CutLine, type Deal, type DealEntryInput, type DealEntryKind } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { DealsSignIn, Notice } from '../../components/deals';
 import { checkDate, DateField, ErrorNote, groupDigits, inputStyle, MoneyField, TextField } from '../../components/fields';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';

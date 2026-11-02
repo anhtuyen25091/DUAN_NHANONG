@@ -92,6 +92,69 @@ class FarmSharingTest extends TestCase
             ->assertJsonPath('message', 'Bạn chỉ được xem trang trại này, không được bật / tắt máy.');
     }
 
+    /**
+     * Chủ tạo sẵn 1 ngưỡng, 1 luật, 1 lịch tưới; trả về id của chúng.
+     *
+     * @return array{threshold: int, rule: int, schedule: int}
+     */
+    private function ownerCreatesSettings(): array
+    {
+        Sanctum::actingAs($this->owner);
+
+        return [
+            'threshold' => $this->postJson(route('api.v1.thresholds.store', $this->plot), ['metric' => 'soil_ph', 'min' => 5.5, 'max' => 6.5])->assertCreated()->json('data.id'),
+            'rule' => $this->postJson(route('api.v1.rules.store', $this->plot), ['metric' => 'soil_moisture', 'actuator_id' => $this->pump->id, 'operator' => 'below', 'value' => 30, 'minutes' => 10])->assertCreated()->json('data.id'),
+            'schedule' => $this->postJson(route('api.v1.schedules.store', $this->pump), ['start_time' => '05:30', 'minutes' => 15, 'every_days' => 1])->assertCreated()->json('data.id'),
+        ];
+    }
+
+    public function test_members_see_schedules_rules_and_thresholds_but_cannot_change_them(): void
+    {
+        foreach ([FarmMember::VIEWER, FarmMember::OPERATOR] as $role) {
+            $member = $this->share($role);
+            $ids = $this->ownerCreatesSettings();
+            Sanctum::actingAs($member);
+
+            $this->getJson(route('api.v1.thresholds.index', $this->plot))->assertOk()->assertJsonPath('data.0.id', $ids['threshold']);
+            $this->getJson(route('api.v1.rules.index', $this->plot))->assertOk()->assertJsonPath('data.0.id', $ids['rule']);
+            $this->getJson(route('api.v1.schedules.index', $this->plot))->assertOk()->assertJsonPath('data.0.id', $ids['schedule']);
+
+            $this->postJson(route('api.v1.thresholds.store', $this->plot), ['metric' => 'soil_ph', 'min' => 4])->assertForbidden();
+            $this->deleteJson(route('api.v1.thresholds.destroy', $ids['threshold']))->assertForbidden();
+            $this->postJson(route('api.v1.rules.store', $this->plot), ['metric' => 'soil_moisture', 'actuator_id' => $this->pump->id, 'operator' => 'below', 'value' => 20, 'minutes' => 5])->assertForbidden();
+            $this->putJson(route('api.v1.rules.update', $ids['rule']), ['metric' => 'soil_moisture', 'actuator_id' => $this->pump->id, 'operator' => 'below', 'value' => 20, 'minutes' => 5])->assertForbidden();
+            $this->deleteJson(route('api.v1.rules.destroy', $ids['rule']))->assertForbidden();
+            $this->postJson(route('api.v1.schedules.store', $this->pump), ['start_time' => '06:00', 'minutes' => 5, 'every_days' => 1])->assertForbidden();
+            $this->putJson(route('api.v1.schedules.update', $ids['schedule']), ['start_time' => '06:00', 'minutes' => 5, 'every_days' => 1])->assertForbidden();
+            $this->deleteJson(route('api.v1.schedules.destroy', $ids['schedule']))->assertForbidden();
+
+            // Không xóa được gì: vẫn còn đủ
+            $this->getJson(route('api.v1.thresholds.index', $this->plot))->assertJsonCount(1, 'data');
+            $this->getJson(route('api.v1.rules.index', $this->plot))->assertJsonCount(1, 'data');
+            $this->getJson(route('api.v1.schedules.index', $this->plot))->assertJsonCount(1, 'data');
+
+            // Dọn để vòng sau (vai trò khác) bắt đầu từ đầu
+            $this->plot->thresholds()->delete();
+            $this->plot->rules()->delete();
+            $this->pump->schedules()->delete();
+            FarmMember::query()->delete();
+        }
+    }
+
+    public function test_strangers_cannot_see_schedules_rules_or_thresholds(): void
+    {
+        $ids = $this->ownerCreatesSettings();
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->getJson(route('api.v1.thresholds.index', $this->plot))->assertNotFound();
+        $this->getJson(route('api.v1.rules.index', $this->plot))->assertNotFound();
+        $this->getJson(route('api.v1.schedules.index', $this->plot))->assertNotFound();
+        $this->postJson(route('api.v1.thresholds.store', $this->plot), ['metric' => 'soil_ph', 'min' => 4])->assertNotFound();
+        $this->deleteJson(route('api.v1.thresholds.destroy', $ids['threshold']))->assertNotFound();
+        $this->deleteJson(route('api.v1.rules.destroy', $ids['rule']))->assertNotFound();
+        $this->deleteJson(route('api.v1.schedules.destroy', $ids['schedule']))->assertNotFound();
+    }
+
     public function test_strangers_get_not_found(): void
     {
         Sanctum::actingAs(User::factory()->create());

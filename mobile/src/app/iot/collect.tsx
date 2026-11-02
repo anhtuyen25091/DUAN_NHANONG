@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { Button, Card, styles } from '../../components/ui';
 import { collectFromDevice, flushDeviceFiles, type PendingDeviceFile } from '../../lib/iot';
 import { colors, font } from '../../lib/theme';

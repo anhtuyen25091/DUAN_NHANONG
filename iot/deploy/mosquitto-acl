@@ -1,7 +1,15 @@
-# Thiết bị chỉ được gửi lên nhanong/<mã>/up, không đọc được dữ liệu thiết bị khác
+# Thiết bị chỉ được gửi lên nhanong/<mã>/up (số đo) và nhanong/<mã>/ack (kết quả lệnh), không đọc được dữ liệu thiết bị khác.
+# Mỗi bản tin gửi lên vẫn kèm khóa riêng của thiết bị ("key"), máy chủ kiểm khóa.
 user nhanong-device
 topic write nhanong/+/up
+topic write nhanong/+/ack
 
-# Máy chủ đọc mọi số đo
+# Máy chủ đọc số đo + kết quả lệnh, đẩy lệnh xuống nhanong/<mã>/down
 user nhanong-server
 topic read nhanong/+/up
+topic read nhanong/+/ack
+topic write nhanong/+/down
+
+# Mỗi mạch chỉ nghe lệnh của chính nó: mã client MQTT = mã thiết bị (firmware kết nối bằng DEVICE_UID).
+# Mạch kiểm thêm chữ ký HMAC trong bản tin (tài khoản thiết bị dùng chung, không tin topic).
+pattern read nhanong/%c/down

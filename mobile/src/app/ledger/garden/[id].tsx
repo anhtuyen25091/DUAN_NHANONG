@@ -2,7 +2,8 @@ import { allocatedEntries, paginate, CONTRACT_STATUS_LABELS, contractSummaries, 
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { groupDigits } from '../../../components/fields';
-import { ActivityIndicator, FlatList, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, View } from 'react-native';
+import { Text } from '../../../components/AppText';
 import { EntryItemRow, entryItems, Fab, ItemRow, MonthBars, Pager, ProfitCard, RowCard, type EntryItem } from '../../../components/ledger';
 import { Button, Card, Chip, styles } from '../../../components/ui';
 import { FieldLines } from '../../../components/extraFields';

@@ -19,7 +19,8 @@ export interface MapRender {
  * Kéo / phóng xong thì báo khung đang xem về app ({action: 'view', bbox, zoom}); app tải rồi gọi window.render(MapRender):
  * nhiều điểm thì vẽ cụm ghi số (bấm để phóng to), ít điểm thì vẽ từng chấm, bấm nút trong ô thông tin thì báo về app.
  */
-export function mapHtml(view: { center: [number, number]; zoom: number | null }): string {
+/** dark: app đang ở chế độ tối → đảo màu nền bản đồ, ô thông tin nền tối (giống bảng màu tối của app) */
+export function mapHtml(view: { center: [number, number]; zoom: number | null; dark?: boolean }): string {
   // Dữ liệu nhúng vào <script>: chặn "</script>"
   const data = JSON.stringify({
     tiles: TILES,
@@ -34,13 +35,19 @@ export function mapHtml(view: { center: [number, number]; zoom: number | null })
   }).replace(/</g, '\\u003c');
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <link rel="stylesheet" href="${LEAFLET}/leaflet.css">
-<style>html,body,#map{height:100%;margin:0}body{font:16px -apple-system,Roboto,sans-serif}.leaflet-popup-content{font-size:16px;line-height:1.45}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;700&display=swap">
+<style>html,body,#map{height:100%;margin:0}body{font:16px 'Be Vietnam Pro',-apple-system,Roboto,sans-serif}.leaflet-container{font-family:inherit}.leaflet-popup-content{font-size:16px;line-height:1.45}
 .muted{color:#666;font-size:14px}.acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.acts button{font-size:15px;padding:8px 10px;border-radius:8px;border:1px solid #1b7a3a;background:#fff;color:#1b7a3a}
 .acts button.primary{background:#1b7a3a;color:#fff}
 .vn-label span{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;text-align:center;pointer-events:none;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff}
 .vn-label.sovereignty span{color:#b3261e;font-weight:700;font-size:13px}.vn-label.sea span{color:#2f6690;font-style:italic;font-size:13px}
 .vn-label.province span{color:#444;font-size:12px}
-.leaflet-marker-icon.cl{box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(27,122,58,.85);border:3px solid rgba(255,255,255,.9);box-shadow:0 0 0 3px rgba(27,122,58,.25);color:#fff;font-weight:700;font-size:13px;line-height:1}</style></head><body><div id="map"></div>
+.leaflet-marker-icon.cl{box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(27,122,58,.85);border:3px solid rgba(255,255,255,.9);box-shadow:0 0 0 3px rgba(27,122,58,.25);color:#fff;font-weight:700;font-size:13px;line-height:1}
+.dark .leaflet-container{background:#0c1310}.dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.9)}
+.dark .leaflet-popup-content-wrapper,.dark .leaflet-popup-tip{background:#141d18;color:#ebf2ed}.dark .muted{color:#9fb2a6}.dark .leaflet-container a.leaflet-popup-close-button{color:#9fb2a6}
+.dark .acts button{background:#141d18;color:#3ddc97;border-color:#3ddc97}.dark .acts button.primary{background:#3ddc97;color:#06281a}
+.dark .vn-label span{text-shadow:0 0 3px #000,0 0 3px #000,0 0 3px #000}.dark .vn-label.province span{color:#c8d3cc}.dark .vn-label.sea span{color:#8ec1e6}.dark .vn-label.sovereignty span{color:#ff8a80}
+.dark .leaflet-bar a,.dark .leaflet-control-attribution{background:#141d18;color:#ebf2ed}.dark .leaflet-control-attribution a{color:#3ddc97}</style></head><body${view.dark ? ' class="dark"' : ''}><div id="map"></div>
 <script src="${LEAFLET}/leaflet.js"></script><script>
 const D=${data};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);

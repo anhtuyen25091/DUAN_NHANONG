@@ -1,11 +1,12 @@
 import { directionsUrl, geoNote, PROVINCE_CENTERS, spreadPoint, SHOP_TYPE_COLORS, SHOP_TYPE_LABELS, telHref, VIETNAM_CENTER, type Shop, type ShopFilters, type ShopMapView } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
+import { Text } from './AppText';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { api } from '../lib/api';
 import { mapHtml, type MapRender, type MapShop } from '../lib/shopMapHtml';
-import { colors } from '../lib/theme';
+import { colors, currentScheme } from '../lib/theme';
 import { styles } from './ui';
 
 const toMapShop = (s: Shop): MapShop => {
@@ -42,12 +43,14 @@ export function ShopMap({ filters, position }: { filters: ShopFilters; position:
   const [error, setError] = useState<string | null>(null);
   const lastView = useRef<{ bbox: string; zoom: number } | null>(null);
 
+  // Màn hình được dựng lại khi đổi sáng / tối (app/_layout.tsx) nên đọc một lần là đủ
+  const dark = currentScheme() === 'dark';
   // Khung xem ban đầu theo bộ lọc; đổi bộ lọc thì dựng lại bản đồ
   const html = useMemo(() => {
     const province = filters.province ? PROVINCE_CENTERS[filters.province] : undefined;
-    if (position) return mapHtml({ center: [position.lat, position.lng], zoom: 11 });
-    if (province) return mapHtml({ center: province, zoom: 9 });
-    return mapHtml({ center: VIETNAM_CENTER, zoom: null });
+    if (position) return mapHtml({ center: [position.lat, position.lng], zoom: 11, dark });
+    if (province) return mapHtml({ center: province, zoom: 9, dark });
+    return mapHtml({ center: VIETNAM_CENTER, zoom: null, dark });
   }, [filters.type, filters.province, filters.q, position?.lat, position?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = async (bbox: string, zoom: number) => {
@@ -97,7 +100,7 @@ export function ShopMap({ filters, position }: { filters: ShopFilters; position:
         </Text>
       )}
       <View style={{ flex: 1, minHeight: 280, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
-        <WebView<object> ref={web} key={html.length + (filters.province ?? '') + (filters.type ?? '') + (filters.q ?? '')} originWhitelist={['*']} source={{ html }} onMessage={onMessage} style={{ flex: 1 }} setSupportMultipleWindows={false} />
+        <WebView<object> ref={web} key={html.length + (filters.province ?? '') + (filters.type ?? '') + (filters.q ?? '')} originWhitelist={['*']} source={{ html }} onMessage={onMessage} style={{ flex: 1, backgroundColor: colors.bg }} setSupportMultipleWindows={false} />
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         {(Object.keys(SHOP_TYPE_COLORS) as (keyof typeof SHOP_TYPE_COLORS)[]).map((t) => (

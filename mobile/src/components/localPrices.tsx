@@ -1,7 +1,8 @@
 import { CATEGORY_TYPE_LABELS, compareToReference, formatDate, formatPercent, formatDistance, formatVnd, SHOP_TYPE_LABELS, radiusToReach, telHref, type CategoryType, type FartherProduct, type LocalPriceProduct } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
+import { Text } from './AppText';
 import { api } from '../lib/api';
 import { confirmAsync } from '../lib/confirm';
 import { setMyLocation, useMyLocation } from '../lib/myLocation';

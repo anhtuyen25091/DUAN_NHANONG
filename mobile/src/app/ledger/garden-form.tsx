@@ -1,6 +1,7 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TextInput, type TextInputProps } from 'react-native';
+import { ActivityIndicator, ScrollView, type TextInputProps } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { extraTexts, saveExtra, type CustomFieldDef } from '@nhanong/shared';
 import { CustomFieldInputs } from '../../components/extraFields';
 import { Button, styles } from '../../components/ui';

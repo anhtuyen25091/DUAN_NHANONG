@@ -1,7 +1,8 @@
 import { formatDecimal, isController, parseDecimalInput, type IotActuator, type IotActuatorKind, type IotDevice } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text } from 'react-native';
+import { ScrollView } from 'react-native';
+import { Text } from '../../components/AppText';
 import { FormInput, FormMessage, FormSection, NO_ERRORS, toFormErrors } from '../../components/iotForm';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
 import { confirmAsync } from '../../lib/confirm';

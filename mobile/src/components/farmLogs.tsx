@@ -1,6 +1,7 @@
 import { FARM_LOG_KIND_LABELS, formatDate, formatQty, today, withholdingOn, withholdingText, type LedgerSnapshot } from '@nhanong/shared';
 import { router } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from './AppText';
 import { colors, font } from '../lib/theme';
 import { RowCard } from './ledger';
 import { Button, Card, styles } from './ui';

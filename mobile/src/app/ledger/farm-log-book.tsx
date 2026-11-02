@@ -1,7 +1,8 @@
 import { farmLogLine, farmLogText, today, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Share, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { WithholdingNotice } from '../../components/farmLogs';
 import { DateField } from '../../components/fields';
 import { Button, Card, styles } from '../../components/ui';

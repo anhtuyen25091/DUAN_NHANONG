@@ -1,7 +1,8 @@
-import { describeRule, formatDecimal, parseDecimalInput, timeAgo, type IotActuator, type IotMetric, type IotPlotType, type IotRule } from '@nhanong/shared';
+import { canManage, describeRule, formatDecimal, parseDecimalInput, timeAgo, type IotActuator, type IotMetric, type IotPlotType, type IotRole, type IotRule } from '@nhanong/shared';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { SectionTitle } from '../../components/iot';
 import { FormInput, FormMessage, FormSection, NO_ERRORS, toFormErrors } from '../../components/iotForm';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
@@ -20,14 +21,16 @@ const GROUPS: Record<IotPlotType, IotMetric['group'][]> = {
 
 /** Luật tự động của 1 lô: số đo vượt mức thì tự bật / tắt máy */
 export default function IotRulesScreen() {
-  const { plot, name, type } = useLocalSearchParams<{ plot: string; name?: string; type?: IotPlotType }>();
+  const { plot, name, type, role } = useLocalSearchParams<{ plot: string; name?: string; type?: IotPlotType; role?: IotRole }>();
+  // Người dùng chung chỉ xem, không sửa
+  const manage = canManage(role);
   const data = useAsync(() => Promise.all([iotApi.rules(Number(plot)), iotApi.actuators(Number(plot)), iotApi.metrics()]), [plot]);
   const [editing, setEditing] = useState<IotRule | 'new' | null>(null);
 
   if (data.state.status !== 'ok') return <Status state={data.state} retry={data.reload} />;
   const [rules, actuators, metrics] = data.state.data;
 
-  if (editing) {
+  if (editing && manage) {
     return (
       <RuleForm
         plotId={Number(plot)}
@@ -48,6 +51,7 @@ export default function IotRulesScreen() {
       <Text style={[styles.muted, { marginBottom: 8 }]}>
         Số đo vượt mức thì app tự bật máy và báo về điện thoại. Có thời gian nghỉ giữa 2 lần bật để máy không bật / tắt liên tục. Máy bạn bật tay thì luật không tự tắt.
       </Text>
+      {!manage && <Text style={[styles.muted, { marginBottom: 8 }]}>🔒 Bạn đang xem trang trại được chia sẻ. Chỉ chủ trang trại được thêm / sửa / xóa.</Text>}
       {actuators.length === 0 && (
         <Card>
           <Text style={styles.body}>Lô chưa có thiết bị điều khiển. Thêm máy bơm / quạt oxy ở màn hình lô trước.</Text>
@@ -60,7 +64,7 @@ export default function IotRulesScreen() {
         </Card>
       )}
       {rules.map((rule) => (
-        <Pressable key={rule.id} onPress={() => setEditing(rule)} accessibilityRole="button">
+        <Pressable key={rule.id} disabled={!manage} onPress={() => setEditing(rule)} accessibilityRole="button">
           <Card style={!rule.enabled ? { opacity: 0.6 } : undefined}>
             <Text style={[styles.body, { fontWeight: '700' }]}>{describeRule(rule)}</Text>
             <Text style={styles.muted}>
@@ -70,7 +74,7 @@ export default function IotRulesScreen() {
           </Card>
         </Pressable>
       ))}
-      {actuators.length > 0 && <Button label="＋ Thêm luật" onPress={() => setEditing('new')} />}
+      {manage && actuators.length > 0 && <Button label="＋ Thêm luật" onPress={() => setEditing('new')} />}
     </ScrollView>
   );
 }

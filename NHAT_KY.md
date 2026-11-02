@@ -11,6 +11,43 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 02/11/2026: Gửi lệnh qua MQTT, người dùng chung xem lịch tưới / luật / ngưỡng, app màu tối + phông Be Vietnam Pro, OCR PDF bản scan, Android cho HTTP tới thiết bị
+
+**Đã làm**
+- **Gửi lệnh bật / tắt xuống qua MQTT** (`iot/`):
+  - máy chủ gửi `nhanong/{uid}/down` (QoS 1, không giữ lại, có chữ ký HMAC bằng khóa thiết bị + hạn `exp`); thiết bị trả lời ở `nhanong/{uid}/ack`
+  - chỉ gửi cho ESP32 đã nói chuyện qua MQTT trong 24 giờ (cột mới `devices.mqtt_seen_at`, cần `php artisan migrate`); tắt được bằng `IOT_MQTT_DOWNLINK=false`
+  - gửi xong lệnh vẫn "đang chờ" tới khi thiết bị trả lời; không gửi được thì để thiết bị tự hỏi qua HTTP như cũ; lệnh không làm 2 lần (theo mã lệnh)
+  - đổi chu kỳ đo / có firmware mới cũng đẩy qua MQTT
+  - firmware: nhận lệnh qua MQTT dùng chung đường xử lý với HTTP, vẫn hỏi HTTP mỗi `MQTT_POLL_SECONDS` (60 giây); MQTT có kết nối riêng (trước dùng chung với HTTP nên bị ngắt)
+  - quyền Mosquitto (`deploy/mosquitto-acl`): thiết bị chỉ đọc được `nhanong/<mã mình>/down`
+- **Người được chia sẻ trang trại xem được lịch tưới, luật tự động, ngưỡng cảnh báo** (app + web), chỉ xem; chỉ chủ thêm / sửa / xóa. API vốn đã đúng quyền, chỉ thiếu giao diện; thêm test.
+- **App màu tối** theo cài đặt điện thoại (`userInterfaceStyle: automatic`), màu tối lấy theo bản web:
+  - `theme.ts` có 2 bộ màu, đổi tại chỗ; style tạo ở cấp file phải bọc `themed(() => ...)` (đã ghi trong `theme.ts`)
+  - bản đồ điểm bán, biểu đồ, thanh tab, đầu trang đều đổi màu
+- **Phông Be Vietnam Pro** cho app: `src/components/AppText.tsx` thay `Text` / `TextInput` của react-native (đổi `fontWeight` → đúng phông), 87 file đổi dòng import.
+  - gói mới: `expo-font`, `expo-splash-screen`, `expo-system-ui`, `@expo-google-fonts/be-vietnam-pro`
+- **Đọc PDF bản scan bằng OCR** (`backend/`, điểm bán): PDF trung bình < 30 ký tự / trang thì coi là bản scan → `pdftoppm` + `tesseract -l vie` → cùng cách đọc bảng như PDF chữ.
+  - điểm đọc từ bản scan luôn chờ admin duyệt (lọc "Đọc từ bản scan (OCR)" trong `/admin`)
+  - máy thiếu công cụ thì `shops:collect` bỏ qua nguồn đó, báo cảnh báo, không dừng cả lượt
+  - cách cài: README mục Điểm bán
+- **Android cho gọi HTTP thường** (lấy file `http://192.168.4.1` từ thiết bị): thêm `expo-build-properties`, `usesCleartextTraffic: true`.
+- `iot/tests/Unit/.gitkeep`: trước thiếu thư mục nên `php artisan test` dừng ngay.
+
+**Kiểm tra**
+- backend 228/228, iot 90/90 (thêm 10 test MQTT, 2 test chia sẻ), thư viện chung 142/142, web build sạch, app typecheck sạch.
+- App màu sáng / tối: chụp màn hình bản web của app (Chrome tự động), đổi sáng ↔ tối khi đang mở thì vẽ lại đúng.
+
+**Còn tồn**
+- Firmware chưa biên dịch lại (máy chưa có PlatformIO); chưa thử với Mosquitto thật và mạch thật.
+- OCR chưa chạy thật: Homebrew không cài được tesseract vì Xcode 11.7 quá cũ (cần 15.2). Thử trên server Ubuntu (`apt install tesseract-ocr tesseract-ocr-vie poppler-utils`) với 1 file scan thật.
+- Màu tối + phông chỉ có trên bản build riêng (EAS), chưa thử trên điện thoại. Đổi giao diện sáng / tối lúc đang mở app thì form đang nhập dở bị mất.
+- Ô "⬜️ Hiện mật khẩu" và nút chính bị khóa hơi mờ khi màu tối.
+- `usesCleartextTraffic` cho phép HTTP với mọi địa chỉ: khi phát hành API phải dùng HTTPS.
+- Database `nhanong_iot` trên máy dev chưa có (user `nhanong` không có quyền tạo, cần tạo bằng root).
+
+---
+
 ## 01/11/2026 (tiếp 8): Firmware: HTTPS / MQTT có mã hóa, đổi cấu hình từ xa, cập nhật qua mạng (OTA); đẩy code lên GitHub
 
 **Đã làm**

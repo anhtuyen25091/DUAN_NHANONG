@@ -1,7 +1,8 @@
 import { formatDateTime, formatNumber, type PriceAlert } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { Button, Card, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { registerPush, type PushResult } from '../../lib/push';

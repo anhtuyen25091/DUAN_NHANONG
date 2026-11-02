@@ -2,7 +2,8 @@ import { foldVietnamese, PROVINCE_CENTERS, PROVINCE_NAMES, type IotFarm } from '
 import * as Location from 'expo-location';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, Text } from 'react-native';
+import { ActivityIndicator, ScrollView } from 'react-native';
+import { Text } from '../../components/AppText';
 import { FormInput, FormMessage, FormSection, NO_ERRORS, toFormErrors } from '../../components/iotForm';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
 import { confirmAsync } from '../../lib/confirm';

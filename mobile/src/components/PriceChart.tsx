@@ -1,8 +1,9 @@
 import { formatDate, formatNumber, priceUnit, type HistoryPoint } from '@nhanong/shared';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from './AppText';
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
-import { colors } from '../lib/theme';
+import { colors, fontFamilyFor } from '../lib/theme';
 import { styles } from './ui';
 
 const H = 200;
@@ -87,14 +88,14 @@ export function PriceChart({ points, unit, interval = 'day' }: { points: History
               <Line key={`g${v}`} x1={PAD.left} x2={width - PAD.right} y1={y(v)} y2={y(v)} stroke={colors.border} />
             ))}
             {ticks.map((v) => (
-              <SvgText key={`t${v}`} x={PAD.left - 6} y={y(v) + 4} fontSize={11} fill={colors.muted} textAnchor="end">
+              <SvgText fontFamily={fontFamilyFor('400') ?? undefined} key={`t${v}`} x={PAD.left - 6} y={y(v) + 4} fontSize={11} fill={colors.muted} textAnchor="end">
                 {formatNumber(v)}
               </SvgText>
             ))}
             {points.map(
               (p, i) =>
                 ((i % labelEvery === 0 && points.length - 1 - i >= labelEvery / 2) || i === points.length - 1) && (
-                  <SvgText
+                  <SvgText fontFamily={fontFamilyFor('400') ?? undefined}
                     key={p.date}
                     x={x(i)}
                     y={H - 6}

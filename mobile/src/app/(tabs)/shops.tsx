@@ -2,7 +2,8 @@ import { directionsUrl, formatDistance, geoNote, SHOP_TYPE_LABELS, telHref, type
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Linking, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { FlatList, Linking, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { ShopMap } from '../../components/ShopMap';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -193,7 +194,7 @@ export default function ShopsScreen() {
           elevation: 3,
         })}
       >
-        <Text style={{ color: '#fff', fontSize: font.body, fontWeight: '700' }}>＋ Thêm điểm</Text>
+        <Text style={{ color: colors.onPrimary, fontSize: font.body, fontWeight: '700' }}>＋ Thêm điểm</Text>
       </Pressable>
     </View>
   );

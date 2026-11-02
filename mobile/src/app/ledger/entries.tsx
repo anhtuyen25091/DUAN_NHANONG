@@ -1,7 +1,8 @@
 import { filterEntries, formatVnd, paginate, totals, type EntryType } from '@nhanong/shared';
 import { Stack } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { EntryItemRow, entryItems, Fab, Pager, type EntryItem } from '../../components/ledger';
 import { Chip, styles } from '../../components/ui';
 import { useLedger } from '../../lib/ledger';

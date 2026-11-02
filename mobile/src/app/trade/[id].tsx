@@ -1,7 +1,8 @@
 import { formatDate, formatKg, formatVnd, telHref, type Purchase } from '@nhanong/shared';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Linking, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { DealsSignIn } from '../../components/deals';
 import { MoneyField } from '../../components/fields';
 import { PrintButtons } from '../../components/PrintButtons';

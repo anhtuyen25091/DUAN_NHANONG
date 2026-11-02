@@ -1,6 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import { Alert, Image, Modal, Pressable, Text, View } from 'react-native';
+import { Alert, Image, Modal, Pressable, View } from 'react-native';
+import { Text } from './AppText';
 import { photoUri, savePhoto } from '../lib/receipts';
 import { colors, font } from '../lib/theme';
 import { Button, styles } from './ui';

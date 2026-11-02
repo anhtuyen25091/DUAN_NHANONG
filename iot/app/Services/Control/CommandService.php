@@ -5,6 +5,7 @@ namespace App\Services\Control;
 use App\Enums\CommandStatus;
 use App\Enums\DeviceKind;
 use App\Jobs\SendLoRaWanCommand;
+use App\Jobs\SendMqttDownlink;
 use App\Models\Actuator;
 use App\Models\ActuatorCommand;
 use App\Models\AutomationRule;
@@ -16,6 +17,7 @@ use InvalidArgumentException;
 
 /**
  * Vòng đời lệnh bật / tắt: tạo (lệnh mới thay lệnh cũ chưa làm) → mạch lấy (sent) → mạch báo đã làm / lỗi (done / failed).
+ * Đường xuống mạch: LoRaWAN đẩy qua network server; ESP32 dùng MQTT thì đẩy qua nhanong/{uid}/down, kèm tự hỏi qua HTTP.
  * Mạch không lấy trước expires_at thì lệnh quá hạn: không làm nữa (VD mất điện 2 giờ, có điện lại không tự bật bơm).
  */
 class CommandService
@@ -54,6 +56,9 @@ class CommandService
         // Mạch LoRaWAN không tự hỏi lệnh: máy chủ đẩy xuống qua network server
         if ($actuator->device->kind === DeviceKind::LoRaWan) {
             SendLoRaWanCommand::dispatch($command->id)->afterCommit();
+        } elseif ($actuator->device->usesMqttDownlink()) {
+            // Mạch ESP32 đang nối MQTT: đẩy xuống ngay, không chờ lần hỏi lệnh HTTP sau (HTTP vẫn là đường dự phòng)
+            SendMqttDownlink::dispatch($actuator->device_id, $command->id)->afterCommit();
         }
 
         return $command;

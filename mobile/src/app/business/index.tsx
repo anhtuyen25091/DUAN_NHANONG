@@ -20,7 +20,8 @@ import {
 } from '@nhanong/shared';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, View } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { DealsSignIn } from '../../components/deals';
 import { DateField, ErrorNote, Field, inputStyle, MoneyField, TextField } from '../../components/fields';
 import { RowCard } from '../../components/ledger';

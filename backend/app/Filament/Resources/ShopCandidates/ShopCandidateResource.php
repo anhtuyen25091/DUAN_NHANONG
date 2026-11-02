@@ -15,8 +15,10 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use UnitEnum;
 
@@ -76,6 +78,8 @@ class ShopCandidateResource extends Resource
                 SelectFilter::make('source')->label('Nguồn')
                     ->options(fn (): array => ShopCandidate::query()->distinct()->orderBy('source')->pluck('source', 'source')->all()),
                 SelectFilter::make('province_code')->label('Tỉnh')->options(Provinces::options()),
+                // Điểm đọc từ PDF bản scan (OCR): chữ có thể sai, cần xem kỹ
+                Filter::make('ocr')->label('Đọc từ bản scan (OCR)')->query(fn (Builder $query): Builder => $query->where('raw->ocr', true)),
             ])
             ->recordActions([
                 Action::make('publish')

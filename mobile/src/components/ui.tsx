@@ -1,8 +1,9 @@
 import { ApiError, formatChange, trendOf } from '@nhanong/shared';
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, font, primaryShadow, radius, shadow } from '../lib/theme';
+import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Text } from './AppText';
+import { colors, font, primaryShadow, radius, shadow, themed } from '../lib/theme';
 import { BrandGradient } from './Gradient';
 import { setAuth } from '../lib/auth';
 import type { AsyncState } from '../lib/useAsync';
@@ -90,40 +91,43 @@ export function Status({ state, retry }: { state: AsyncState<unknown>; retry: ()
   return null;
 }
 
-export const styles = StyleSheet.create({
-  body: { fontSize: font.body, color: colors.text },
-  muted: { fontSize: font.small, color: colors.muted },
-  change: { fontSize: font.small, fontWeight: '700' },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: 'rgba(225, 232, 222, 0.7)',
-    padding: 16,
-    marginBottom: 12,
-    ...shadow,
-  },
-  chip: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  chipActive: { backgroundColor: colors.primary, borderColor: 'transparent', ...primaryShadow },
-  chipText: { fontSize: font.body, color: colors.muted, fontWeight: '600' },
-  chipTextActive: { color: '#fff', fontWeight: '700' },
-  button: {
-    minHeight: 50,
-    borderRadius: radius.control,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  buttonOutline: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.primary, elevation: 0, shadowOpacity: 0 },
-  buttonText: { color: '#fff', fontSize: font.body, fontWeight: '700' },
-});
+/** Tính lại khi đổi sáng / tối (xem themed trong lib/theme) */
+export const styles = themed(() =>
+  StyleSheet.create({
+    body: { fontSize: font.body, color: colors.text },
+    muted: { fontSize: font.small, color: colors.muted },
+    change: { fontSize: font.small, fontWeight: '700' },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.card,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      padding: 16,
+      marginBottom: 12,
+      ...shadow,
+    },
+    chip: {
+      minHeight: 44,
+      paddingHorizontal: 16,
+      borderRadius: 999,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    chipActive: { backgroundColor: colors.primary, borderColor: 'transparent', ...primaryShadow },
+    chipText: { fontSize: font.body, color: colors.muted, fontWeight: '600' },
+    chipTextActive: { color: '#fff', fontWeight: '700' },
+    button: {
+      minHeight: 50,
+      borderRadius: radius.control,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+    },
+    buttonOutline: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.primary, elevation: 0, shadowOpacity: 0 },
+    buttonText: { color: '#fff', fontSize: font.body, fontWeight: '700' },
+  }),
+);

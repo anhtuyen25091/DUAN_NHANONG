@@ -1,7 +1,8 @@
 import { CLOUD_PRIVACY_NOTE, allocatedEntries, contractSummaries, debtStatus, debtSummary, dueReminders, filterEntries, formatDate, formatVnd, interestPaid, supplyStock, today, totals, type Ledger, type LedgerSnapshot, type StorageMode, workerBalances } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { EntryItemRow, entryItems, Fab, ProfitCard, SyncBadge } from '../../components/ledger';
 import { Button, Card, Chip, styles } from '../../components/ui';
 import { refreshLinkedDeals } from '../../lib/deals';

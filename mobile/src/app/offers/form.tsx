@@ -1,7 +1,8 @@
 import { ApiError, describeLocation, kgInputText, parseKgText, today, type ProduceOffer } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { DealsSignIn } from '../../components/deals';
 import { DateField, ErrorNote, MoneyField, QtyField, TextField } from '../../components/fields';
 import { LocationBar } from '../../components/LocationPicker';

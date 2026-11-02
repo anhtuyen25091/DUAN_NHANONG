@@ -25,8 +25,11 @@
 // Tài khoản MQTT chung cho thiết bị (deploy/mosquitto-production.conf). Để trống nếu broker cho kết nối không mật khẩu (dev)
 #define MQTT_USERNAME ""
 #define MQTT_PASSWORD ""
-// 1 = MQTT qua TLS (thường cổng 8883), dùng chung TLS_ROOT_CA. MQTT không nhận được cấu hình từ xa / bản cập nhật (cần HTTP)
+// 1 = MQTT qua TLS (thường cổng 8883), dùng chung TLS_ROOT_CA.
+// Mạch đo chạy pin + MQTT không nhận được cấu hình từ xa / bản cập nhật (chỉ gửi lên rồi ngủ). Mạch điều khiển + MQTT thì nhận
+// lệnh bật / tắt + cấu hình ngay qua nhanong/<uid>/down, vẫn hỏi lệnh qua HTTP (API_BASE) mỗi MQTT_POLL_SECONDS giây làm dự phòng.
 #define MQTT_TLS 0
+#define MQTT_POLL_SECONDS 60
 
 // ---- Chu kỳ ----
 #define MEASURE_INTERVAL_MIN 15   // đo mỗi 15 phút, ngủ sâu giữa 2 lần đo (đổi từ xa được: app / trang quản trị > Thiết bị > Chu kỳ đo)

@@ -1,13 +1,14 @@
 import { ApiError, formatDate, formatVnd } from '@nhanong/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View, type TextInputProps } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { Button, Card, Chip, Status, styles } from '../components/ui';
 import { api } from '../lib/api';
 import { setAuth, updateAuthUser, useAuth } from '../lib/auth';
 import { adoptAccountLocation } from '../lib/myLocation';
 import { deviceName } from '../lib/sync';
-import { colors, font } from '../lib/theme';
+import { colors, font, themed } from '../lib/theme';
 import { useAsync } from '../lib/useAsync';
 
 /**
@@ -77,7 +78,7 @@ export default function AccountScreen() {
   );
 }
 
-const sectionTitle = { fontSize: font.body + 1, fontWeight: '700' as const, color: colors.text, marginTop: 8, marginBottom: 8 };
+const sectionTitle = themed(() => ({ fontSize: font.body + 1, fontWeight: '700' as const, color: colors.text, marginTop: 8, marginBottom: 8 }));
 
 function SignedIn() {
   const auth = useAuth()!;

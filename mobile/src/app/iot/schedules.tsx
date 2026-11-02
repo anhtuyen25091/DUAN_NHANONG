@@ -1,7 +1,8 @@
-import { describeSchedule, monthsLabel, parseDecimalInput, timeAgo, type IotActuator, type IotCropPreset, type IotSchedule } from '@nhanong/shared';
+import { canManage, describeSchedule, monthsLabel, parseDecimalInput, timeAgo, type IotActuator, type IotCropPreset, type IotRole, type IotSchedule } from '@nhanong/shared';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { SectionTitle } from '../../components/iot';
 import { FormInput, FormMessage, FormSection, NO_ERRORS, toFormErrors } from '../../components/iotForm';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';
@@ -16,14 +17,16 @@ const SKIP_RAIN: (number | null)[] = [null, 5, 10, 20];
 
 /** Lịch tưới của các máy bơm / van trong lô */
 export default function IotSchedulesScreen() {
-  const { plot, name } = useLocalSearchParams<{ plot: string; name?: string }>();
+  const { plot, name, role } = useLocalSearchParams<{ plot: string; name?: string; role?: IotRole }>();
+  // Người dùng chung chỉ xem, không sửa
+  const manage = canManage(role);
   const data = useAsync(() => Promise.all([iotApi.schedules(Number(plot)), iotApi.actuators(Number(plot)), iotApi.cropPresets()]), [plot]);
   const [editing, setEditing] = useState<IotSchedule | 'new' | null>(null);
 
   if (data.state.status !== 'ok') return <Status state={data.state} retry={data.reload} />;
   const [schedules, actuators, presets] = data.state.data;
 
-  if (editing) {
+  if (editing && manage) {
     return (
       <ScheduleForm
         schedule={editing === 'new' ? undefined : editing}
@@ -43,6 +46,7 @@ export default function IotSchedulesScreen() {
       <Text style={[styles.muted, { marginBottom: 8 }]}>
         Tới giờ app tự bật máy bơm, chạy đủ số phút rồi tự tắt. Có thể chỉ tưới trong mùa khô, và bỏ lượt khi vườn vừa mưa đủ.
       </Text>
+      {!manage && <Text style={[styles.muted, { marginBottom: 8 }]}>🔒 Bạn đang xem trang trại được chia sẻ. Chỉ chủ trang trại được thêm / sửa / xóa.</Text>}
       {actuators.length === 0 && (
         <Card>
           <Text style={styles.body}>Lô chưa có máy bơm / van điều khiển được. Thêm ở khu ⚙️ Điều khiển của lô trước.</Text>
@@ -55,7 +59,7 @@ export default function IotSchedulesScreen() {
         </Card>
       )}
       {schedules.map((schedule) => (
-        <Pressable key={schedule.id} onPress={() => setEditing(schedule)} accessibilityRole="button">
+        <Pressable key={schedule.id} disabled={!manage} onPress={() => setEditing(schedule)} accessibilityRole="button">
           <Card style={!schedule.enabled ? { opacity: 0.6 } : undefined}>
             <Text style={[styles.body, { fontWeight: '700' }]}>🗓️ {schedule.actuator.name}</Text>
             <Text style={styles.body}>{describeSchedule(schedule)}</Text>
@@ -67,7 +71,7 @@ export default function IotSchedulesScreen() {
           </Card>
         </Pressable>
       ))}
-      {actuators.length > 0 && <Button label="＋ Thêm lịch tưới" onPress={() => setEditing('new')} />}
+      {manage && actuators.length > 0 && <Button label="＋ Thêm lịch tưới" onPress={() => setEditing('new')} />}
     </ScrollView>
   );
 }

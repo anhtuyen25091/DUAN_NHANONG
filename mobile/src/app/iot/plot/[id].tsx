@@ -1,7 +1,8 @@
 import { canControl, canManage, formatIotValue, thresholdLabel, timeAgo, type IotReading } from '@nhanong/shared';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Text } from '../../../components/AppText';
 import { AlertCard, ExportButton, SectionTitle } from '../../../components/iot';
 import { ControlSection } from '../../../components/iotControl';
 import { Button, Card, Status, styles } from '../../../components/ui';
@@ -61,20 +62,21 @@ export default function IotPlotScreen() {
             ))}
           </View>
 
-          {canManage(data.role) && (
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Button
-                  label="⚙️ Ngưỡng cảnh báo"
-                  variant="outline"
-                  onPress={() => router.push({ pathname: '/iot/thresholds', params: { plot: String(data.plot.id), name: data.plot.name, type: data.plot.type } })}
-                />
-              </View>
+          {/* Người dùng chung cũng xem được ngưỡng (chỉ chủ được sửa) */}
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Button
+                label="⚙️ Ngưỡng cảnh báo"
+                variant="outline"
+                onPress={() => router.push({ pathname: '/iot/thresholds', params: { plot: String(data.plot.id), name: data.plot.name, type: data.plot.type, role: data.role } })}
+              />
+            </View>
+            {canManage(data.role) && (
               <View style={{ flex: 1 }}>
                 <Button label="✏️ Sửa lô" variant="outline" onPress={() => router.push({ pathname: '/iot/plot-form', params: { id: String(data.plot.id) } })} />
               </View>
-            </View>
-          )}
+            )}
+          </View>
           <View style={{ height: 12 }} />
           <ExportButton plotId={data.plot.id} plotName={data.plot.name} />
 

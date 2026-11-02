@@ -1,7 +1,8 @@
 import { CATEGORY_TYPE_LABELS, describeLocation, formatNumber, formatPriceRange, groupByProduct, matchesSearch, pinFollowed, priceUnit, relativeDay, summarizeProduct, type CategoryType, type PriceRow } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { BrandGradient } from '../../components/Gradient';
 import { Card, Change, Chip, Status, styles } from '../../components/ui';
 import { api } from '../../lib/api';

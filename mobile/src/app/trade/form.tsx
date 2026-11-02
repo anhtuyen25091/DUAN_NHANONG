@@ -1,7 +1,8 @@
 import { ApiError, foldVietnamese, formatKg, formatVnd, isOfflineError, kgInputText, parseKgText, priceWarnings, purchaseTotals, randomUuid, today, type PendingPurchase, type Purchase, type PurchaseLineInput, type TradeKind } from '@nhanong/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { DealsSignIn } from '../../components/deals';
 import { DateField, ErrorNote, Field, inputStyle, MoneyField, QtyField, TextField } from '../../components/fields';
 import { showToast } from '../../lib/toast';

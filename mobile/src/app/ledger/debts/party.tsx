@@ -1,7 +1,8 @@
 import { DEBT_KIND_LABELS, debtsByParty, debtStatus, formatDate, formatVnd, telHref, today, type DebtKind, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Linking, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, View } from 'react-native';
+import { Text } from '../../../components/AppText';
 import { checkDate, DateField, ErrorNote, MoneyField } from '../../../components/fields';
 import { KIND_ICON, RowCard, SectionTitle } from '../../../components/ledger';
 import { Button, Card, styles } from '../../../components/ui';

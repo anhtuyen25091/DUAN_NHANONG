@@ -1,7 +1,8 @@
 import { formatVnd, today, type DebtKind, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { Text } from '../../../components/AppText';
 import { CategoryPicker, checkDate, CheckRow, DateField, ErrorNote, GardenPicker, MoneyField, TextField } from '../../../components/fields';
 import { LenderFields, LoanFields } from '../../../components/loan';
 import { Button, Chip, styles } from '../../../components/ui';
@@ -83,7 +84,7 @@ function DebtForm({ ledger, data }: { ledger: Ledger; data: LedgerSnapshot }) {
                 accessibilityState={{ selected: active }}
                 style={{ flex: 1, minHeight: 56, paddingHorizontal: 4, borderRadius: 12, borderWidth: 1, borderColor: active ? color : colors.border, backgroundColor: active ? color : colors.surface, alignItems: 'center', justifyContent: 'center' }}
               >
-                <Text style={{ fontSize: font.body, fontWeight: '700', textAlign: 'center', color: active ? '#fff' : colors.text }}>{KIND_TABS[k]}</Text>
+                <Text style={{ fontSize: font.body, fontWeight: '700', textAlign: 'center', color: active ? colors.onPrimary : colors.text }}>{KIND_TABS[k]}</Text>
               </Pressable>
             );
           })}

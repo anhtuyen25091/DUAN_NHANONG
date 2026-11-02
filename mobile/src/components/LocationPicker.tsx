@@ -1,7 +1,8 @@
 import { describeLocation, foldVietnamese, nearestProvince, placeLabel, provinceLocation, RADIUS_OPTIONS, type MyLocation, type Place } from '@nhanong/shared';
 import * as Location from 'expo-location';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { Text, TextInput } from './AppText';
 import { api } from '../lib/api';
 import { setMyLocation, useMyLocation } from '../lib/myLocation';
 import { colors, font } from '../lib/theme';

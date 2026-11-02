@@ -1,7 +1,16 @@
-import { router, Stack } from 'expo-router';
+import { BeVietnamPro_400Regular } from '@expo-google-fonts/be-vietnam-pro/400Regular';
+import { BeVietnamPro_500Medium } from '@expo-google-fonts/be-vietnam-pro/500Medium';
+import { BeVietnamPro_600SemiBold } from '@expo-google-fonts/be-vietnam-pro/600SemiBold';
+import { BeVietnamPro_700Bold } from '@expo-google-fonts/be-vietnam-pro/700Bold';
+import { BeVietnamPro_800ExtraBold } from '@expo-google-fonts/be-vietnam-pro/800ExtraBold';
+import { useFonts } from 'expo-font';
+import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, type Theme } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import * as SystemUI from 'expo-system-ui';
 import { gradientHeader } from '../components/Gradient';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { Fragment, useEffect, useMemo, type ReactNode } from 'react';
+import { useColorScheme } from 'react-native';
 import { DealNotices } from '../components/DealNotices';
 import { ToastHost } from '../components/ledger';
 import { startDealWatch } from '../lib/dealWatch';
@@ -10,7 +19,7 @@ import { getAuth, subscribeAuth } from '../lib/auth';
 import { openLedger } from '../lib/ledger';
 import { syncIotPush } from '../lib/iot';
 import { onNotificationOpened, registerPush, type OpenedData } from '../lib/push';
-import { colors } from '../lib/theme';
+import { applyScheme, brandGradient, colors, fontFamilyFor, fontStyle, setFontsReady, type Scheme } from '../lib/theme';
 
 function openFromNotification(data: OpenedData) {
   // Thông báo nhắc hạn trả nợ: mở khoản nợ
@@ -35,7 +44,39 @@ function openFromNotification(data: OpenedData) {
   }
 }
 
+// Giữ màn hình chờ đến khi nạp xong phông (tránh chữ nhảy từ phông hệ thống sang Be Vietnam Pro)
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 export default function RootLayout() {
+  // Chỉ nạp các độ đậm app dùng; mỗi độ đậm là một họ phông riêng (xem fontFamilyFor trong lib/theme)
+  const [fontsLoaded, fontError] = useFonts({
+    BeVietnamPro_400Regular,
+    BeVietnamPro_500Medium,
+    BeVietnamPro_600SemiBold,
+    BeVietnamPro_700Bold,
+    BeVietnamPro_800ExtraBold,
+  });
+  const ready = fontsLoaded || !!fontError;
+  // Nạp lỗi thì dùng phông hệ thống
+  setFontsReady(fontsLoaded);
+
+  // Sáng / tối theo cài đặt của máy: đổi bảng màu ngay trong lúc dựng, trước khi các màn hình con đọc colors
+  const scheme: Scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  applyScheme(scheme);
+
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
+  useEffect(() => {
+    // Nền gốc của app (lộ ra khi chuyển trang, bàn phím mở…) theo bảng màu
+    SystemUI.setBackgroundColorAsync(colors.bg).catch(() => {});
+  }, [scheme]);
+
+  if (!ready) return null;
+  return <App scheme={scheme} />;
+}
+
+function App({ scheme }: { scheme: Scheme }) {
   useEffect(() => startDealWatch(), []);
   useEffect(() => startPurchaseOutbox(), []);
   useEffect(() => {
@@ -66,16 +107,34 @@ export default function RootLayout() {
     };
   }, []);
 
+  // Thanh điều hướng của react-navigation (nền màn hình, chữ, phông) theo bảng màu + phông của app
+  const navTheme = useMemo<Theme>(() => {
+    const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+    return {
+      dark: scheme === 'dark',
+      colors: { ...base.colors, primary: colors.primary, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border, notification: colors.loss },
+      fonts: {
+        regular: { ...base.fonts.regular, ...fontStyle('400') },
+        medium: { ...base.fonts.medium, ...fontStyle('500') },
+        bold: { ...base.fonts.bold, ...fontStyle('600') },
+        heavy: { ...base.fonts.heavy, ...fontStyle('700') },
+      } as Theme['fonts'],
+    };
+  }, [scheme]);
+
   return (
-    <>
+    <ThemeProvider value={navTheme}>
       <Stack
+        // Đổi sáng / tối: dựng lại từng màn hình (giữ nguyên trang đang mở) để các style đọc màu mới
+        screenLayout={({ children }: { children: ReactNode }) => <Fragment key={scheme}>{children}</Fragment>}
         screenOptions={{
-          headerStyle: { backgroundColor: colors.primary },
+          headerStyle: { backgroundColor: brandGradient[1] },
           headerBackground: gradientHeader,
           headerTintColor: '#fff',
-          headerTitleStyle: { color: '#fff', fontWeight: '700' },
+          headerTitleStyle: { color: '#fff', ...fontStyle('700') },
           contentStyle: { backgroundColor: colors.bg },
           headerBackTitle: 'Quay lại',
+          headerBackTitleStyle: { fontFamily: fontFamilyFor('400') ?? undefined },
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -128,10 +187,12 @@ export default function RootLayout() {
         <Stack.Screen name="offers/form" options={{ title: '📣 Chào bán lô hàng' }} />
         <Stack.Screen name="offers/[id]" options={{ title: 'Lô hàng' }} />
       </Stack>
-      <ToastHost />
-      <DealNotices />
-      {/* Đầu trang xanh đậm → chữ thanh trạng thái màu trắng */}
+      <Fragment key={scheme}>
+        <ToastHost />
+        <DealNotices />
+      </Fragment>
+      {/* Đầu trang luôn là dải xanh đậm (cả chế độ tối) → chữ thanh trạng thái màu trắng */}
       <StatusBar style="light" />
-    </>
+    </ThemeProvider>
   );
 }

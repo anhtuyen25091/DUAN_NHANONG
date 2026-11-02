@@ -1,7 +1,8 @@
 import { ApiError, SHOP_REMOVE_REASONS, type ShopRemoveReason } from '@nhanong/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, TextInput, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { Button, Card, Chip, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { colors, font } from '../../lib/theme';

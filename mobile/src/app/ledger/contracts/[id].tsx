@@ -1,13 +1,14 @@
 import { CONTRACT_STATUS_LABELS, contractSettlement, contractSummaries, cutOwing, cutValue, formatDate, formatQty, formatVnd, telHref, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
+import { Text } from '../../../components/AppText';
 import { ErrorNote, MoneyField } from '../../../components/fields';
 import { ItemRow, SectionTitle } from '../../../components/ledger';
 import { Button, Card, Chip, styles } from '../../../components/ui';
 import { confirmAsync } from '../../../lib/confirm';
 import { useLedger } from '../../../lib/ledger';
-import { colors, font } from '../../../lib/theme';
+import { colors, font, themed } from '../../../lib/theme';
 import { showToast } from '../../../lib/toast';
 
 /** Một hợp đồng bán cho lái: tình hình, các đợt cắt, kết thúc */
@@ -221,7 +222,7 @@ function ContractDetail({ ledger, data, id }: { ledger: Ledger; data: LedgerSnap
   );
 }
 
-const heading = { fontSize: font.body + 1, fontWeight: '700' as const, color: colors.text, marginBottom: 8 };
+const heading = themed(() => ({ fontSize: font.body + 1, fontWeight: '700' as const, color: colors.text, marginBottom: 8 }));
 
 /** 1 dòng của bảng quyết toán: nhãn bên trái, số tiền bên phải */
 function Row({ label, value, bold, color }: { label: string; value: string; bold?: boolean; color?: string }) {

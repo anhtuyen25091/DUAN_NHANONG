@@ -1,7 +1,8 @@
 import { formatDate, formatQty, formatVnd, telHref, webJoinLink, type Deal, type DealEntry } from '@nhanong/shared';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, RefreshControl, ScrollView, Share, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, RefreshControl, ScrollView, Share, View } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { DealsSignIn, Notice, Tag } from '../../components/deals';
 import { CheckRow, inputStyle } from '../../components/fields';
 import { SectionTitle } from '../../components/ledger';
@@ -13,7 +14,7 @@ import { confirmAsync } from '../../lib/confirm';
 import { balanceText, counterpartName, KIND_LABEL, STATUS_LABEL } from '../../lib/deals';
 import { dealWatcher } from '../../lib/dealWatch';
 import { useLedger } from '../../lib/ledger';
-import { colors, font } from '../../lib/theme';
+import { colors, font, themed } from '../../lib/theme';
 import { showToast } from '../../lib/toast';
 
 type Run = (action: () => Promise<Deal>, message?: string) => Promise<boolean>;
@@ -196,7 +197,7 @@ function DealDetail({ token, id }: { token: string; id: string }) {
   );
 }
 
-const heading = { fontSize: font.body + 1, fontWeight: '700' as const, color: colors.text, marginBottom: 4 };
+const heading = themed(() => ({ fontSize: font.body + 1, fontWeight: '700' as const, color: colors.text, marginBottom: 4 }));
 
 /** 1 dòng: nhãn bên trái, số tiền bên phải */
 /** "🖨 Gửi phiếu cân đợt này": bấm mới hiện 2 nút PDF / Word để thẻ đợt cân gọn */
@@ -257,7 +258,7 @@ function ShareCode({ deal }: { deal: Deal }) {
   );
 }
 
-const STATUS_COLOR: Record<DealEntry['status'], string> = { pending: colors.loss, confirmed: colors.gain, disputed: colors.error, private: colors.muted };
+const STATUS_COLOR: Record<DealEntry['status'], string> = themed(() => ({ pending: colors.loss, confirmed: colors.gain, disputed: colors.error, private: colors.muted }));
 
 function EntryCard({ deal, entry: e, token, run }: { deal: Deal; entry: DealEntry; token: string; run: Run }) {
   const [disputing, setDisputing] = useState(false);

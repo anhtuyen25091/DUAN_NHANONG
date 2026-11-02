@@ -10,10 +10,12 @@ use App\Shops\Collect\Sources\CsvSource;
 use App\Shops\Collect\Sources\LicenseDocxSource;
 use App\Shops\Collect\Sources\LicensePdfSource;
 use App\Shops\Collect\Sources\LicenseSheetSource;
+use App\Shops\Collect\Sources\OcrUnavailableException;
 use App\Support\Provinces;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Vd danh sách cơ sở buôn bán phân bón của Sở NN&MT Đồng Tháp (đã chuyển sang CSV):
@@ -73,7 +75,14 @@ class CollectShopsFile extends Command
             $source = new CallbackSource($key, $label, $trust, $read);
         }
 
-        $counts = $collector->collect($source);
+        try {
+            $counts = $collector->collect($source);
+        } catch (OcrUnavailableException $e) {
+            Log::warning("shops:collect-file bỏ qua {$path}: {$e->getMessage()}");
+            $this->warn($e->getMessage());
+
+            return self::FAILURE;
+        }
         $this->info("{$source->label()}: mới {$counts['new']}, cập nhật {$counts['updated']}, bỏ qua {$counts['skipped']}.");
         if (! $this->option('no-process')) {
             $result = $collector->process($key);

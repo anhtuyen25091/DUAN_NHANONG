@@ -1,7 +1,8 @@
 import { formatDate, formatVnd, type Deal } from '@nhanong/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { DealsSignIn, Notice, Tag } from '../../components/deals';
 import { RowCard } from '../../components/ledger';
 import { Button, Card, Chip, Status, styles } from '../../components/ui';

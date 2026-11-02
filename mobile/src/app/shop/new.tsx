@@ -1,7 +1,8 @@
 import { ApiError, SHOP_TYPE_LABELS, type ShopType } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { ScrollView, View, type TextInputProps } from 'react-native';
+import { Text, TextInput } from '../../components/AppText';
 import { Button, Card, Chip, styles } from '../../components/ui';
 import { api } from '../../lib/api';
 import { colors, font } from '../../lib/theme';

@@ -1,7 +1,8 @@
 import { formatQtyGrouped, formatVnd, HARVEST_UNITS, today, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { WithholdingNotice } from '../../components/farmLogs';
 import { CheckRow, DateField, ErrorNote, Field, GardenPicker, MoneyField, QtyField, TextField } from '../../components/fields';
 import { Button, Chip, styles } from '../../components/ui';

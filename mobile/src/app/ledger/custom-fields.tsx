@@ -1,7 +1,8 @@
 import { CUSTOM_FIELD_TARGET_LABELS, CUSTOM_FIELD_TYPE_LABELS, type CustomFieldTarget, type CustomFieldType, type Ledger, type LedgerSnapshot } from '@nhanong/shared';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { ErrorNote, Field, TextField } from '../../components/fields';
 import { Button, Card, Chip, styles } from '../../components/ui';
 import { confirmAsync } from '../../lib/confirm';

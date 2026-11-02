@@ -1,7 +1,8 @@
 import { formatDate, formatDateTime, formatKg, formatVnd, itemsText, purchaseShareText, webJoinLink, type Purchase, type PurchaseHistoryItem, type PurchaseLine, type TradeCustomer, type TradeRow, type TradeTotals } from '@nhanong/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Share, Text, View } from 'react-native';
+import { Alert, Share, View } from 'react-native';
+import { Text } from './AppText';
 import { api } from '../lib/api';
 import { colors, font } from '../lib/theme';
 import { ErrorNote, TextField } from './fields';

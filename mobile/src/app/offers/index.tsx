@@ -1,7 +1,8 @@
 import { BID_STATUS_LABELS, formatDate, formatQuantity, formatVnd, OFFER_STATUS_LABELS, RADIUS_OPTIONS, type ProduceOffer } from '@nhanong/shared';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { Text } from '../../components/AppText';
 import { DealsSignIn } from '../../components/deals';
 import { RowCard } from '../../components/ledger';
 import { LocationBar } from '../../components/LocationPicker';

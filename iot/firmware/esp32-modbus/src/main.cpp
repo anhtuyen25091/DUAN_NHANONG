@@ -11,6 +11,8 @@
 // API_BASE https:// thì kiểm chứng chỉ máy chủ (TLS_ROOT_CA). Máy chủ gửi kèm phản hồi:
 //   - "config": cấu hình đổi từ xa (chu kỳ đo), lưu vào /config.json
 //   - "firmware_update": có bản mới (chỉ bản build -e esp32dev-ota): tải GET /device/firmware, kiểm MD5, khởi động lại
+// Mạch điều khiển + USE_MQTT: nghe lệnh trên nhanong/<uid>/down (máy chủ ký HMAC bằng khóa thiết bị), báo kết quả lên
+// nhanong/<uid>/ack; vẫn hỏi lệnh qua HTTP (thưa hơn) làm đường dự phòng, lệnh đã làm (theo id) không làm lại.
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -40,6 +42,10 @@
 #endif
 #ifndef MQTT_TLS
 #define MQTT_TLS 0
+#endif
+// Mạch điều khiển đang nối MQTT thì vẫn hỏi lệnh qua HTTP, nhưng thưa hơn (dự phòng khi lỡ bản tin MQTT)
+#ifndef MQTT_POLL_SECONDS
+#define MQTT_POLL_SECONDS 60
 #endif
 // Bật bằng môi trường build esp32dev-ota (2 vùng chương trình nên vùng LittleFS chỉ còn ~640 KB)
 #ifndef OTA_ENABLED
@@ -72,19 +78,22 @@ ModbusMaster modbus;
 
 WiFiClient plainNet;
 WiFiClientSecure secureNet;
+// Kết nối riêng cho MQTT: mạch điều khiển giữ MQTT mở trong lúc vẫn gọi HTTP (dùng chung 1 kết nối thì HTTP cắt mất MQTT)
+WiFiClient mqttPlainNet;
+WiFiClientSecure mqttSecureNet;
 
 // Kết nối cho http:// hoặc https://. https mà chưa khai báo chứng chỉ gốc thì từ chối (trừ khi TLS_INSECURE để thử)
-NetworkClient *netFor(bool tls) {
-    if (!tls) return &plainNet;
+NetworkClient *netFor(bool tls, WiFiClient &plain = plainNet, WiFiClientSecure &secure = secureNet) {
+    if (!tls) return &plain;
     if (strlen(TLS_ROOT_CA) > 0) {
-        secureNet.setCACert(TLS_ROOT_CA);
+        secure.setCACert(TLS_ROOT_CA);
     } else if (TLS_INSECURE) {
-        secureNet.setInsecure();
+        secure.setInsecure();
     } else {
         Serial.println("Máy chủ dùng https nhưng chưa khai báo TLS_ROOT_CA trong config.h");
         return nullptr;
     }
-    return &secureNet;
+    return &secure;
 }
 
 bool beginHttp(HTTPClient &http, const String &url) {
@@ -371,18 +380,59 @@ String buildBatch(File &f, size_t &next) {
 #if USE_MQTT
 PubSubClient mqtt;
 
+// nhanong/<uid>/up (số đo), /ack (kết quả lệnh), /down (lệnh máy chủ gửi xuống)
+String mqttTopic(const char *kind) {
+    return String("nhanong/") + DEVICE_UID + "/" + kind;
+}
+
+#if CONTROLLER_MODE
+String relayStates();
+// Bản tin lệnh vừa nhận; xử lý trong controllerLoop chứ không trong callback (PubSubClient dùng chung bộ đệm khi gửi báo cáo)
+String mqttInbox;
+
+void onMqttMessage(char *topic, uint8_t *payload, unsigned int length) {
+    mqttInbox = "";
+    mqttInbox.reserve(length);
+    for (unsigned int i = 0; i < length; i++) mqttInbox += (char)payload[i];
+}
+
+// Báo trạng thái relay lên nhanong/<uid>/ack (không có "id"): lúc vừa nối và mỗi giờ, để máy chủ biết mạch đang nghe MQTT
+unsigned long lastMqttStatus = 0;
+
+void publishMqttStatus() {
+    JsonDocument doc;
+    doc["key"] = DEVICE_KEY;
+    doc["states"] = relayStates();
+    String body;
+    serializeJson(doc, body);
+    mqtt.publish(mqttTopic("ack").c_str(), body.c_str());
+    lastMqttStatus = millis();
+}
+#endif
+
+// Mã client = mã thiết bị (broker chỉ cho đọc nhanong/<mã client>/down)
+bool mqttConnect() {
+    if (mqtt.connected()) return true;
+    NetworkClient *net = netFor(MQTT_TLS, mqttPlainNet, mqttSecureNet);
+    if (net == nullptr) return false;
+    mqtt.setClient(*net);
+    mqtt.setServer(MQTT_HOST, MQTT_PORT);
+    mqtt.setBufferSize(24 * 1024);
+    bool connected = strlen(MQTT_USERNAME) > 0 ? mqtt.connect(DEVICE_UID, MQTT_USERNAME, MQTT_PASSWORD) : mqtt.connect(DEVICE_UID);
+    if (!connected) return false;
+#if CONTROLLER_MODE
+    mqtt.setCallback(onMqttMessage);
+    mqtt.subscribe(mqttTopic("down").c_str(), 1);
+    // Máy chủ biết mạch đang nghe MQTT: từ giờ đẩy lệnh xuống ngay
+    publishMqttStatus();
+    Serial.println("Đã nối MQTT, nghe lệnh");
+#endif
+    return true;
+}
+
 bool sendBatch(const String &body) {
-    if (!mqtt.connected()) {
-        NetworkClient *net = netFor(MQTT_TLS);
-        if (net == nullptr) return false;
-        mqtt.setClient(*net);
-        mqtt.setServer(MQTT_HOST, MQTT_PORT);
-        mqtt.setBufferSize(24 * 1024);
-        bool connected = strlen(MQTT_USERNAME) > 0 ? mqtt.connect(DEVICE_UID, MQTT_USERNAME, MQTT_PASSWORD) : mqtt.connect(DEVICE_UID);
-        if (!connected) return false;
-    }
-    String topic = String("nhanong/") + DEVICE_UID + "/up";
-    return mqtt.publish(topic.c_str(), body.c_str());
+    if (!mqttConnect()) return false;
+    return mqtt.publish(mqttTopic("up").c_str(), body.c_str());
 }
 #else
 bool sendBatch(const String &body) {
@@ -618,6 +668,7 @@ size_t doneNext = 0;
 unsigned long pollMs = 10000;
 unsigned long lastPoll = 0;
 unsigned long lastMeasure = 0;
+unsigned long lastMqttTry = 0;
 
 void setRelay(size_t index, bool on, uint32_t minutes) {
     relayOn[index] = on;
@@ -643,36 +694,34 @@ bool alreadyDone(uint32_t id) {
     return false;
 }
 
+// Báo kết quả: qua MQTT khi đang nối (QoS 0, mất thì lần hỏi HTTP sau lệnh còn đó, mạch báo lại), không thì qua HTTP
 void ackCommand(uint32_t id, bool ok, const char *message) {
-    HTTPClient http;
-    if (!beginHttp(http, String(API_BASE) + "/device/commands/" + id + "/ack")) return;
-    http.addHeader("Content-Type", "application/json");
     JsonDocument doc;
     doc["ok"] = ok;
     if (message) doc["message"] = message;
     doc["states"] = relayStates();
+#if USE_MQTT
+    if (mqtt.connected()) {
+        doc["key"] = DEVICE_KEY;
+        doc["id"] = id;
+        String body;
+        serializeJson(doc, body);
+        if (mqtt.publish(mqttTopic("ack").c_str(), body.c_str())) return;
+        doc.remove("key");
+        doc.remove("id");
+    }
+#endif
+    HTTPClient http;
+    if (!beginHttp(http, String(API_BASE) + "/device/commands/" + id + "/ack")) return;
+    http.addHeader("Content-Type", "application/json");
     String body;
     serializeJson(doc, body);
     http.POST(body);
     http.end();
 }
 
-void pollCommands() {
-    HTTPClient http;
-    if (!beginHttp(http, String(API_BASE) + "/device/commands?states=" + relayStates())) return;
-    http.setTimeout(10000);
-    int status = http.GET();
-    if (status != 200) {
-        Serial.printf("Hỏi lệnh lỗi HTTP %d\n", status);
-        http.end();
-        return;
-    }
-
-    JsonDocument response;
-    DeserializationError error = deserializeJson(response, http.getString());
-    http.end();
-    if (error) return;
-
+// Phản hồi GET /device/commands hoặc bản tin MQTT nhanong/<uid>/down (cùng dạng): làm lệnh, đổi cấu hình
+void handleServerCommands(JsonDocument &response) {
     if (response["poll_seconds"].is<uint32_t>()) pollMs = max(3UL, (unsigned long)response["poll_seconds"].as<uint32_t>()) * 1000UL;
     if (nowEpoch() == 0 && response["server_time"].is<uint32_t>()) setClock(response["server_time"].as<uint32_t>());
     applyServerResponse(response);
@@ -697,6 +746,48 @@ void pollCommands() {
     }
 }
 
+void pollCommands() {
+    HTTPClient http;
+    if (!beginHttp(http, String(API_BASE) + "/device/commands?states=" + relayStates())) return;
+    http.setTimeout(10000);
+    int status = http.GET();
+    if (status != 200) {
+        Serial.printf("Hỏi lệnh lỗi HTTP %d\n", status);
+        http.end();
+        return;
+    }
+
+    JsonDocument response;
+    DeserializationError error = deserializeJson(response, http.getString());
+    http.end();
+    if (error) return;
+    handleServerCommands(response);
+}
+
+#if USE_MQTT
+// {"data": "<JSON như phản hồi /device/commands>", "sig": "<HMAC-SHA256 của data bằng khóa thiết bị>"}
+// Tài khoản MQTT dùng chung cho mọi thiết bị: chỉ làm lệnh có chữ ký đúng và chưa quá hạn ("exp")
+void handleMqttDownlink(const String &message) {
+    JsonDocument envelope;
+    if (deserializeJson(envelope, message)) return;
+    const char *data = envelope["data"] | "";
+    const char *sig = envelope["sig"] | "";
+    if (strlen(data) == 0 || !hmacString(String(data)).equalsIgnoreCase(sig)) {
+        Serial.println("Bỏ qua bản tin MQTT sai chữ ký");
+        return;
+    }
+    JsonDocument response;
+    if (deserializeJson(response, data)) return;
+    uint32_t expiresAt = response["exp"] | 0;
+    time_t now = nowEpoch();
+    if (expiresAt != 0 && now != 0 && now > (time_t)expiresAt) {
+        Serial.println("Bỏ qua lệnh MQTT đã quá hạn");
+        return;
+    }
+    handleServerCommands(response);
+}
+#endif
+
 void controllerSetup() {
     for (size_t i = 0; i < RELAY_COUNT; i++) {
         pinMode(RELAY_PINS[i], OUTPUT);
@@ -714,7 +805,25 @@ void controllerLoop() {
     }
 
     bool online = WiFi.status() == WL_CONNECTED;
-    if (online && millis() - lastPoll >= pollMs) {
+    unsigned long pollEvery = pollMs;
+#if USE_MQTT
+    if (online && !mqtt.connected() && (lastMqttTry == 0 || millis() - lastMqttTry >= 30000)) {
+        lastMqttTry = millis();
+        if (nowEpoch() == 0) syncClockNtp();
+        mqttConnect();
+    }
+    if (mqtt.connected()) {
+        mqtt.loop();
+        if (!mqttInbox.isEmpty()) {
+            String message = mqttInbox;
+            mqttInbox = "";
+            handleMqttDownlink(message);
+        }
+        if (millis() - lastMqttStatus >= 3600000UL) publishMqttStatus();
+        pollEvery = max(pollMs, MQTT_POLL_SECONDS * 1000UL);
+    }
+#endif
+    if (online && millis() - lastPoll >= pollEvery) {
         lastPoll = millis();
         if (nowEpoch() == 0) syncClockNtp();
         pollCommands();

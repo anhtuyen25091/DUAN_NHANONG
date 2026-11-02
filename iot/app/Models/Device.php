@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\DeviceKind;
+use App\Jobs\SendMqttDownlink;
 use Database\Factories\DeviceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -33,6 +34,7 @@ class Device extends Model
             'api_key' => 'encrypted',
             'downlink' => 'encrypted:array',
             'last_seen_at' => 'datetime',
+            'mqtt_seen_at' => 'datetime',
             'offline_notified_at' => 'datetime',
             'low_battery_notified_at' => 'datetime',
             'battery' => 'integer',
@@ -47,6 +49,12 @@ class Device extends Model
         });
         static::saving(function (Device $device) {
             $device->dev_eui = $device->dev_eui ? strtolower($device->dev_eui) : null;
+        });
+        // Đổi chu kỳ đo: mạch điều khiển đang nối MQTT nhận ngay, không chờ lần hỏi lệnh sau
+        static::updated(function (Device $device) {
+            if ($device->wasChanged('measure_interval_min') && $device->usesMqttDownlink()) {
+                SendMqttDownlink::dispatch($device->id)->afterCommit();
+            }
         });
     }
 
@@ -80,6 +88,19 @@ class Device extends Model
     public function sign(string $payload): string
     {
         return hash_hmac('sha256', $payload, (string) $this->api_key);
+    }
+
+    /**
+     * Máy chủ đẩy lệnh xuống qua MQTT (nhanong/<uid>/down): mạch ESP32 có khóa và gần đây có gửi bản tin MQTT hợp lệ.
+     * Mạch HTTP / mạch đã chuyển sang HTTP thì thôi, vẫn tự hỏi lệnh như cũ.
+     */
+    public function usesMqttDownlink(): bool
+    {
+        return config('iot.mqtt.downlink')
+            && $this->kind === DeviceKind::Esp32
+            && $this->api_key !== null
+            && $this->mqtt_seen_at !== null
+            && $this->mqtt_seen_at->gt(now()->subHours(config('iot.offline_after_hours')));
     }
 
     public function isOnline(): bool

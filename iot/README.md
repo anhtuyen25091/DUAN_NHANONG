@@ -89,6 +89,29 @@ Gửi lại cùng số đo thì được tính vào `duplicates`, không bị nh
 | `POST /ingest` | Mạch có relay thì phản hồi kèm `commands` như trên |
 | `GET /device/firmware` | Tải bản firmware mới (header `x-MD5`). Phản hồi `/ingest`, `/device/commands` báo `"firmware_update": {"version", "size", "md5"}` khi có bản chưa cài (tải lên ở `/admin` › Cập nhật firmware), và `"config": {"measure_interval_min": 30}` khi chủ trang trại đổi chu kỳ đo |
 
+**Mạch điều khiển ESP32 nối MQTT** (`CONTROLLER_MODE 1` + `USE_MQTT 1`): bấm bật / tắt (tay, luật tự động, lịch tưới, khóa an toàn) thì máy chủ đẩy lệnh xuống ngay, không chờ mạch hỏi.
+
+| Topic | Chiều | Nội dung |
+|---|---|---|
+| `nhanong/<uid>/down` | máy chủ → mạch, QoS 1, **không** giữ lại (retain) | `{"data": "<chuỗi JSON>", "sig": "<HMAC-SHA256 của data bằng khóa thiết bị>"}`. `data` giống phản hồi `GET /device/commands`: `{"commands": [{"id": 12, "channel": 1, "action": "on", "minutes": 30}], "server_time": …, "exp": <giờ hết hạn lệnh>, "config": {…}, "firmware_update": {…}}` |
+| `nhanong/<uid>/ack` | mạch → máy chủ | `{"key": "ndk_…", "id": 12, "ok": true, "message": null, "states": "1:1,2:0"}` giống `POST /device/commands/{id}/ack`. Không có `id` = chỉ báo trạng thái relay (mạch gửi lúc vừa nối MQTT và mỗi giờ) |
+
+- Máy chủ chỉ đẩy khi mạch đã gửi bản tin MQTT hợp lệ (`up` hoặc `ack`, đúng khóa) trong 24 giờ qua (cột `devices.mqtt_seen_at`); tắt hẳn bằng `IOT_MQTT_DOWNLINK=false`. Cần chạy `queue:work` (job `SendMqttDownlink`, gửi 1 lần, không thử lại).
+- Đẩy được: lệnh vẫn "chờ gửi" (ghi `sent_at`), vì broker nhận chưa chắc mạch đã nhận. Mạch báo `ack` → "đã làm" / "lỗi" (lỗi báo về điện thoại). Không ai nhận trong 10 phút → quá hạn + báo về điện thoại, như mạch HTTP.
+- Đẩy không được (broker tắt…): chỉ ghi log, lệnh nằm chờ cho **đường HTTP dự phòng**: mạch vẫn hỏi `GET /device/commands` mỗi 60 giây khi đang nối MQTT. Lệnh nhận cả 2 đường cũng chỉ làm 1 lần: mạch nhớ id đã làm, chỉ báo lại.
+- Mạch chỉ làm bản tin có chữ ký đúng và chưa quá `exp` (thiết bị dùng chung tài khoản MQTT). Không retain: lệnh giữ trên broker sẽ chạy lại mỗi lần mạch nối lại.
+- Đổi chu kỳ đo, tải firmware mới lên `/admin`: máy chủ cũng đẩy qua `down` (danh sách lệnh rỗng). Mạch đo chạy pin gửi qua MQTT thì không nhận (chỉ gửi rồi ngủ), vẫn như cũ.
+- Mosquitto chạy thật: xem `deploy/mosquitto-acl` (mạch chỉ đọc được `nhanong/<mã client>/down`, mã client = uid).
+
+Thử với broker dev (`docker compose up -d mosquitto`, chạy `php artisan iot:mqtt-listen` + `php artisan queue:work`):
+
+```bash
+mosquitto_sub -h 127.0.0.1 -t 'nhanong/+/down' -q 1 -v                     # xem lệnh máy chủ đẩy xuống
+# Giả làm mạch ND7K3M9QXA: báo đang nghe MQTT, bấm bật máy trong app, rồi báo đã làm lệnh (id lấy từ bản tin down)
+mosquitto_pub -h 127.0.0.1 -t 'nhanong/ND7K3M9QXA/ack' -q 1 -m '{"key":"ndk_…","states":"1:0,2:0"}'
+mosquitto_pub -h 127.0.0.1 -t 'nhanong/ND7K3M9QXA/ack' -q 1 -m '{"key":"ndk_…","id":12,"ok":true,"states":"1:1,2:0"}'
+```
+
 **Mạch relay LoRaWAN** (Dragino LT-22222-L, chọn dòng `dragino-lt22222` khi thêm thiết bị; kênh 1–2):
 - Bấm bật / tắt: máy chủ đẩy lệnh `03 aa bb` xuống (`01` đóng relay, `00` mở, `11` giữ nguyên) qua network server, cổng `IOT_LORAWAN_DOWNLINK_FPORT` (mặc định 2).
   - The Things Stack: bật "Downlink API key" trong webhook. Bản tin gửi lên có header `X-Downlink-Push` / `X-Downlink-Apikey`, máy chủ tự lưu, không cần cấu hình gì thêm.
@@ -103,7 +126,7 @@ Gửi lại cùng số đo thì được tính vào `duplicates`, không bị nh
 | `POST /ingest/upload` | Điện thoại gửi file tải từ thiết bị (trường `file` hoặc `content`). Dòng đầu `#nhanong uid=… sig=<HMAC-SHA256>`. Không cần đăng nhập vì chữ ký chứng minh nguồn gốc. |
 | `POST /sms/inbound` | Cổng SMS chuyển tiếp tin nhắn (trường `text`), header `X-Webhook-Secret: IOT_SMS_SECRET`. Nội dung tin: `<uid> <16 ký tự đầu chữ ký> <dữ liệu>`. Dữ liệu là `t,metric,value;…`, hoặc dạng gọn cho 1 lần đo (vừa 1 tin 160 ký tự): `@<t>;soil_ph=6.2;salinity=4.6`. |
 | `POST /lorawan/chirpstack`, `POST /lorawan/ttn` | Webhook của network server LoRaWAN. Header `X-Webhook-Secret: IOT_LORAWAN_SECRET`. |
-| MQTT `nhanong/<uid>/up` | Nội dung giống `/ingest`, thêm `"key"`. Chạy `php artisan iot:mqtt-listen` để nhận (MQTT 3.1.1, QoS 1, mã client cố định `IOT_MQTT_CLIENT_ID`). |
+| MQTT `nhanong/<uid>/up` | Nội dung giống `/ingest`, thêm `"key"`. Chạy `php artisan iot:mqtt-listen` để nhận (MQTT 3.1.1, QoS 1, mã client cố định `IOT_MQTT_CLIENT_ID`). Lệnh cho mạch điều khiển: `nhanong/<uid>/down` / `nhanong/<uid>/ack`, xem phần mạch điều khiển ở trên. |
 
 Số đo gửi bù cũ hơn 24 giờ chỉ được lưu lại, không bắn cảnh báo muộn.
 
@@ -143,7 +166,7 @@ Số đo gửi bù cũ hơn 24 giờ chỉ được lưu lại, không bắn c�
 | `devices:check-health` | Báo chủ trang trại khi thiết bị không gửi số đo quá 24 giờ, hoặc pin dưới 20% (lịch: 30 phút/lần). Mỗi sự cố chỉ báo 1 lần, tới khi thiết bị gửi lại / pin lên trên 30%. |
 | `weather:rain-watch` | 15 phút / lần: xem mưa tại vị trí mọi trang trại (Open-Meteo, gọi gộp 50 vị trí / lần). Trời bắt đầu mưa thì báo chủ vườn "🌧️ … đang mưa" (mỗi cơn 1 lần, cách nhau ≥ 3 giờ; tạnh 1 giờ mới hết cơn). Vườn có máy đo mưa (chỉ số `rainfall`) thì báo ngay khi máy ghi nhận mưa. Tắt được theo từng trang trại (`rain_alerts`). |
 | `weather:sync-rain --days=2` | Mỗi giờ: lưu lượng mưa từng ngày (bảng `farm_rain_daily`). Trang trại vừa có / đổi vị trí thì tự lấy 1 năm. Ngày đã qua lấy từ API lưu trữ, hôm nay cộng các giờ đã qua; ngày không có số liệu để trống (không ghi 0). |
-| `iot:mqtt-listen` | Nghe MQTT. Chạy liên tục bằng supervisor. |
+| `iot:mqtt-listen` | Nghe MQTT (`nhanong/+/up` số đo, `nhanong/+/ack` kết quả lệnh). Chạy liên tục bằng supervisor. |
 | `iot:simulate` | Giả lập thiết bị |
 | `iot:simulate-controller <uid>` | Giả lập mạch điều khiển relay: nhận lệnh bật / tắt, tự tắt khi hết giờ (để thử app khi chưa có phần cứng) |
 | `commands:expire` | Mỗi phút: hủy lệnh bật / tắt quá 10 phút mà mạch chưa nhận, báo chủ trang trại; gửi lệnh tắt cho máy LoRaWAN hết giờ chạy |

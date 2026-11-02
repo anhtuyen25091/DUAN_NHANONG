@@ -6,7 +6,7 @@ use App\Crawling\Extraction\Text;
 use Smalot\PdfParser\Parser;
 
 /**
- * Dựng lại bảng từ file PDF có chữ (không phải bản scan) bằng vị trí từng đoạn chữ:
+ * Dựng lại bảng từ file PDF bằng vị trí từng đoạn chữ (chữ có sẵn trong PDF, hoặc chữ OCR của bản scan qua PdfOcr):
  * - cột: lấy theo dòng tiêu đề (ô "TT" / "STT" và các ô cùng hàng), ranh giới cột = giữa 2 tiêu đề kề nhau
  * - dòng: mỗi số thứ tự ở cột đầu là 1 dòng; chữ của 1 ô có thể xuống nhiều hàng và nằm lệch trên / dưới số thứ tự,
  *   nên chữ thuộc dòng nào tính theo khoảng giữa 2 số thứ tự liền nhau
@@ -17,18 +17,60 @@ final class PdfTable
     /** Chữ cách dòng tiêu đề trong khoảng này (điểm PDF) vẫn tính là tiêu đề (tiêu đề 2 tầng: "Địa chỉ" / "Bản | Xã") */
     private const HEADER_BAND = 40;
 
+    /** Trung bình mỗi trang ít hơn chừng này chữ cái / chữ số thì coi như không có lớp chữ (bản scan) */
+    public const MIN_CHARS_PER_PAGE = 30;
+
     /**
      * @return list<list<string>>
      */
     public static function rows(string $pdfContent): array
     {
-        $document = (new Parser)->parseContent($pdfContent);
+        return self::fromPages(self::pages($pdfContent));
+    }
+
+    /**
+     * Các đoạn chữ của từng trang (toạ độ PDF: điểm, gốc ở góc dưới trái). Trang scan (ảnh) thì không có đoạn nào.
+     *
+     * @return list<list<array{x: float, y: float, text: string}>>
+     */
+    public static function pages(string $pdfContent): array
+    {
+        return array_map(fn ($page): array => self::items($page->getDataTm()), array_values((new Parser)->parseContent($pdfContent)->getPages()));
+    }
+
+    /**
+     * File có lớp chữ dùng được không: bản scan không có chữ, hoặc chỉ vài chữ (số trang, dấu mộc…).
+     *
+     * @param  list<list<array{x: float, y: float, text: string}>>  $pages
+     */
+    public static function hasTextLayer(array $pages): bool
+    {
+        if ($pages === []) {
+            return false;
+        }
+        $chars = 0;
+        foreach ($pages as $items) {
+            foreach ($items as $item) {
+                $chars += (int) preg_match_all('/[\p{L}\p{N}]/u', $item['text']);
+            }
+        }
+
+        return $chars / count($pages) >= self::MIN_CHARS_PER_PAGE;
+    }
+
+    /**
+     * Dựng bảng từ các đoạn chữ của từng trang: chữ trong PDF, hoặc chữ nhận dạng từ ảnh (PdfOcr, đã đổi sang toạ độ PDF).
+     *
+     * @param  list<list<array{x: float, y: float, text: string}>>  $pages
+     * @return list<list<string>>
+     */
+    public static function fromPages(array $pages): array
+    {
         $columns = null;
         $headerCells = [];
         $rows = [];
 
-        foreach ($document->getPages() as $page) {
-            $items = self::items($page->getDataTm());
+        foreach ($pages as $items) {
             usort($items, fn (array $a, array $b): int => [$b['y'], $a['x']] <=> [$a['y'], $b['x']]);
             if ($items === []) {
                 continue;
