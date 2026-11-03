@@ -1,7 +1,16 @@
-import { MAP_MAX_ZOOM, VIETNAM_CENTER } from '@nhanong/shared'
+import { MAP_LAYER_BUTTON, MAP_MAX_ZOOM, VIETNAM_CENTER } from '@nhanong/shared'
 import L from 'leaflet'
 import { useEffect, useRef, useState } from 'react'
-import { createVietnamMap } from '../../vietnamMap'
+import { createVietnamMap, SATELLITE, setSatellite } from '../../vietnamMap'
+
+const SATELLITE_KEY = 'nhanong.farmMap.satellite'
+const readSatellite = () => {
+  try {
+    return localStorage.getItem(SATELLITE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 type Point = { lat: number; lng: number }
 
@@ -19,6 +28,8 @@ export default function FarmLocationMap({ point, center, onPick }: { point: Poin
   const pick = useRef(onPick)
   const [hint, setHint] = useState<string | null>(null)
   const hintTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // Ảnh vệ tinh: nhìn thấy mái nhà, hàng cây, ao để ghim đúng mảnh vườn; nhớ lựa chọn cho lần sau
+  const [satellite, setSatelliteOn] = useState(() => SATELLITE !== null && readSatellite())
 
   useEffect(() => {
     pick.current = onPick
@@ -35,12 +46,25 @@ export default function FarmLocationMap({ point, center, onPick }: { point: Poin
     m.on('click', (e: L.LeafletMouseEvent) => pick.current(round(e.latlng)))
     pin.current = L.marker(VIETNAM_CENTER, { icon: PIN, draggable: true, keyboard: false }).on('dragend', (e) => pick.current(round((e.target as L.Marker).getLatLng())))
     map.current = m
+    setSatellite(m, satellite)
     return () => {
       clearTimeout(hintTimer.current)
       m.remove()
       map.current = null
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const toggleSatellite = () => {
+    const next = !satellite
+    setSatelliteOn(next)
+    if (map.current) setSatellite(map.current, next)
+    try {
+      localStorage.setItem(SATELLITE_KEY, next ? '1' : '0')
+    } catch {
+      // Không lưu được (chế độ riêng tư): chỉ đổi cho lần này
+    }
+  }
 
   useEffect(() => {
     const m = map.current
@@ -59,6 +83,11 @@ export default function FarmLocationMap({ point, center, onPick }: { point: Poin
   return (
     <div className="shop-map-wrap">
       <div ref={box} className="shop-map farm-map" role="application" aria-label="Bản đồ chọn vị trí vườn" />
+      {SATELLITE && (
+        <button type="button" className="map-layer-toggle" onClick={toggleSatellite} aria-pressed={satellite}>
+          {satellite ? MAP_LAYER_BUTTON.map : MAP_LAYER_BUTTON.satellite}
+        </button>
+      )}
       {hint && <div className="map-hint">{hint}</div>}
     </div>
   )

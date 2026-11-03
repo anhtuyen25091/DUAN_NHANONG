@@ -621,10 +621,13 @@ function ChartPage({ query }: { query: URLSearchParams }) {
 
 function WeatherPage({ farmId, name }: { farmId: number; name: string }) {
   const [weather, reload] = useAsync(() => iotApi.weather(farmId), [farmId])
+  // Link không kèm tên (mở từ thông báo cũ, chép link): lấy tên trang trại cho tiêu đề
+  const [farmName] = useAsync(async () => name || ((await iotApi.farms()).find((f) => f.id === farmId)?.name ?? ''), [farmId, name])
+  const title = farmName.status === 'ok' && farmName.data ? farmName.data : name
   return (
     <section>
       <Back />
-      <h1>🌦️ Thời tiết{name ? ` · ${name}` : ''}</h1>
+      <h1>🌦️ Thời tiết{title ? ` · ${title}` : ''}</h1>
       <Status state={weather} retry={reload} />
       {weather.status === 'ok' && (
         <>

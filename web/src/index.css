@@ -2008,6 +2008,23 @@ button.linklike.danger {
   z-index: 0;
   background: #dfe3e6;
 }
+/* Nút đổi nền bản đồ ↔ ảnh vệ tinh (bản đồ chọn vị trí vườn) */
+.map-layer-toggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 900;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
 .map-hint {
   position: absolute;
   inset: 0;

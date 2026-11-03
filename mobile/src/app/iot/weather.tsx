@@ -11,10 +11,13 @@ import { useAsync } from '../../lib/useAsync';
 export default function IotWeatherScreen() {
   const { farm, name } = useLocalSearchParams<{ farm: string; name?: string }>();
   const weather = useAsync(() => iotApi.weather(Number(farm)), [farm]);
+  // Mở từ thông báo / link không kèm tên (bản cũ, hoặc tên đã đổi): lấy tên trang trại cho tiêu đề
+  const farmName = useAsync(async () => name || ((await iotApi.farms()).find((f) => f.id === Number(farm))?.name ?? ''), [farm, name]);
+  const title = farmName.state.status === 'ok' && farmName.state.data ? farmName.state.data : name;
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16 }} refreshControl={<RefreshControl refreshing={weather.refreshing} onRefresh={weather.reload} />}>
-      <Stack.Screen options={{ title: name ? `🌦️ Thời tiết · ${name}` : '🌦️ Thời tiết' }} />
+      <Stack.Screen options={{ title: title ? `🌦️ Thời tiết · ${title}` : '🌦️ Thời tiết' }} />
       <Status state={weather.state} retry={weather.reload} />
       {weather.state.status === 'error' && <RainHistory farmId={Number(farm)} />}
       {weather.state.status === 'ok' && (

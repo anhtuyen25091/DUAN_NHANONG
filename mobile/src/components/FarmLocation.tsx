@@ -1,5 +1,6 @@
 import { foldVietnamese, nearestProvince, parseCoordinates, placeLabel, PROVINCE_CENTERS, PROVINCE_NAMES, VIETNAM_CENTER, type Place } from '@nhanong/shared';
 import * as Location from 'expo-location';
+import Storage from 'expo-sqlite/kv-store';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
@@ -11,6 +12,27 @@ import { FormInput, FormSection } from './iotForm';
 import { Button, Card, Chip, styles } from './ui';
 
 type Point = { lat: number; lng: number };
+
+/** Nhớ lựa chọn nền ảnh vệ tinh cho lần mở form sau */
+const SATELLITE_KEY = 'farm-map-satellite';
+const satelliteStore =
+  Platform.OS === 'web'
+    ? { get: (k: string) => localStorage.getItem(k), set: (k: string, v: string) => localStorage.setItem(k, v) }
+    : { get: (k: string) => Storage.getItemSync(k), set: (k: string, v: string) => Storage.setItemSync(k, v) };
+function readSatellite(): boolean {
+  try {
+    return satelliteStore.get(SATELLITE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function saveSatellite(on: boolean) {
+  try {
+    satelliteStore.set(SATELLITE_KEY, on ? '1' : '0');
+  } catch {
+    // Không lưu được: lần sau mở lại nền thường
+  }
+}
 export type FarmPlace = { province: string; point: Point | null };
 
 /**
@@ -115,6 +137,7 @@ export function FarmLocation({ value, onChange }: { value: FarmPlace; onChange: 
         zoom: point ? 14 : provinceCode ? 9 : null,
         dark: currentScheme() === 'dark',
         pin: point,
+        satellite: readSatellite(),
       }),
     [], // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -123,7 +146,8 @@ export function FarmLocation({ value, onChange }: { value: FarmPlace; onChange: 
   }, [point]);
 
   const onMessage = (event: WebViewMessageEvent) => {
-    const message = JSON.parse(event.nativeEvent.data) as { action: string; lat?: number; lng?: number };
+    const message = JSON.parse(event.nativeEvent.data) as { action: string; lat?: number; lng?: number; satellite?: boolean };
+    if (message.action === 'layer') return saveSatellite(message.satellite === true);
     if (message.action === 'pick' && message.lat !== undefined && message.lng !== undefined) place({ lat: message.lat, lng: message.lng }, 'chỗ đã chọn trên bản đồ');
   };
 

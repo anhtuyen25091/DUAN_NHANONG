@@ -1,6 +1,7 @@
-import { MAP_LABELS, MAP_MAX_ZOOM, MAP_MIN_ZOOM, mapTiles, PROVINCE_LABEL_MAX_ZOOM, PROVINCE_LABEL_MIN_ZOOM, provinceLabels, VIETNAM_BOUNDS, type Shop } from '@nhanong/shared';
+import { MAP_LABELS, MAP_LAYER_BUTTON, MAP_MAX_ZOOM, MAP_MIN_ZOOM, mapSatellite, mapTiles, PROVINCE_LABEL_MAX_ZOOM, PROVINCE_LABEL_MIN_ZOOM, provinceLabels, VIETNAM_BOUNDS, type Shop } from '@nhanong/shared';
 
 const TILES = mapTiles(process.env.EXPO_PUBLIC_MAP_TILE_URL, process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION);
+const SATELLITE = mapSatellite(process.env.EXPO_PUBLIC_MAP_SATELLITE_URL, process.env.EXPO_PUBLIC_MAP_SATELLITE_ATTRIBUTION);
 const LEAFLET = 'https://unpkg.com/leaflet@1.9.4/dist';
 
 /** 1 điểm đã chuẩn bị sẵn để vẽ (tọa độ đã dàn, chữ đã ghép) */
@@ -23,8 +24,10 @@ export interface MapRender {
  * dark: app đang ở chế độ tối → đảo màu nền bản đồ, ô thông tin nền tối (giống bảng màu tối của app).
  * pin: chế độ chọn vị trí (form trang trại): có ghim kéo được, bấm / kéo thì báo {action: 'pick', lat, lng};
  * app dời ghim bằng window.setPin(lat, lng). null = chưa có vị trí, chưa hiện ghim.
+ * Chế độ chọn vị trí có nút "🛰️ Ảnh vệ tinh" (satellite: bật sẵn lúc mở); bấm đổi nền thì báo {action: 'layer', satellite} để app nhớ.
  */
-export function mapHtml(view: { center: [number, number]; zoom: number | null; dark?: boolean; pin?: { lat: number; lng: number } | null }): string {
+export function mapHtml(view: { center: [number, number]; zoom: number | null; dark?: boolean; pin?: { lat: number; lng: number } | null; satellite?: boolean }): string {
+  const picker = view.pin !== undefined;
   // Dữ liệu nhúng vào <script>: chặn "</script>"
   const data = JSON.stringify({
     tiles: TILES,
@@ -36,8 +39,11 @@ export function mapHtml(view: { center: [number, number]; zoom: number | null; d
     labels: MAP_LABELS,
     provinces: provinceLabels(),
     provinceZoom: [PROVINCE_LABEL_MIN_ZOOM, PROVINCE_LABEL_MAX_ZOOM],
-    picker: view.pin !== undefined,
+    picker,
     pin: view.pin ?? null,
+    satellite: picker ? SATELLITE : null,
+    satelliteOn: picker && SATELLITE !== null && view.satellite === true,
+    layerButton: MAP_LAYER_BUTTON,
   }).replace(/</g, '\\u003c');
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <link rel="stylesheet" href="${LEAFLET}/leaflet.css">
@@ -53,6 +59,8 @@ export function mapHtml(view: { center: [number, number]; zoom: number | null; d
 .dark .leaflet-popup-content-wrapper,.dark .leaflet-popup-tip{background:#141d18;color:#ebf2ed}.dark .muted{color:#9fb2a6}.dark .leaflet-container a.leaflet-popup-close-button{color:#9fb2a6}
 .dark .acts button{background:#141d18;color:#3ddc97;border-color:#3ddc97}.dark .acts button.primary{background:#3ddc97;color:#06281a}
 .dark .vn-label span{text-shadow:0 0 3px #000,0 0 3px #000,0 0 3px #000}.dark .vn-label.province span{color:#c8d3cc}.dark .vn-label.sea span{color:#8ec1e6}.dark .vn-label.sovereignty span{color:#ff8a80}
+.layer{position:absolute;top:10px;right:10px;z-index:1000;padding:8px 12px;border-radius:10px;border:1px solid #d5ddd7;background:#fff;color:#17201a;font:inherit;font-size:15px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.dark .layer{background:#141d18;color:#ebf2ed;border-color:#2b3a31}.dark.sat .leaflet-tile-pane{filter:none}
 .pin span{display:block;font-size:32px;line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
 .dark .leaflet-bar a,.dark .leaflet-control-attribution{background:#141d18;color:#ebf2ed}.dark .leaflet-control-attribution a{color:#3ddc97}</style></head><body${view.dark ? ' class="dark"' : ''}><div id="map"></div>
 <script src="${LEAFLET}/leaflet.js"></script><script>
@@ -62,7 +70,15 @@ const post=m=>window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(J
 const send=(action,id)=>post({action,id});
 const B=L.latLngBounds(D.bounds);
 const map=L.map('map',{center:D.center,zoom:D.zoom||5,minZoom:D.minZoom,maxZoom:D.maxZoom,maxBounds:B,maxBoundsViscosity:1,preferCanvas:true});
-for(const t of D.tiles)L.tileLayer(t.url,Object.assign({},t,{bounds:B.pad(1)})).addTo(map);
+const base=L.layerGroup(D.tiles.map(t=>L.tileLayer(t.url,Object.assign({},t,{bounds:B.pad(1)})))).addTo(map);
+if(D.satellite){
+  // Ảnh vệ tinh: chỉ tải lớp đang xem; nền tối không đảo màu ảnh
+  const sat=L.tileLayer(D.satellite.url,Object.assign({},D.satellite,{bounds:B.pad(1)}));
+  const btn=document.createElement('button');btn.className='layer';btn.type='button';document.body.appendChild(btn);
+  const setSat=(on,tell)=>{if(on){base.remove();sat.addTo(map)}else{sat.remove();base.addTo(map)}document.body.classList.toggle('sat',on);btn.textContent=on?D.layerButton.map:D.layerButton.satellite;btn.setAttribute('aria-pressed',String(on));if(tell)post({action:'layer',satellite:on})};
+  let satOn=D.satelliteOn;setSat(satOn,false);
+  btn.onclick=()=>{satOn=!satOn;setSat(satOn,true)};
+}
 map.setMinZoom(Math.max(4,map.getBoundsZoom(B)));
 if(D.zoom===null)map.setView(D.center,map.getMinZoom());
 const label=(t,k)=>L.marker(t.at,{interactive:false,keyboard:false,icon:L.divIcon({className:'vn-label '+k,html:'<span>'+esc(t.text).replace(' (','<br>(')+'</span>',iconSize:[0,0]})});

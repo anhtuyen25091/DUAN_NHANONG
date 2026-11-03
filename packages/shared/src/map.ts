@@ -32,6 +32,27 @@ export const MAP_TILES: MapTiles[] = [
 /** Phóng to nhất được */
 export const MAP_MAX_ZOOM = 17;
 
+/**
+ * Lớp ảnh vệ tinh (Esri World Imagery) cho bản đồ chọn vị trí vườn: nhìn thấy mái nhà, hàng cây, ao để ghim đúng mảnh vườn.
+ * Ảnh không có chữ, không có đường biên. Cùng điều kiện giấy phép như nền Esri ở trên (dùng thương mại cần tài khoản ArcGIS).
+ * Đặt biến môi trường web VITE_MAP_SATELLITE_URL / app EXPO_PUBLIC_MAP_SATELLITE_URL để đổi nhà cung cấp;
+ * đặt "off" để ẩn nút ảnh vệ tinh.
+ */
+export function mapSatellite(url?: string, attribution?: string): MapTiles | null {
+  if (url === 'off') return null;
+  return {
+    url: url || `${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`,
+    subdomains: 'abc',
+    attribution: attribution || 'Ảnh vệ tinh © Esri, Maxar, Earthstar Geographics',
+    minZoom: 0,
+    maxZoom: MAP_MAX_ZOOM,
+    maxNativeZoom: 18,
+  };
+}
+
+/** Chữ trên nút đổi nền (bản đồ chọn vị trí vườn) */
+export const MAP_LAYER_BUTTON = { satellite: '🛰️ Ảnh vệ tinh', map: '🗺️ Bản đồ' };
+
 /** Ô bản đồ đã tính biến môi trường (để trống thì dùng mặc định) */
 export function mapTiles(url?: string, attribution?: string): MapTiles[] {
   return url ? [{ url, subdomains: 'abc', attribution: attribution || MAP_TILES[0].attribution, minZoom: 0, maxZoom: MAP_MAX_ZOOM, maxNativeZoom: 19 }] : MAP_TILES;

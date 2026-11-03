@@ -11,6 +11,27 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 03/11/2026: Ảnh vệ tinh khi chọn vị trí vườn; tiêu đề màn thời tiết luôn có tên trang trại
+
+**Đã làm**
+- **Ảnh vệ tinh** trên bản đồ chọn vị trí vườn (form thêm / sửa trang trại, web + app): nút "🛰️ Ảnh vệ tinh" ↔ "🗺️ Bản đồ" ở góc trên bên phải.
+  - Esri World Imagery (cùng điều kiện giấy phép như nền Esri đang dùng), không có chữ / đường biên; tên Hoàng Sa, Trường Sa tự vẽ vẫn hiện
+  - chỉ tải lớp đang xem; nền tối của app không đảo màu ảnh
+  - nhớ lựa chọn cho lần mở form sau (web `localStorage`, app `expo-sqlite/kv-store`)
+  - hàm chung `mapSatellite()` (`packages/shared/src/map.ts`); đổi nhà cung cấp bằng `VITE_MAP_SATELLITE_URL` / `EXPO_PUBLIC_MAP_SATELLITE_URL` (kèm `_ATTRIBUTION`), đặt `off` để ẩn nút
+  - bản đồ điểm bán không đổi
+- **Tiêu đề màn thời tiết:** thông báo mưa / khô hạn vốn đã gửi kèm tên trang trại; nay link không kèm tên (thông báo cũ, chép link, tải lại trang web) thì tự lấy tên từ danh sách trang trại (app `iot/weather.tsx`, web `WeatherPage`).
+
+**Kiểm tra**
+- Thư viện chung 152/152 (thêm 2 test `mapSatellite`), web build + lint sạch (1 cảnh báo cũ ở `PriceBoard.tsx`), app typecheck + `expo lint` sạch.
+- Trang bản đồ của app chụp bằng Chrome headless (vị trí gần Buôn Ma Thuột, mức 17): nền thường có nút, ảnh vệ tinh hiện mái nhà / ruộng vườn, nền tối không bị đảo màu.
+
+**Còn tồn**
+- Chưa bấm thử nút trên web đã đăng nhập và trên điện thoại thật.
+- Ảnh vệ tinh ở vùng nông thôn có thể cũ vài năm hoặc có mây.
+
+---
+
 ## 02/11/2026 (tiếp 4): App: giao diện tối, đổi sáng / tối không mất chữ đang nhập, thêm ESLint
 
 **Đã làm**

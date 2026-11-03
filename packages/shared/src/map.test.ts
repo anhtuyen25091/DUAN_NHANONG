@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCoordinates } from './map';
+import { MAP_MAX_ZOOM, mapSatellite, parseCoordinates } from './map';
 
 describe('parseCoordinates', () => {
   it('đọc số tọa độ', () => {
@@ -23,5 +23,19 @@ describe('parseCoordinates', () => {
     expect(parseCoordinates('https://maps.app.goo.gl/AbCd1234')).toBeNull();
     expect(parseCoordinates('48.8566, 2.3522')).toBeNull();
     expect(parseCoordinates('0912345678')).toBeNull();
+  });
+});
+
+describe('mapSatellite', () => {
+  it('mặc định dùng ảnh vệ tinh Esri, phóng tới mức tối đa của bản đồ', () => {
+    const sat = mapSatellite();
+    expect(sat?.url).toContain('World_Imagery');
+    expect(sat?.attribution).toContain('Esri');
+    expect(sat?.maxZoom).toBe(MAP_MAX_ZOOM);
+  });
+
+  it('đổi nhà cung cấp hoặc tắt bằng biến môi trường', () => {
+    expect(mapSatellite('https://tiles.example.vn/{z}/{x}/{y}.jpg', 'Ảnh © Example')).toMatchObject({ url: 'https://tiles.example.vn/{z}/{x}/{y}.jpg', attribution: 'Ảnh © Example' });
+    expect(mapSatellite('off')).toBeNull();
   });
 });

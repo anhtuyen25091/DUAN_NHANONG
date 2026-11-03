@@ -1,9 +1,28 @@
-import { MAP_GESTURE_HINTS, MAP_LABELS, MAP_MAX_ZOOM, MAP_MIN_ZOOM, mapTiles, PROVINCE_LABEL_MAX_ZOOM, PROVINCE_LABEL_MIN_ZOOM, provinceLabels, VIETNAM_BOUNDS, VIETNAM_CENTER, VIETNAM_ZOOM } from '@nhanong/shared'
+import { MAP_GESTURE_HINTS, MAP_LABELS, MAP_MAX_ZOOM, MAP_MIN_ZOOM, mapSatellite, mapTiles, PROVINCE_LABEL_MAX_ZOOM, PROVINCE_LABEL_MIN_ZOOM, provinceLabels, VIETNAM_BOUNDS, VIETNAM_CENTER, VIETNAM_ZOOM } from '@nhanong/shared'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 /** Bản đồ dùng chung: điểm bán (pages/ShopMap) và chọn vị trí trang trại (pages/iot/FarmLocation) */
 export const TILES = mapTiles(import.meta.env.VITE_MAP_TILE_URL, import.meta.env.VITE_MAP_TILE_ATTRIBUTION)
+
+/** Ảnh vệ tinh (null = tắt bằng VITE_MAP_SATELLITE_URL=off) */
+export const SATELLITE = mapSatellite(import.meta.env.VITE_MAP_SATELLITE_URL, import.meta.env.VITE_MAP_SATELLITE_ATTRIBUTION)
+
+/** Nền bản đồ thường của từng bản đồ (để đổi qua lại với ảnh vệ tinh) */
+const baseLayers = new WeakMap<L.Map, { base: L.LayerGroup; satellite: L.TileLayer | null }>()
+
+/** Đổi nền giữa bản đồ thường và ảnh vệ tinh (chỉ tải lớp đang xem) */
+export function setSatellite(m: L.Map, on: boolean) {
+  const layers = baseLayers.get(m)
+  if (!layers?.satellite) return
+  if (on) {
+    layers.base.remove()
+    layers.satellite.addTo(m)
+  } else {
+    layers.satellite.remove()
+    layers.base.addTo(m)
+  }
+}
 
 export const escape = (text: string) => text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
@@ -28,7 +47,8 @@ export function createVietnamMap(box: HTMLDivElement, onHint: (text: string) => 
     preferCanvas: true,
     dragging: !touch,
   })
-  for (const t of TILES) L.tileLayer(t.url, { ...t, bounds: bounds.pad(1) }).addTo(m)
+  const base = L.layerGroup(TILES.map((t) => L.tileLayer(t.url, { ...t, bounds: bounds.pad(1) }))).addTo(m)
+  baseLayers.set(m, { base, satellite: SATELLITE ? L.tileLayer(SATELLITE.url, { ...SATELLITE, bounds: bounds.pad(1) }) : null })
   // Thu nhỏ tối đa = vừa khít cả nước (kể cả 2 quần đảo), không thấy nước khác
   m.setMinZoom(Math.max(4, m.getBoundsZoom(bounds)))
 
