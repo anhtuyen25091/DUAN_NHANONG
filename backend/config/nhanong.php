@@ -36,4 +36,9 @@ return [
         'cache_days' => 30,
     ],
 
+    /*
+    | Địa chỉ web app (vd https://nhanong.vn); dùng cho nút "Xem trên web" của bài viết trong /admin. Bỏ trống thì ẩn nút.
+    */
+    'web_url' => env('WEB_URL'),
+
 ];

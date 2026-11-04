@@ -2,6 +2,7 @@ import { ApiError, formatDate, formatNumber, formatPriceRange, type AccessTier }
 import { useEffect } from 'react'
 import { api } from '../api'
 import { setAuth, updateAuthUser, useAuth } from '../auth'
+import { ProductArticles } from '../components/ArticleCards'
 import { Change } from '../components/Change'
 import { PriceChart } from '../components/PriceChart'
 import { Status } from '../components/Status'
@@ -139,6 +140,8 @@ export function ProductDetail({ code, query }: { code: string; query: URLSearchP
       )}
 
       <LocalPriceForProduct code={code} />
+
+      <ProductArticles productCode={code} />
 
       <p className="notice small">Muốn nhận báo khi giá thay đổi? Cài app Nhà Nông trên điện thoại để đặt cảnh báo giá.</p>
     </>

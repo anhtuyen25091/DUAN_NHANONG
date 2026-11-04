@@ -147,18 +147,23 @@ class BackfillRunner
                 }
 
                 $onPage = 0;
-                preg_match_all('#href="([^"]+)"|datetime="([^"]+)"#', $html, $matches, PREG_SET_ORDER);
+                // Ngày bài: <time datetime="…"> hoặc (giao diện mới thuonghieucongluan) <span class="news-list-time">06:20 16/10</span>
+                preg_match_all('#href="([^"]+)"|datetime="([^"]+)"|news-list-time".*?\d{1,2}:\d{2} (\d{1,2})/(\d{1,2})<#s', $html, $matches, PREG_SET_ORDER);
                 $pending = [];
                 foreach ($matches as $match) {
                     $url = html_entity_decode($match[1]);
+                    $date = match (true) {
+                        ($match[2] ?? '') !== '' => CarbonImmutable::parse($match[2])->setTimezone(config('app.timezone'))->toDateString(),
+                        ($match[3] ?? '') !== '' => $this->dayMonthToDate((int) $match[3], (int) $match[4]),
+                        default => null,
+                    };
                     if ($url !== '' && preg_match($urlPattern, $url)) {
                         $onPage++;
                         if (! isset($found[$url])) {
                             $pending[$url] = true;
                         }
-                    } elseif (($match[2] ?? '') !== '' && $pending !== []) {
-                        // Thẻ <time> đứng sau link bài trong cùng ô danh sách
-                        $date = CarbonImmutable::parse($match[2])->setTimezone(config('app.timezone'))->toDateString();
+                    } elseif ($date !== null && $pending !== []) {
+                        // Ngày đứng sau link bài trong cùng ô danh sách
                         foreach (array_keys($pending) as $pendingUrl) {
                             $found[$pendingUrl] = $date;
                         }
@@ -173,6 +178,21 @@ class BackfillRunner
         }
 
         return $found;
+    }
+
+    /**
+     * Ngày "dd/mm" không ghi năm: lấy lần gần nhất không sau hôm nay.
+     */
+    private function dayMonthToDate(int $day, int $month): ?string
+    {
+        $today = CarbonImmutable::today(config('app.timezone'));
+        foreach ([$today->year, $today->year - 1] as $year) {
+            if (checkdate($month, $day, $year) && CarbonImmutable::create($year, $month, $day)->lessThanOrEqualTo($today)) {
+                return sprintf('%04d-%02d-%02d', $year, $month, $day);
+            }
+        }
+
+        return null;
     }
 
     private function adapterFor(PriceSource $source): PriceSourceAdapter

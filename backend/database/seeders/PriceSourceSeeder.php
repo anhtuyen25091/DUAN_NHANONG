@@ -200,6 +200,8 @@ class PriceSourceSeeder extends Seeder
                         ['url' => 'https://thuonghieucongluan.com.vn/news-tag254327/gia-sau-rieng/trang-{page}', 'from' => 1, 'to' => 10],
                         ['url' => 'https://thuonghieucongluan.com.vn/news-tag264505/gia-sau-rieng-hom-nay/trang-{page}', 'from' => 1, 'to' => 60],
                         ['url' => 'https://thuonghieucongluan.com.vn/news-tag267425/gia-ri6/trang-{page}', 'from' => 1, 'to' => 100],
+                        // Tag đang dùng từ 2026 (các tag trên không còn gắn bài mới); trang cuối là bài mới nhất
+                        ['url' => 'https://thuonghieucongluan.com.vn/news-tag250094/gia-sau-rieng-hom-nay/trang-{page}', 'from' => 1, 'to' => 30],
                     ],
                     'url_pattern' => '#thuonghieucongluan\.com\.vn/gia-sau-rieng-hom-nay-#',
                 ],

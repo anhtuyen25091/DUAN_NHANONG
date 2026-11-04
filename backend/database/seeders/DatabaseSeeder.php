@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             CatalogSeeder::class,
             PriceSourceSeeder::class,
             PlanSeeder::class,
+            ArticleCategorySeeder::class,
         ]);
     }
 }

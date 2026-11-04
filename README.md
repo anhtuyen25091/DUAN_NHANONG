@@ -120,6 +120,34 @@ php artisan shops:collect-file ds.pdf --source=so-x-pb --province=son-la --type=
 - Cấu hình khác (`backend/.env`): `TESSERACT_BIN`, `PDFTOPPM_BIN` (đường dẫn lệnh, mặc định tìm trong PATH), `SHOPS_OCR_DPI` (300), `SHOPS_OCR_TIMEOUT` (giây / trang, 180), `SHOPS_OCR_MAX_PAGES` (200).
 - Kiểm tra đã cài đủ: `tesseract --list-langs` (có `vie`), `pdftoppm -v`.
 
+## Bài viết
+
+- Admin soạn bài trong `/admin` → Nội dung → Bài viết:
+  - trình soạn thảo có tiêu đề, danh sách, bảng, chèn ảnh
+  - ảnh bìa, tóm tắt, danh mục, mặt hàng liên quan
+  - nháp / đăng / hẹn giờ (đặt ngày đăng trong tương lai), bài nổi bật, nguồn tham khảo
+- Danh mục (thêm / sửa / tắt / kéo đổi thứ tự): `/admin` → Nội dung → Danh mục bài viết. Có 8 danh mục mặc định (`ArticleCategorySeeder`).
+- Web `#/bai-viet`:
+  - lọc theo danh mục, theo mặt hàng (`?mat_hang=`) và tìm kiếm
+  - bài nổi bật nằm to ở đầu trang
+  - trang đọc bài có "Bài cùng chủ đề"
+  - thẻ "Bài viết mới" trên Bảng giá, "Bài viết liên quan" ở trang mặt hàng
+- Ảnh lưu ở `storage/app/public/articles`. Lần đầu cần chạy `php artisan storage:link`. Máy chủ lọc HTML (bỏ script, thuộc tính sự kiện) trước khi trả nội dung.
+- `WEB_URL` trong `backend/.env`: hiện nút "Xem trên web" trong admin.
+- Bài mẫu (chỉ máy dev): `php artisan db:seed --class=ArticleDemoSeeder`.
+- API: `GET /api/v1/article-categories`, `GET /api/v1/articles?category=&product=&q=&featured=&page=`, `GET /api/v1/articles/{slug}`.
+- Bài do admin tự soạn nên không thuộc diện mạng xã hội (NĐ 147/2024). Nếu tham khảo báo thì chỉ tóm tắt và ghi nguồn.
+
+### Thư viện ảnh & file
+
+- `/admin` → Nội dung → Thư viện ảnh & file: gom mọi file trên ổ `public`
+  - file tải lên trực tiếp (ảnh JPG / PNG / WebP / GIF, PDF, Word, Excel; tối đa 10 MB) để dùng ở ngoài: nút **Chi tiết** có link công khai để dán vào web khác, Zalo, Facebook…
+  - ảnh bìa và ảnh chèn trong bài viết (tự ghi nhận khi lưu bài)
+- Mỗi file ghi "Đang dùng ở n chỗ" (bấm Chi tiết để xem bài nào) hoặc "Chưa dùng". Chỉ xóa được file chưa dùng; xóa thì xóa luôn file trên máy chủ.
+- Soạn bài: nút **Chèn ảnh từ thư viện** trên thanh công cụ và **Chọn từ thư viện** ở ô Ảnh bìa. Ảnh trong bài chỉ được trỏ tới file mới tải lên hoặc file có trong thư viện.
+- `php artisan media:sync` (hoặc nút **Quét lại**): đưa file có sẵn trên ổ vào thư viện, bỏ bản ghi file đã mất, tính lại chỗ dùng. Chạy 1 lần sau khi cập nhật lên máy chủ.
+- Link công khai theo địa chỉ đang mở admin. Máy dev mở admin qua IP mạng LAN thì nên đặt `APP_URL` cùng IP đó, nếu không ô Ảnh bìa không hiện được ảnh xem trước.
+
 ## Sổ thu chi
 
 - Mặc định chỉ lưu trên máy: web dùng IndexedDB, app dùng SQLite. Không gửi gì lên server.

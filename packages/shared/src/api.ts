@@ -2,6 +2,7 @@
  * Kiểu dữ liệu và client gọi API /api/v1 của backend, dùng chung cho web và mobile.
  */
 import type { BuyerProfile, BuyerProfileInput, BuyerReport, BuyerStatus, LocalPriceFilters, LocalPrices, MyLocation, Place } from './local';
+import type { ArticleCategory, ArticleDetail, ArticleFilters, ArticlePage } from './articles';
 import type { BidInput, OfferInput, OfferMarket, ProduceOffer } from './offers';
 import type { AdvanceInput, Business, BusinessActivity, BusinessAdvance, BusinessDeal, BusinessInput, BusinessMemberInfo, BusinessSummary, BuyPriceBoard, BuyPriceInput, MemberCash, MemberInput } from './business';
 import { documentPath, type CustomerInput, type DocumentFormat, type DocumentTarget, type Purchase, type PurchaseInput, type ReceivedPurchase, type TradeCustomer, type TradeFilters, type TradeList, type TradeSummary } from './trade';
@@ -461,6 +462,10 @@ export function createApi({ baseUrl, getDeviceId, fetch: fetchFn = globalThis.fe
     history: (productCode: string, { token, ...options }: { region?: string | null; days?: number; to?: string; token?: string | null } = {}) =>
       request<PriceHistory>('GET', `/products/${encodeURIComponent(productCode)}/history`, { query: options, token: token ?? undefined }),
     plans: () => request<PlanList>('GET', '/plans'),
+
+    articleCategories: () => request<{ data: ArticleCategory[] }>('GET', '/article-categories').then((r) => r.data),
+    articles: (filters: ArticleFilters = {}) => request<ArticlePage>('GET', '/articles', { query: filters }),
+    article: (slug: string) => request<ArticleDetail>('GET', `/articles/${encodeURIComponent(slug)}`),
 
     /** since: chỉ lấy đơn thay đổi từ thời điểm đó (hỏi định kỳ để báo bên kia vừa ghi / xác nhận) */
     deals: (token: string, since?: string) => request<{ data: Deal[] }>('GET', '/deals', { token, query: since ? { since } : {} }).then((r) => r.data),

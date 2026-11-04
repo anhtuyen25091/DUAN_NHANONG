@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\ArticleController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BusinessController;
 use App\Http\Controllers\Api\V1\BuyerController;
@@ -35,6 +36,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/shops/map', [ShopController::class, 'map'])->name('shops.map');
     Route::get('/provinces', [ShopController::class, 'provinces'])->name('provinces');
     Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
+    Route::middleware('throttle:120,1,articles')->group(function () {
+        Route::get('/article-categories', [ArticleController::class, 'categories'])->name('articles.categories');
+        Route::get('/articles', [ArticleController::class, 'index'])->name('articles.index');
+        Route::get('/articles/{slug}', [ArticleController::class, 'show'])->name('articles.show');
+    });
     // Giá quanh 1 vị trí do các điểm mua đã duyệt đăng (không cần đăng nhập)
     Route::get('/local-prices', [LocalPriceController::class, 'index'])->middleware('throttle:60,1,local-prices.index')->name('local-prices.index');
     Route::get('/places', [LocalPriceController::class, 'places'])->middleware('throttle:places')->name('places.index');

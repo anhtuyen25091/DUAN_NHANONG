@@ -1,6 +1,7 @@
 import { CATEGORY_TYPE_LABELS, describeLocation, groupByProduct, matchesSearch, pinFollowed, type CategoryType } from '@nhanong/shared'
 import { useState } from 'react'
 import { api } from '../api'
+import { LatestArticles } from '../components/ArticleCards'
 import { ProductPriceCard } from '../components/ProductPriceCard'
 import { Status } from '../components/Status'
 import { href, replaceQuery, useAsync } from '../hooks'
@@ -83,6 +84,7 @@ export function PriceBoard({ query }: { query: URLSearchParams }) {
           <ProductPriceCard product={product} rows={rows} followed={followed.includes(product.code)} region={region} expanded={search.trim() !== '' || region !== ''} />
         </div>
       ))}
+      <LatestArticles />
     </>
   )
 }

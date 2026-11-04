@@ -8,6 +8,7 @@ use App\Models\Price;
 use App\Models\PriceSource;
 use App\Models\Product;
 use App\Models\Region;
+use Carbon\CarbonImmutable;
 use Database\Seeders\CatalogSeeder;
 use Database\Seeders\PriceSourceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -190,6 +191,30 @@ class NewsArchiveBackfillTest extends TestCase
         // Mỗi tag đọc tới trang đầu tiên không còn bài: tag 1, 2 (2 trang), tag 3 (1 trang)
         Http::assertSent(fn ($request): bool => str_ends_with($request->url(), 'gia-sau-rieng-hom-nay/trang-2'));
         Http::assertNotSent(fn ($request): bool => str_ends_with($request->url(), 'gia-sau-rieng-hom-nay/trang-3'));
+    }
+
+    public function test_durian_tag_pages_with_day_month_only_listing_are_dated_by_most_recent_year(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2025-07-05 08:00', 'Asia/Ho_Chi_Minh'));
+        $item = fn (string $slug, string $time): string => '<div class="news-list-item"><a href="https://thuonghieucongluan.com.vn/'.$slug.'.html">x</a>'
+            .'<span class="news-list-time"><svg viewBox="0 0 24 24"><path d="M3 7"></path></svg><span>'.$time.'</span></span></div>';
+        // 27/06 → 2025 (đã qua); 14/12 → 2024 (chưa tới trong năm nay)
+        $listing = $item('gia-sau-rieng-hom-nay-27-6-sau-thai-giam-a268253', '06:30 27/06')
+            .$item('gia-sau-rieng-hom-nay-14-12-sau-thai-a-tiep-tuc-tang-a253194', '05:49 14/12');
+
+        Http::fake([
+            'thuonghieucongluan.com.vn/robots.txt' => Http::response("User-agent: *\nAllow: /"),
+            'thuonghieucongluan.com.vn/news-tag250094/gia-sau-rieng-hom-nay/trang-1' => Http::response($listing),
+            'thuonghieucongluan.com.vn/news-tag*' => Http::response('<div>trống</div>'),
+            'thuonghieucongluan.com.vn/gia-sau-rieng-hom-nay-27-6-*' => Http::response($this->fixture('thcl-sau-rieng-2025-06-27.html')),
+        ]);
+
+        $this->artisan('crawl:backfill', ['sources' => ['thcl-sau-rieng'], '--from' => '2025-06', '--to' => '2025-06'])
+            ->expectsOutputToContain('1 bài,   0 đã có, lưu   29 giá, 0 lỗi')
+            ->assertSuccessful();
+
+        $this->assertSame(76500, $this->price('sau-rieng-thai', 'dbscl', '2025-06-27'));
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'a253194'));
     }
 
     /**

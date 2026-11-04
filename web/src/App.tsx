@@ -19,6 +19,7 @@ const TradeRoutes = lazy(() => import('./pages/trade/TradeRoutes'))
 const BusinessPage = lazy(() => import('./pages/business/BusinessPage'))
 const OfferRoutes = lazy(() => import('./pages/offers/OfferRoutes'))
 const IotRoutes = lazy(() => import('./pages/iot/IotRoutes'))
+const ArticleRoutes = lazy(() => import('./pages/articles/ArticleRoutes'))
 
 export default function App() {
   const { path, query } = useRoute()
@@ -38,7 +39,9 @@ export default function App() {
           ? 'deals'
           : path[0] === 'tai-khoan' || path[0] === 'diem-mua'
             ? 'account'
-            : 'prices'
+            : path[0] === 'bai-viet'
+              ? 'articles'
+              : 'prices'
 
   return (
     <>
@@ -65,6 +68,12 @@ export default function App() {
               🤝{awaiting > 0 && <span className="nav-badge">{awaiting}</span>}
             </span>
             <span className="nav-label">Đơn</span>
+          </a>
+          <a href={href('bai-viet')} aria-current={section === 'articles' ? 'page' : undefined}>
+            <span className="nav-icon" aria-hidden>
+              📰
+            </span>
+            <span className="nav-label">Bài viết</span>
           </a>
           <a href={href('diem-ban')} aria-current={section === 'shops' ? 'page' : undefined}>
             <span className="nav-icon" aria-hidden>
@@ -106,6 +115,10 @@ export default function App() {
         ) : path[0] === 'cam-bien' ? (
           <Suspense fallback={<p className="muted center">Đang tải…</p>}>
             <IotRoutes path={path} query={query} />
+          </Suspense>
+        ) : path[0] === 'bai-viet' ? (
+          <Suspense fallback={<p className="muted center">Đang tải…</p>}>
+            <ArticleRoutes path={path} query={query} />
           </Suspense>
         ) : path[0] === 'gia-quanh-toi' ? (
           <LocalPrices query={query} />

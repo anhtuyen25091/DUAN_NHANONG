@@ -11,6 +11,62 @@ File này ghi lại các việc đã làm theo từng ngày. Mục mới nhất 
 
 ---
 
+## 04/11/2026: Thư viện ảnh & file
+
+**Đã làm**
+- Bảng `media_files` (file trên ổ public) và `media_usages` (file dùng ở đâu). Lớp `App\Media\MediaLibrary` ghi nhận file, quét ổ, tính chỗ dùng; bài viết tự cập nhật khi lưu / xóa.
+- Admin → Nội dung → Thư viện ảnh & file: lưới ảnh thu nhỏ, tải lên nhiều file, lọc theo thư mục / loại / đang dùng, link công khai, xem bài đang dùng, xóa file chưa dùng (cả xóa hàng loạt), nút Quét lại.
+- Soạn bài: nút "Chèn ảnh từ thư viện" (plugin RichEditor) và "Chọn từ thư viện" cho ảnh bìa; chặn data-id ảnh trỏ tới file ngoài thư viện.
+- Lệnh `php artisan media:sync`.
+
+**Kiểm tra**
+- `MediaLibraryTest` 6 test; toàn bộ backend 243/243.
+- Chạy thật trên Chrome: tải 2 ảnh, chèn 1 ảnh vào bài, chọn ảnh bìa từ thư viện, lưu; web hiện đúng cả 2 ảnh qua IP LAN. Đã dọn dữ liệu thử.
+
+**Còn tồn**
+- Mở admin qua IP LAN mà `APP_URL=localhost` thì ô Ảnh bìa không tải được ảnh xem trước (lỗi cấu hình máy dev, có từ trước).
+- Sao chép link bằng nút chỉ chạy trên HTTPS / localhost; qua HTTP LAN thì bôi đen ô link để chép.
+
+---
+
+## 04/11/2026: Mục "Bài viết" (admin soạn, web hiện theo danh mục); lấy bù giá 16/10–04/11; sửa thu thập giá sầu riêng
+
+**Đã làm**
+- **Bài viết** (bảng `article_categories`, `articles`, `article_product`):
+  - `/admin` → Nội dung:
+    - "Bài viết": RichEditor có chèn ảnh, ảnh bìa, tóm tắt, danh mục, mặt hàng liên quan, nháp / đăng / hẹn giờ, nổi bật, nguồn; nút "Xem trên web" (`WEB_URL`)
+    - "Danh mục bài viết": 8 danh mục mặc định
+  - API công khai `/api/v1/article-categories`, `/articles`, `/articles/{slug}`:
+    - nội dung lọc XSS bằng `RichContentRenderer::toHtml()`
+    - đếm lượt xem
+    - link ảnh theo đúng tên miền người dùng đang gọi (điện thoại trong mạng LAN không mở được `localhost`)
+  - Web `#/bai-viet`:
+    - danh mục dạng nút cuộn ngang, tìm kiếm, bài nổi bật, "Xem thêm"
+    - trang đọc bài, bài cùng chủ đề
+    - menu thêm mục thứ 6 "📰 Bài viết" (chỉnh CSS thanh dưới đáy cho màn 360px)
+    - thẻ trên Bảng giá và trang mặt hàng
+  - Vite proxy thêm `/storage`; `/api` giữ Host gốc (`changeOrigin: false`).
+  - 4 bài mẫu: `ArticleDemoSeeder`.
+- **Lấy bù giá 16/10 → 04/11:**
+  - `crawl:run` từng ngày + `crawl:backfill` tháng 10–11
+  - cà phê, tiêu, lúa gạo đủ các ngày có bài; sầu riêng đủ 16/10–04/11
+- **Sửa thu thập giá sầu riêng:** thuonghieucongluan.com.vn đổi giao diện:
+  - các tag cũ không còn gắn bài mới, nên thêm tag `news-tag250094` vào cấu hình nguồn (DB + seeder)
+  - danh sách bài chỉ ghi "06:20 16/10" (không có năm): `BackfillRunner` đọc kiểu ngày này, năm lấy lần gần nhất không sau hôm nay
+
+**Kiểm tra**
+- Backend 237/237 (thêm `ArticleApiTest` 7 test, 1 test backfill), thư viện chung 155/155, `npm run typecheck` sạch, web lint chỉ còn cảnh báo cũ ở `PriceBoard.tsx`.
+- Chrome tự động (Playwright):
+  - danh sách / đọc bài ở 390px, 360px, 1280px không tràn ngang
+  - đăng nhập admin, tạo bài có ảnh bìa: ảnh hiện trên web qua `192.168.1.7:5174` (bài thử đã xóa)
+
+**Còn tồn**
+- App mobile chưa có mục Bài viết (API đã sẵn).
+- Vite trên ổ `/Volumes/MacOS` không tự nhận file sửa, phải chạy lại `npx vite`.
+- 2 giá crawl đang "Cần duyệt" do so với giá cũ gần 1 năm (sầu riêng Ri6 Lâm Đồng, tiêu Tây Nguyên): nên giới hạn tuổi giá đem so.
+
+---
+
 ## 03/11/2026: Ảnh vệ tinh khi chọn vị trí vườn; tiêu đề màn thời tiết luôn có tên trang trại
 
 **Đã làm**
